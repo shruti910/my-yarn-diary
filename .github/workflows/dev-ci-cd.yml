@@ -17,7 +17,7 @@ jobs:
       infra: ${{ steps.filter.outputs.infra }}
     steps:
       - name: Checkout Codebase
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Run Path Differential Filter
         id: filter
@@ -32,7 +32,6 @@ jobs:
               - '.github/workflows/**'
 
   # JOB 2: Validate Infrastructure & Docker Composites
-  # Triggers if docker-compose changes OR if any core code block builds successfully
   infra-validation:
     name: Infrastructure Config Verification
     needs: path-filter
@@ -44,14 +43,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Codebase
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Validate Docker Compose Configuration Syntax
         run: |
           # Dry-runs and parses your yaml orchestration settings to verify network/volume bindings
           docker compose config
 
-  #  JOB 3: Test and Compile Java Microservices (Skips Gateway)
+  # JOB 3: Test and Compile Java Microservices (Skips Gateway)
   java-backend-validation:
     name: Java Services Build
     needs: path-filter
@@ -59,10 +58,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Codebase
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v4.4.0
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -81,10 +80,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Codebase
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Set up Node.js for Gateway
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v4.2.0
         with:
           node-version: '20'
           cache: 'npm'
@@ -108,10 +107,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Codebase
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Set up Node.js for Frontend
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v4.2.0
         with:
           node-version: '20'
           cache: 'npm'
