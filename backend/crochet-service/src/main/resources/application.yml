@@ -1,0 +1,42 @@
+spring:
+  profiles:
+    active: local
+  jpa:
+    open-in-view: false
+    show-sql: true
+    hibernate:
+      ddl-auto: none
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+logging:
+  pattern:
+    console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+logging:
+  include-application-name: true
+  structured:
+    format:
+      console: logstash # Automatically bundles active traceId and spanId fields into every log line
+management:
+  tracing:
+    sampling:
+      probability: 1.0 # Trace 100% of requests for development and monitoring purposes
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,prometheus"
+  endpoint:
+    health:
+      show-details: always

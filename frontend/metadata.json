@@ -1,0 +1,10 @@
+{
+  "name": "crochet.ai",
+  "description": "An AI-enabled multimodal companion and journal tracking ecosystem for crochet crafters.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
