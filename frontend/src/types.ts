@@ -62,10 +62,13 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+export type ChatCategory = 'crochet-buddy' | 'pattern-decoder' | 'reverse-engineer' | 'image-generator' | 'crochet-tutor';
+
 export interface ChatSession {
   chatId: string;
   userId: string;
   title: string;
+  category?: ChatCategory;
   messages: ChatMessage[];
   createdAt: string;
 }

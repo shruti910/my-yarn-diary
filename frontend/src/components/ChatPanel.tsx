@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Image, Plus, Trash2, ArrowRight, MessageSquare, Compass, AlertCircle } from 'lucide-react';
+import { Send, Image, Plus, Trash2, ArrowRight, MessageSquare, Compass, AlertCircle, Camera, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
-import { ChatSession, ChatMessage } from '../types';
+import { ChatSession, ChatMessage, ChatCategory } from '../types';
 import { useDialog } from './DialogProvider';
 
 interface ChatPanelProps {
   token: string;
+  category: ChatCategory;
 }
 
-export function ChatPanel({ token }: ChatPanelProps) {
+export function ChatPanel({ token, category }: ChatPanelProps) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [input, setInput] = useState('');
@@ -17,10 +18,17 @@ export function ChatPanel({ token }: ChatPanelProps) {
   const { showConfirm } = useDialog();
   const [error, setError] = useState<string | null>(null);
 
-  // In-chat image attachments
-  const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
-  const [attachmentBase64, setAttachmentBase64] = useState<string | null>(null);
-  const [attachmentMime, setAttachmentMime] = useState<string>('');
+  // In-chat image attachments (multiple, up to 3)
+  interface ImageAttachment {
+    preview: string;
+    base64: string;
+    mime: string;
+  }
+  const [attachments, setAttachments] = useState<ImageAttachment[]>([]);
+  const [cameraActive, setCameraActive] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // Custom creation modal to bypass iframe prompt sandbox restrictions
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -39,6 +47,9 @@ export function ChatPanel({ token }: ChatPanelProps) {
     try {
       const response = await fetch(url, { ...options, headers });
       if (!response.ok) {
+        if (response.status === 401) {
+          window.dispatchEvent(new Event('unauthorized'));
+        }
         console.group('%c[Network API Error Interceptor]', 'color: #ef4444; font-weight: bold;');
         console.error(`[URI]: ${url}`);
         console.error(`[Status Code]: ${response.status} (${response.statusText || 'Status Unknown'})`);
@@ -60,8 +71,9 @@ export function ChatPanel({ token }: ChatPanelProps) {
         // Handle sorting
         const list = (data as ChatSession[]).sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
         setSessions(list);
-        if (list.length > 0 && !activeChatId) {
-          setActiveChatId(list[0].chatId);
+        const filtered = list.filter(sess => (sess.category || 'crochet-buddy') === category);
+        if (filtered.length > 0 && (!activeChatId || !filtered.some(s => s.chatId === activeChatId))) {
+          setActiveChatId(filtered[0].chatId);
         }
       }
     } catch (err) {
@@ -72,7 +84,82 @@ export function ChatPanel({ token }: ChatPanelProps) {
   useEffect(() => {
     if (!token) return;
     loadSessions();
-  }, [token]);
+  }, [token, category]);
+
+  const filteredSessions = sessions.filter(s => (s.category || 'crochet-buddy') === category);
+
+  useEffect(() => {
+    if (filteredSessions.length > 0) {
+      if (!activeChatId || !filteredSessions.some(s => s.chatId === activeChatId)) {
+        setActiveChatId(filteredSessions[0].chatId);
+      }
+    } else {
+      setActiveChatId(null);
+    }
+  }, [category, sessions]);
+
+  const getIntroDetails = () => {
+    switch (category) {
+      case 'pattern-decoder':
+        return {
+          emoji: '🔍',
+          title: 'Welcome to Pattern Decoder!',
+          desc: 'Upload an image of a pattern chart, diagram, or written shorthand to decode it into full instructions.',
+          placeholder: "Ask pattern decoder... 'Translate this shorthand pattern row...'",
+          suggestions: [
+            { text: 'Decode shorthand pattern', input: 'Can you explain how to work this row?' },
+            { text: 'Analyze stitch chart symbol', input: 'What does the stitch symbol in row 3 mean?' }
+          ]
+        };
+      case 'reverse-engineer':
+        return {
+          emoji: '📐',
+          title: 'Welcome to Visual Reverse-Engineer!',
+          desc: 'Upload a clear photo of any finished item or swatch to estimate stitches, hook size, and recreate it.',
+          placeholder: "Ask reverse-engineer... 'What stitch is used in this granny square?'",
+          suggestions: [
+            { text: 'Reverse engineer texture', input: 'What stitches are used to achieve this texture?' },
+            { text: 'Estimate hook size', input: 'What hook size and yarn weight does this look like?' }
+          ]
+        };
+      case 'image-generator':
+        return {
+          emoji: '🎨',
+          title: 'Welcome to Image Generator!',
+          desc: 'Describe any crochet design or project you want to visualize, and AI will generate it for you.',
+          placeholder: "Describe the image you want... 'A pastel rainbow zig-zag baby blanket...'",
+          suggestions: [
+            { text: 'Visualize pastel baby blanket', input: 'Generate a concept photo for a pastel color zig-zag baby blanket' },
+            { text: 'Design amigurumi frog concept', input: 'Generate a concept photo for a cute amigurumi frog sitting on a lilypad' }
+          ]
+        };
+      case 'crochet-tutor':
+        return {
+          emoji: '🎓',
+          title: 'Welcome to AI Crochet Tutor!',
+          desc: 'Learn crochet stitches, terminology (US/UK differences), and troubleshoot structural mistakes.',
+          placeholder: "Ask crochet tutor... 'How do I hold the crochet hook for best tension?'",
+          suggestions: [
+            { text: 'Explain double crochet', input: 'How do I do a double crochet (US terms)?' },
+            { text: 'UK vs US terminology chart', input: 'Can you show me a comparison chart of UK and US crochet terms?' }
+          ]
+        };
+      default:
+        return {
+          emoji: '🧶',
+          title: 'Welcome to AI Crochet Buddy!',
+          desc: 'Ask me anything: customized row instructions, yarn color matchers, calculations, or stitch directions. Attach images to ask visual pattern queries!',
+          placeholder: "Ask your crochet buddy... 'Write a beginner pattern for a mushroom bag...'",
+          suggestions: [
+            { text: '🪄 Craft Magic Ring', input: 'How do I crochet a simple magic ring?' },
+            { text: '🌎 Terminology Conversion', input: 'Convert a UK Triple Crochet loop pattern to US stitch terminology' },
+            { text: '🧸 Amigurumi Increases', input: 'Explain how to increase rows in Amigurumi rounds' }
+          ]
+        };
+    }
+  };
+
+  const intro = getIntroDetails();
 
   // Scroll to bottom
   const scrollToBottom = () => {
@@ -86,7 +173,14 @@ export function ChatPanel({ token }: ChatPanelProps) {
   }, [activeChat?.messages]);
 
   const handleCreateChat = () => {
-    setNewChatTitle('Pattern Customizer');
+    let defaultTitle = 'Pattern Customizer';
+    if (category === 'crochet-buddy') defaultTitle = 'Crochet Buddy Thread';
+    else if (category === 'pattern-decoder') defaultTitle = 'Pattern Decoder Thread';
+    else if (category === 'reverse-engineer') defaultTitle = 'Reverse Engineer Thread';
+    else if (category === 'image-generator') defaultTitle = 'Image Generator Thread';
+    else if (category === 'crochet-tutor') defaultTitle = 'Crochet Tutor Thread';
+
+    setNewChatTitle(defaultTitle);
     setIsCreateModalOpen(true);
   };
 
@@ -96,7 +190,10 @@ export function ChatPanel({ token }: ChatPanelProps) {
 
       const res = await fetchWithToken('/api/v1/chats', {
         method: 'POST',
-        body: JSON.stringify({ title: newChatTitle.trim() })
+        body: JSON.stringify({
+          title: newChatTitle.trim(),
+          category: category
+        })
       });
 
       if (res) {
@@ -127,26 +224,86 @@ export function ChatPanel({ token }: ChatPanelProps) {
   };
 
   const handleAttachment = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setAttachmentMime(file.type);
-      const reader = new FileReader();
-      reader.onload = () => {
-        setAttachmentPreview(reader.result as string);
-        setAttachmentBase64((reader.result as string).split(',')[1]);
-      };
-      reader.readAsDataURL(file);
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      if (attachments.length + files.length > 3) {
+        setError('You can attach up to 3 photos per message.');
+        return;
+      }
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const preview = reader.result as string;
+          const base64 = preview.split(',')[1];
+          setAttachments(prev => [...prev, { preview, base64, mime: file.type }]);
+        };
+        reader.readAsDataURL(file);
+      });
     }
   };
 
-  const clearAttachment = () => {
-    setAttachmentPreview(null);
-    setAttachmentBase64(null);
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const clearAttachments = () => {
+    setAttachments([]);
+  };
+
+  const startCamera = async () => {
+    setError(null);
+    try {
+      setCameraActive(true);
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Camera access failed. Please check browser permissions.');
+      setCameraActive(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setCameraActive(false);
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const dataUrl = canvas.toDataURL('image/jpeg');
+        const preview = dataUrl;
+        const base64 = dataUrl.split(',')[1];
+
+        if (attachments.length >= 3) {
+          setError('You can attach up to 3 photos per message.');
+          stopCamera();
+          return;
+        }
+
+        setAttachments(prev => [...prev, { preview, base64, mime: 'image/jpeg' }]);
+        stopCamera();
+      }
+    }
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() && !attachmentBase64) return;
+    if (!input.trim() && attachments.length === 0) return;
     if (!activeChatId) return;
 
     const userText = input;
@@ -154,34 +311,35 @@ export function ChatPanel({ token }: ChatPanelProps) {
     setLoading(true);
     setError(null);
 
-    // Dynamic random ID matching chat specifications
+    // Join multiple image previews with |||
+    const joinedPreviews = attachments.map(a => a.preview).join('|||');
+
     const randomId = 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(4);
     const userMsg: ChatMessage = {
       id: randomId,
       role: 'user',
       text: userText || '(Attached Image)',
-      imageData: attachmentPreview || undefined,
+      imageData: joinedPreviews || undefined,
       createdAt: new Date().toISOString()
     };
 
-    // Keep temporary copies
-    const attPreview = attachmentPreview;
+    // Keep temporary copy for the fetch payload
+    const payloadImages = attachments.map(a => a.preview).join('|||');
 
-    // Instantly append locally to make messaging layout snappy
+    // Instantly append locally
     setSessions(prev => prev.map(s => {
       if (s.chatId === activeChatId) {
-        return {
-          ...s,
-          messages: [...(s.messages || []), userMsg]
-        };
+         return {
+           ...s,
+           messages: [...(s.messages || []), userMsg]
+         };
       }
       return s;
     }));
 
-    clearAttachment();
+    clearAttachments();
 
     try {
-      // Send chat message and request reply through backend microservices
       const res = await fetch(`/api/v1/chats/${activeChatId}/messages`, {
         method: 'POST',
         headers: {
@@ -190,12 +348,15 @@ export function ChatPanel({ token }: ChatPanelProps) {
         },
         body: JSON.stringify({
           text: userText.trim() || 'Analyze this image',
-          imageData: attPreview || ''
+          imageData: payloadImages || ''
         })
       });
 
       const data = await res.json();
       if (!res.ok) {
+        if (res.status === 401) {
+          window.dispatchEvent(new Event('unauthorized'));
+        }
         throw new Error(data.error || 'Interaction error with Gemini API.');
       }
 
@@ -250,7 +411,7 @@ export function ChatPanel({ token }: ChatPanelProps) {
 
         {/* Scroll list */}
         <div className="flex-1 overflow-y-auto p-3 space-y-1.5 scrollbar-thin">
-          {sessions.length === 0 ? (
+          {filteredSessions.length === 0 ? (
             <div className="text-center py-12 px-4 text-[#A89F94]">
               <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50 text-[#F5CAC3]" />
               <p className="text-xs font-bold uppercase tracking-wider">No Conversational Threads</p>
@@ -262,7 +423,7 @@ export function ChatPanel({ token }: ChatPanelProps) {
               </button>
             </div>
           ) : (
-            sessions.map((sess) => {
+            filteredSessions.map((sess) => {
               const isActive = sess.chatId === activeChatId;
               return (
                 <div
@@ -294,13 +455,10 @@ export function ChatPanel({ token }: ChatPanelProps) {
       <div className="flex-1 bg-[#FDFBF7] flex flex-col h-full relative">
         {activeChat ? (
           <>
-            {/* Thread top bar header */}
             <div className="px-6 py-4 border-b border-[#E8E2D9] bg-white flex justify-between items-center shadow-xs z-10 shrink-0">
               <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 bg-[#84A59D] rounded-full animate-pulse" />
                 <h3 className="font-serif font-extrabold text-[#2D231B] text-sm">{activeChat.title}</h3>
               </div>
-              <span className="text-[10px] uppercase font-bold tracking-widest text-[#84A59D] bg-[#84A59D]/10 border border-[#84A59D]/20 px-2 py-0.5 rounded-md">Crochet Buddy online</span>
             </div>
 
             {/* Scroll Bubbles Area */}
@@ -308,16 +466,22 @@ export function ChatPanel({ token }: ChatPanelProps) {
               {activeChat.messages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center p-8 max-w-sm mx-auto text-center space-y-4">
                   <div className="w-16 h-16 bg-[#F28482]/10 rounded-2xl flex items-center justify-center text-3xl border border-[#F28482]/20 shadow-inner">
-                    🧶
+                    {intro.emoji}
                   </div>
                   <div>
-                    <h4 className="font-serif font-extrabold text-[#2D231B] text-base">Welcome to Crochet.ai Tutor!</h4>
-                    <p className="text-xs text-[#7C7167] font-semibold mt-1">Ask me anything: customized row instructions, yarn color matchers, calculations, or stitch directions. Attach images to ask visual pattern queries!</p>
+                    <h4 className="font-serif font-extrabold text-[#2D231B] text-base">{intro.title}</h4>
+                    <p className="text-xs text-[#7C7167] font-semibold mt-1">{intro.desc}</p>
                   </div>
                   <div className="flex flex-wrap gap-2 justify-center pt-2">
-                    <button onClick={() => setInput('How do I crochet a simple magic ring?')} className="px-3 py-1.5 bg-white border border-[#E8E2D9] text-[10px] font-bold text-[#7C7167] rounded-full hover:border-[#F28482] hover:text-[#F28482] transition-all cursor-pointer">🪄 Craft Magic Ring</button>
-                    <button onClick={() => setInput('Convert a UK Triple Crochet loop pattern to US stitch terminology')} className="px-3 py-1.5 bg-white border border-[#E8E2D9] text-[10px] font-bold text-[#7C7167] rounded-full hover:border-[#F28482] hover:text-[#F28482] transition-all cursor-pointer">🌎 Terminology Conversion</button>
-                    <button onClick={() => setInput('Explain how to increase rows in Amigurumi rounds')} className="px-3 py-1.5 bg-white border border-[#E8E2D9] text-[10px] font-bold text-[#7C7167] rounded-full hover:border-[#F28482] hover:text-[#F28482] transition-all cursor-pointer">🧸 Amigurumi Increases</button>
+                    {intro.suggestions.map((sug, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setInput(sug.input)}
+                        className="px-3 py-1.5 bg-white border border-[#E8E2D9] text-[10px] font-bold text-[#7C7167] rounded-full hover:border-[#F28482] hover:text-[#F28482] transition-all cursor-pointer"
+                      >
+                        {sug.text}
+                      </button>
+                    ))}
                   </div>
                 </div>
               ) : (
@@ -342,11 +506,16 @@ export function ChatPanel({ token }: ChatPanelProps) {
                           : 'bg-white text-[#2D231B] rounded-tl-none border border-[#E8E2D9]'
                           }`}>
                           {msg.imageData && (
-                            <img
-                              src={msg.imageData}
-                              alt="Uploaded visual thread"
-                              className="rounded-xl max-h-48 mb-3 object-contain border border-[#E8E2D9] mx-auto"
-                            />
+                            <div className="flex flex-wrap gap-2 mb-3 justify-center">
+                              {msg.imageData.split('|||').map((imgUrl, i) => (
+                                <img
+                                  key={i}
+                                  src={imgUrl}
+                                  alt={`Uploaded visual thread ${i + 1}`}
+                                  className="rounded-xl max-h-48 object-contain border border-[#E8E2D9]"
+                                />
+                              ))}
+                            </div>
                           )}
 
                           {isUser ? (
@@ -395,19 +564,60 @@ export function ChatPanel({ token }: ChatPanelProps) {
             <form onSubmit={handleSendMessage} className="p-4 border-t border-[#E8E2D9] bg-white bg-opacity-85 backdrop-blur-md z-10 shrink-0">
 
               {/* Attachment Previews */}
-              {attachmentPreview && (
-                <div className="mb-3 p-2 bg-[#FDFCFB] border border-[#E8E2D9] rounded-xl flex items-center justify-between w-max gap-4 animate-scale-up">
-                  <div className="flex items-center gap-2">
-                    <img src={attachmentPreview} className="w-12 h-12 rounded-lg object-cover border border-[#E8E2D9]" alt="attachment" />
-                    <span className="text-[10px] text-[#7C7167] font-bold font-mono">Image attached</span>
+              {/* Image attachment preview drawer */}
+              {attachments.length > 0 && (
+                <div className="mb-3 p-2.5 bg-[#FDFCFB] border border-[#E8E2D9] rounded-xl flex items-center justify-between w-full gap-4 animate-scale-up">
+                  <div className="flex flex-wrap gap-2.5 items-center">
+                    {attachments.map((att, index) => (
+                      <div key={index} className="relative group w-12 h-12">
+                        <img src={att.preview} className="w-12 h-12 rounded-lg object-cover border border-[#E8E2D9]" alt={`attachment-${index}`} />
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(index)}
+                          className="absolute -top-1.5 -right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 shadow-md flex items-center justify-center cursor-pointer border border-white"
+                        >
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      </div>
+                    ))}
+                    <span className="text-[10px] text-[#7C7167] font-bold font-mono ml-2">
+                      {attachments.length} photo{attachments.length > 1 ? 's' : ''} attached
+                    </span>
                   </div>
                   <button
                     type="button"
-                    onClick={clearAttachment}
-                    className="p-1 hover:bg-[#F9F6F2] text-[#A89F94] hover:text-[#2D231B] rounded font-bold text-xs"
+                    onClick={clearAttachments}
+                    className="p-1 hover:bg-[#E8E2D9]/40 text-[#A89F94] hover:text-[#2D231B] rounded font-bold text-xs cursor-pointer"
                   >
-                    Discard
+                    Discard All
                   </button>
+                </div>
+              )}
+
+              {/* Camera capture screen */}
+              {cameraActive && (
+                <div className="mb-3 p-3 bg-[#F9F6F2] border border-[#E8E2D9] rounded-xl flex flex-col items-center gap-3 shrink-0 animate-fadeIn">
+                  <div className="relative w-full max-w-sm rounded-xl overflow-hidden border border-[#E8E2D9] bg-black aspect-video shadow-inner">
+                    <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
+                    <canvas ref={canvasRef} className="hidden" />
+                  </div>
+                  <div className="flex gap-2.5">
+                    <button
+                      type="button"
+                      onClick={capturePhoto}
+                      className="px-4 py-2 bg-[#F28482] hover:bg-[#F28482]/95 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      Capture Photo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={stopCamera}
+                      className="px-4 py-2 bg-white border border-[#E8E2D9] text-[#7C7167] hover:bg-stone-50 font-bold text-xs rounded-xl cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -419,6 +629,7 @@ export function ChatPanel({ token }: ChatPanelProps) {
                   id="inchat-file"
                   ref={fileInputRef}
                   accept="image/*"
+                  multiple
                   onChange={handleAttachment}
                   className="hidden"
                 />
@@ -431,18 +642,27 @@ export function ChatPanel({ token }: ChatPanelProps) {
                   <Image className="w-4 h-4" />
                 </button>
 
+                <button
+                  type="button"
+                  onClick={cameraActive ? stopCamera : startCamera}
+                  className="p-2 rounded-xl text-[#A89F94] hover:text-[#F28482] hover:bg-[#F28482]/5 transition-colors cursor-pointer"
+                  title="Take photo"
+                >
+                  <Camera className="w-4 h-4" />
+                </button>
+
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask your crochet buddy... 'Write a beginner pattern for a mushroom bag...'"
+                  placeholder={intro.placeholder}
                   disabled={loading}
                   className="flex-1 bg-transparent border-none text-xs text-[#2D231B] focus:outline-none placeholder-[#A89F94] font-semibold"
                 />
 
                 <button
                   type="submit"
-                  disabled={loading || (!input.trim() && !attachmentBase64)}
+                  disabled={loading || (!input.trim() && attachments.length === 0)}
                   className="p-2.5 bg-[#F28482] hover:bg-[#F28482]/85 text-white rounded-xl shadow-md transition-all transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-30 disabled:hover:translate-y-0 text-xs shrink-0 cursor-pointer"
                 >
                   <Send className="w-4 h-4" />
@@ -455,7 +675,13 @@ export function ChatPanel({ token }: ChatPanelProps) {
             <Compass className="w-12 h-12 text-[#F28482]/40 animate-spin" style={{ animationDuration: '20s' }} />
             <div>
               <h3 className="font-serif font-extrabold text-[#2D231B] text-lg">Consultation Board Open</h3>
-              <p className="text-xs text-[#A89F94] mt-1 font-semibold">Please select an existing chat thread on the left pane or start a new customized thread to consult with your AI Companion tutor.</p>
+              <p className="text-xs text-[#A89F94] mt-1 font-semibold">
+                {category === 'crochet-buddy' && 'Your companion for real-time tips, stitch calculations, and material suggestions.'}
+                {category === 'pattern-decoder' && 'Upload or snap photos of patterns and convert them into clear, understandable instructions you can follow.'}
+                {category === 'reverse-engineer' && 'Analyze finished crochet products or swatches to reverse-engineer and generate readable patterns.'}
+                {category === 'image-generator' && 'Generate hyper-detailed concept prompts to visualize designs before stitching.'}
+                {category === 'crochet-tutor' && 'A dedicated AI mentor to answer your questions, resolve doubts, and guide you through complex crochet techniques.'}
+              </p>
             </div>
             <button
               onClick={handleCreateChat}

@@ -32,6 +32,9 @@ export function ProjectGallery({ projects, token }: ProjectGalleryProps) {
             'Authorization': `Bearer ${token}`
           }
         });
+        if (response.status === 401) {
+          window.dispatchEvent(new Event('unauthorized'));
+        }
         if (response.ok) {
           const data = await response.json();
           setGalleryItems(data);

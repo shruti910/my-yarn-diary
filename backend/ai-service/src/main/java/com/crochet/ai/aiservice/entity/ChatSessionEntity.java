@@ -9,6 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import com.crochet.ai.aiservice.dto.ChatCategory;
+
 @Entity
 @Table(name = "chat_sessions")
 @SoftDelete(columnName = "is_deleted")
@@ -33,6 +35,11 @@ public class ChatSessionEntity {
     @NotBlank(message = "Chat topic is required")
     @Column(name = "title", nullable = false, length = 150)
     private String title;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "category", nullable = false, length = 50)
+    @Builder.Default
+    private ChatCategory category = ChatCategory.CROCHET_BUDDY;
 
     @OneToMany(mappedBy = "chatSession", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @OrderBy("createdAt ASC")

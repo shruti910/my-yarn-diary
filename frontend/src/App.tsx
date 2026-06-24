@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { ChatPanel } from './components/ChatPanel';
@@ -21,7 +21,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('crochet_token'));
   const [user, setUser] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'aitools'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'aitools'>('dashboard');
   const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     return localStorage.getItem('crochet_sidebar_collapsed') === 'true';
@@ -139,6 +139,9 @@ export default function App() {
     try {
       const response = await fetch(url, { ...options, headers });
       if (!response.ok) {
+        if (response.status === 401) {
+          window.dispatchEvent(new Event('unauthorized'));
+        }
         let errMsg = `Network API HTTP error ${response.status}: ${response.statusText || 'Response Error'}`;
         try {
           const errData = await response.json();
@@ -231,7 +234,7 @@ export default function App() {
     localStorage.setItem('crochet_user', JSON.stringify(dbUser));
   };
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try {
       await signOut(auth);
     } catch (e) {
@@ -247,7 +250,17 @@ export default function App() {
     setActiveCategoryId('all');
     setSelectedProject(null);
     setIsInitialLoading(true);
-  };
+  }, []);
+
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      handleLogout();
+    };
+    window.addEventListener('unauthorized', handleUnauthorized);
+    return () => {
+      window.removeEventListener('unauthorized', handleUnauthorized);
+    };
+  }, [handleLogout]);
 
   // --- CRUD DISPATCH FUNCTIONS ---
 
@@ -505,22 +518,6 @@ export default function App() {
 
             <button
               onClick={() => {
-                setActiveTab('chat');
-                setSelectedProject(null);
-                setIsSidebarCollapsed(true);
-                localStorage.setItem('crochet_sidebar_collapsed', 'true');
-              }}
-              className={`px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer ${activeTab === 'chat'
-                ? 'bg-vibrant-coral text-white shadow-sm'
-                : 'text-vibrant-muted hover:bg-vibrant-coral/5 hover:text-vibrant-dark'
-                }`}
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>Crochet Buddy</span>
-            </button>
-
-            <button
-              onClick={() => {
                 setActiveTab('aitools');
                 setSelectedProject(null);
                 setIsSidebarCollapsed(true);
@@ -576,12 +573,6 @@ export default function App() {
                     />
                   </ErrorBoundary>
                 )
-              )}
-
-              {activeTab === 'chat' && (
-                <ErrorBoundary>
-                  <ChatPanel token={token} />
-                </ErrorBoundary>
               )}
 
               {activeTab === 'aitools' && (

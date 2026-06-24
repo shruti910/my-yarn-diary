@@ -104,6 +104,9 @@ export function ProjectDetail({ project, categories, token, onBack, onUpdateProj
     try {
       const response = await fetch(url, { ...options, headers });
       if (!response.ok) {
+        if (response.status === 401) {
+          window.dispatchEvent(new Event('unauthorized'));
+        }
         let errMsg = `Network API HTTP error ${response.status}: ${response.statusText || 'Response Error'}`;
         try {
           const errData = await response.json();
