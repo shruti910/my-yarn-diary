@@ -1,10 +1,10 @@
-# 🧶 crochet.ai — AI-Powered Crochet Companion
+# 🧶 My Yarn Diary — AI-Powered Crochet Companion
 
 An enterprise-grade, multi-service, AI-powered platform for crochet project tracking, pattern decoding, reverse engineering, and community galleries. Built with a modern microservices architecture, secure edge ingress, isolated datastores, and distributed tracing.
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 The platform is designed as a distributed microservice system packaged in Docker containers and secured behind an Edge Ingress Gateway.
 
@@ -31,7 +31,7 @@ graph TD
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 | Layer | Technologies & Frameworks |
 |---|---|
@@ -44,7 +44,7 @@ graph TD
 
 ---
 
-## 🔐 Security & Authentication Flow
+## Security & Authentication Flow
 
 1. **Perimeter Authentication**: The client logs in using Firebase Authentication and obtains a JWT ID Token.
 2. **Token Verification**: Every request to `/api/v1/*` must pass through the Ingress Gateway, which verifies the JWT token's signature, expiration, and issuer using the Firebase Admin SDK.
@@ -58,7 +58,7 @@ graph TD
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```
 ├── backend
@@ -74,7 +74,7 @@ graph TD
 
 ---
 
-## 🚀 Getting Started & Local Setup
+## Getting Started & Local Setup
 
 ### Prerequisites
 * **Docker** & **Docker Compose**
@@ -116,7 +116,7 @@ Open your browser at `http://localhost:5173`.
 
 ---
 
-## 📈 Observability & Diagnostics
+## Observability & Diagnostics
 
 Each Java microservice is instrumented with the **OpenTelemetry (OTLP)** exporter. Traces, spans, and service telemetry logs are exported directly to Grafana Cloud via HTTP Protobuf protocol.
 
