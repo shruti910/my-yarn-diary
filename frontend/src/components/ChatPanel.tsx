@@ -71,10 +71,6 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
         // Handle sorting
         const list = (data as ChatSession[]).sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
         setSessions(list);
-        const filtered = list.filter(sess => (sess.category || 'crochet-buddy') === category);
-        if (filtered.length > 0 && (!activeChatId || !filtered.some(s => s.chatId === activeChatId))) {
-          setActiveChatId(filtered[0].chatId);
-        }
       }
     } catch (err) {
       console.error('Failed loading chat sessions:', err);
@@ -89,14 +85,8 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
   const filteredSessions = sessions.filter(s => (s.category || 'crochet-buddy') === category);
 
   useEffect(() => {
-    if (filteredSessions.length > 0) {
-      if (!activeChatId || !filteredSessions.some(s => s.chatId === activeChatId)) {
-        setActiveChatId(filteredSessions[0].chatId);
-      }
-    } else {
-      setActiveChatId(null);
-    }
-  }, [category, sessions]);
+    setActiveChatId(null);
+  }, [category]);
 
   const getIntroDetails = () => {
     switch (category) {
@@ -304,12 +294,55 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() && attachments.length === 0) return;
-    if (!activeChatId) return;
 
+    let targetChatId = activeChatId;
     const userText = input;
+    const payloadImages = attachments.map(a => a.preview).join('|||');
+
     setInput('');
     setLoading(true);
     setError(null);
+
+    if (!targetChatId) {
+      // Auto-create a new chat thread
+      let defaultTitle = 'New Thread';
+      if (category === 'crochet-buddy') defaultTitle = 'Crochet Buddy Thread';
+      else if (category === 'pattern-decoder') defaultTitle = 'Pattern Decoder Thread';
+      else if (category === 'reverse-engineer') defaultTitle = 'Reverse Engineer Thread';
+      else if (category === 'image-generator') defaultTitle = 'Image Generator Thread';
+      else if (category === 'crochet-tutor') defaultTitle = 'Crochet Tutor Thread';
+
+      const textForTitle = userText.trim();
+      if (textForTitle) {
+        defaultTitle = textForTitle.length > 30 ? textForTitle.substring(0, 30) + '...' : textForTitle;
+      }
+
+      try {
+        const res = await fetchWithToken('/api/v1/chats', {
+          method: 'POST',
+          body: JSON.stringify({
+            title: defaultTitle,
+            category: category
+          })
+        });
+
+        if (res && res.chatId) {
+          // Add this new session to local sessions state
+          setSessions(prev => [res as ChatSession, ...prev]);
+          targetChatId = res.chatId;
+          setActiveChatId(res.chatId);
+        } else {
+          setError('Failed to initialize new conversation thread.');
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        console.error('Failed to create chat session on-the-fly:', err);
+        setError('Failed to initialize new conversation thread.');
+        setLoading(false);
+        return;
+      }
+    }
 
     // Join multiple image previews with |||
     const joinedPreviews = attachments.map(a => a.preview).join('|||');
@@ -323,12 +356,9 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
       createdAt: new Date().toISOString()
     };
 
-    // Keep temporary copy for the fetch payload
-    const payloadImages = attachments.map(a => a.preview).join('|||');
-
     // Instantly append locally
     setSessions(prev => prev.map(s => {
-      if (s.chatId === activeChatId) {
+      if (s.chatId === targetChatId) {
          return {
            ...s,
            messages: [...(s.messages || []), userMsg]
@@ -340,7 +370,7 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
     clearAttachments();
 
     try {
-      const res = await fetch(`/api/v1/chats/${activeChatId}/messages`, {
+      const res = await fetch(`/api/v1/chats/${targetChatId}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -369,7 +399,7 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
       };
 
       setSessions(prev => prev.map(s => {
-        if (s.chatId === activeChatId) {
+        if (s.chatId === targetChatId) {
           // Prevent double append in case background refetch already populated the message
           const hasMessage = s.messages.some(m => m.id === responseMsg.id || (m.role === 'model' && m.text === responseMsg.text));
           if (hasMessage) return s;
@@ -401,7 +431,7 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
         <div className="p-4 border-b border-[#E8E2D9] flex justify-between items-center bg-white">
           <span className="text-[10px] uppercase font-bold tracking-wider text-[#A89F94]">Chat History</span>
           <button
-            onClick={handleCreateChat}
+            onClick={() => setActiveChatId(null)}
             className="p-1.5 rounded bg-[#F28482]/10 hover:bg-[#F28482]/20 text-[#F28482] text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -416,7 +446,7 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
               <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50 text-[#F5CAC3]" />
               <p className="text-xs font-bold uppercase tracking-wider">No Conversational Threads</p>
               <button
-                onClick={handleCreateChat}
+                onClick={() => setActiveChatId(null)}
                 className="text-xs text-[#F28482] font-extrabold underline mt-1 cursor-pointer"
               >
                 Create one now
@@ -453,245 +483,229 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
 
       {/* Main chat history section */}
       <div className="flex-1 bg-[#FDFBF7] flex flex-col h-full relative">
-        {activeChat ? (
-          <>
-            <div className="px-6 py-4 border-b border-[#E8E2D9] bg-white flex justify-between items-center shadow-xs z-10 shrink-0">
-              <div className="flex items-center gap-2">
-                <h3 className="font-serif font-extrabold text-[#2D231B] text-sm">{activeChat.title}</h3>
+        <div className="px-6 py-4 border-b border-[#E8E2D9] bg-white flex justify-between items-center shadow-xs z-10 shrink-0">
+          <div className="flex items-center gap-2">
+            <h3 className="font-serif font-extrabold text-[#2D231B] text-sm">
+              {activeChat ? activeChat.title : (
+                category === 'crochet-buddy' ? 'New Crochet Buddy Thread' :
+                category === 'pattern-decoder' ? 'New Pattern Decoder Thread' :
+                category === 'reverse-engineer' ? 'New Reverse Engineer Thread' :
+                category === 'image-generator' ? 'New Image Generator Thread' :
+                'New Crochet Tutor Thread'
+              )}
+            </h3>
+          </div>
+        </div>
+
+        {/* Scroll Bubbles Area */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin">
+          {!activeChat || activeChat.messages.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center p-8 max-w-sm mx-auto text-center space-y-4">
+              <div className="w-16 h-16 bg-[#F28482]/10 rounded-2xl flex items-center justify-center text-3xl border border-[#F28482]/20 shadow-inner">
+                {intro.emoji}
+              </div>
+              <div>
+                <h4 className="font-serif font-extrabold text-[#2D231B] text-base">{intro.title}</h4>
+                <p className="text-xs text-[#7C7167] font-semibold mt-1">{intro.desc}</p>
+              </div>
+              <div className="flex flex-wrap gap-2 justify-center pt-2">
+                {intro.suggestions.map((sug, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setInput(sug.input)}
+                    className="px-3 py-1.5 bg-white border border-[#E8E2D9] text-[10px] font-bold text-[#7C7167] rounded-full hover:border-[#F28482] hover:text-[#F28482] transition-all cursor-pointer"
+                  >
+                    {sug.text}
+                  </button>
+                ))}
               </div>
             </div>
+          ) : (
+            activeChat.messages.map((msg) => {
+              const isUser = msg.role === 'user';
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex gap-3 max-w-[80%] ${isUser ? 'ml-auto flex-row-reverse' : 'mr-auto'} animate-fade-in`}
+                >
+                  {/* Avatar Bubble */}
+                  {!isUser && (
+                    <div className="w-8 h-8 rounded-xl bg-[#F5CAC3]/20 flex items-center justify-center text-sm border border-[#F5CAC3]/45 shadow-xs shrink-0 self-start">
+                      🧶
+                    </div>
+                  )}
 
-            {/* Scroll Bubbles Area */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin">
-              {activeChat.messages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center p-8 max-w-sm mx-auto text-center space-y-4">
-                  <div className="w-16 h-16 bg-[#F28482]/10 rounded-2xl flex items-center justify-center text-3xl border border-[#F28482]/20 shadow-inner">
-                    {intro.emoji}
-                  </div>
-                  <div>
-                    <h4 className="font-serif font-extrabold text-[#2D231B] text-base">{intro.title}</h4>
-                    <p className="text-xs text-[#7C7167] font-semibold mt-1">{intro.desc}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2 justify-center pt-2">
-                    {intro.suggestions.map((sug, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setInput(sug.input)}
-                        className="px-3 py-1.5 bg-white border border-[#E8E2D9] text-[10px] font-bold text-[#7C7167] rounded-full hover:border-[#F28482] hover:text-[#F28482] transition-all cursor-pointer"
-                      >
-                        {sug.text}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                activeChat.messages.map((msg) => {
-                  const isUser = msg.role === 'user';
-                  return (
-                    <div
-                      key={msg.id}
-                      className={`flex gap-3 max-w-[80%] ${isUser ? 'ml-auto flex-row-reverse' : 'mr-auto'} animate-fade-in`}
-                    >
-                      {/* Avatar Bubble */}
-                      {!isUser && (
-                        <div className="w-8 h-8 rounded-xl bg-[#F5CAC3]/20 flex items-center justify-center text-sm border border-[#F5CAC3]/45 shadow-xs shrink-0 self-start">
-                          🧶
+                  <div className="space-y-1">
+                    {/* Message payload cards */}
+                    <div className={`p-4 rounded-3xl md:p-5 warm-shadow ${isUser
+                      ? 'bg-[#F28482]/10 text-[#2D231B] rounded-tr-none border border-[#F28482]/20'
+                      : 'bg-white text-[#2D231B] rounded-tl-none border border-[#E8E2D9]'
+                      }`}>
+                      {msg.imageData && (
+                        <div className="flex flex-wrap gap-2 mb-3 justify-center">
+                          {msg.imageData.split('|||').map((imgUrl, i) => (
+                            <img
+                              key={i}
+                              src={imgUrl}
+                              alt={`Uploaded visual thread ${i + 1}`}
+                              className="rounded-xl max-h-48 object-contain border border-[#E8E2D9]"
+                            />
+                          ))}
                         </div>
                       )}
 
-                      <div className="space-y-1">
-                        {/* Message payload cards */}
-                        <div className={`p-4 rounded-3xl md:p-5 warm-shadow ${isUser
-                          ? 'bg-[#F28482]/10 text-[#2D231B] rounded-tr-none border border-[#F28482]/20'
-                          : 'bg-white text-[#2D231B] rounded-tl-none border border-[#E8E2D9]'
-                          }`}>
-                          {msg.imageData && (
-                            <div className="flex flex-wrap gap-2 mb-3 justify-center">
-                              {msg.imageData.split('|||').map((imgUrl, i) => (
-                                <img
-                                  key={i}
-                                  src={imgUrl}
-                                  alt={`Uploaded visual thread ${i + 1}`}
-                                  className="rounded-xl max-h-48 object-contain border border-[#E8E2D9]"
-                                />
-                              ))}
-                            </div>
-                          )}
-
-                          {isUser ? (
-                            <p className="text-xs font-semibold whitespace-pre-wrap leading-relaxed">{msg.text}</p>
-                          ) : (
-                            <div className="markdown-body text-xs">
-                              <Markdown>{msg.text}</Markdown>
-                            </div>
-                          )}
+                      {isUser ? (
+                        <p className="text-xs font-semibold whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                      ) : (
+                        <div className="markdown-body text-xs">
+                          <Markdown>{msg.text}</Markdown>
                         </div>
-                        {/* Timestamp helper */}
-                        <span className={`text-[9px] font-mono font-bold text-[#A89F94] block px-1 ${isUser ? 'text-right' : 'text-left'}`}>
-                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
+                      )}
                     </div>
-                  );
-                })
-              )}
-
-              {loading && (
-                <div className="flex gap-3 mr-auto max-w-[80%] animate-fade-in">
-                  <div className="w-8 h-8 rounded-xl bg-[#F5CAC3]/20 flex items-center justify-center text-sm border border-[#F5CAC3]/45 shadow-xs shrink-0 self-start">
-                    🧶
-                  </div>
-                  <div className="bg-white px-5 py-4 rounded-3xl rounded-tl-none border border-[#E8E2D9] warm-shadow flex items-center gap-1.5 self-start">
-                    <span className="w-1.5 h-1.5 bg-[#F28482] rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                    <span className="w-1.5 h-1.5 bg-[#F28482] rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                    <span className="w-1.5 h-1.5 bg-[#F28482] rounded-full animate-bounce"></span>
-                  </div>
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Error notifications */}
-            {error && (
-              <div className="px-6 py-2 bg-red-55 border-t border-b border-red-100 text-xs text-red-700 font-semibold flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-500" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            {/* Input form area */}
-            <form onSubmit={handleSendMessage} className="p-4 border-t border-[#E8E2D9] bg-white bg-opacity-85 backdrop-blur-md z-10 shrink-0">
-
-              {/* Attachment Previews */}
-              {/* Image attachment preview drawer */}
-              {attachments.length > 0 && (
-                <div className="mb-3 p-2.5 bg-[#FDFCFB] border border-[#E8E2D9] rounded-xl flex items-center justify-between w-full gap-4 animate-scale-up">
-                  <div className="flex flex-wrap gap-2.5 items-center">
-                    {attachments.map((att, index) => (
-                      <div key={index} className="relative group w-12 h-12">
-                        <img src={att.preview} className="w-12 h-12 rounded-lg object-cover border border-[#E8E2D9]" alt={`attachment-${index}`} />
-                        <button
-                          type="button"
-                          onClick={() => removeAttachment(index)}
-                          className="absolute -top-1.5 -right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 shadow-md flex items-center justify-center cursor-pointer border border-white"
-                        >
-                          <X className="w-2.5 h-2.5" />
-                        </button>
-                      </div>
-                    ))}
-                    <span className="text-[10px] text-[#7C7167] font-bold font-mono ml-2">
-                      {attachments.length} photo{attachments.length > 1 ? 's' : ''} attached
+                    {/* Timestamp helper */}
+                    <span className={`text-[9px] font-mono font-bold text-[#A89F94] block px-1 ${isUser ? 'text-right' : 'text-left'}`}>
+                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={clearAttachments}
-                    className="p-1 hover:bg-[#E8E2D9]/40 text-[#A89F94] hover:text-[#2D231B] rounded font-bold text-xs cursor-pointer"
-                  >
-                    Discard All
-                  </button>
                 </div>
-              )}
+              );
+            })
+          )}
 
-              {/* Camera capture screen */}
-              {cameraActive && (
-                <div className="mb-3 p-3 bg-[#F9F6F2] border border-[#E8E2D9] rounded-xl flex flex-col items-center gap-3 shrink-0 animate-fadeIn">
-                  <div className="relative w-full max-w-sm rounded-xl overflow-hidden border border-[#E8E2D9] bg-black aspect-video shadow-inner">
-                    <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
-                    <canvas ref={canvasRef} className="hidden" />
-                  </div>
-                  <div className="flex gap-2.5">
-                    <button
-                      type="button"
-                      onClick={capturePhoto}
-                      className="px-4 py-2 bg-[#F28482] hover:bg-[#F28482]/95 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer flex items-center gap-1.5"
-                    >
-                      <Camera className="w-3.5 h-3.5" />
-                      Capture Photo
-                    </button>
-                    <button
-                      type="button"
-                      onClick={stopCamera}
-                      className="px-4 py-2 bg-white border border-[#E8E2D9] text-[#7C7167] hover:bg-stone-50 font-bold text-xs rounded-xl cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2.5 bg-[#FDFCFB] px-4 py-3 border border-[#E8E2D9] focus-within:ring-1 focus-within:ring-[#F28482] focus-within:border-[#F28482] transition-all warm-shadow rounded-2xl">
-
-                {/* Image upload trigger button */}
-                <input
-                  type="file"
-                  id="inchat-file"
-                  ref={fileInputRef}
-                  accept="image/*"
-                  multiple
-                  onChange={handleAttachment}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={triggerAttachment}
-                  className="p-2 rounded-xl text-[#A89F94] hover:text-[#F28482] hover:bg-[#F28482]/5 transition-colors cursor-pointer"
-                  title="Attach image"
-                >
-                  <Image className="w-4 h-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={cameraActive ? stopCamera : startCamera}
-                  className="p-2 rounded-xl text-[#A89F94] hover:text-[#F28482] hover:bg-[#F28482]/5 transition-colors cursor-pointer"
-                  title="Take photo"
-                >
-                  <Camera className="w-4 h-4" />
-                </button>
-
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder={intro.placeholder}
-                  disabled={loading}
-                  className="flex-1 bg-transparent border-none text-xs text-[#2D231B] focus:outline-none placeholder-[#A89F94] font-semibold"
-                />
-
-                <button
-                  type="submit"
-                  disabled={loading || (!input.trim() && attachments.length === 0)}
-                  className="p-2.5 bg-[#F28482] hover:bg-[#F28482]/85 text-white rounded-xl shadow-md transition-all transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-30 disabled:hover:translate-y-0 text-xs shrink-0 cursor-pointer"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
+          {loading && (
+            <div className="flex gap-3 mr-auto max-w-[80%] animate-fade-in">
+              <div className="w-8 h-8 rounded-xl bg-[#F5CAC3]/20 flex items-center justify-center text-sm border border-[#F5CAC3]/45 shadow-xs shrink-0 self-start">
+                🧶
               </div>
-            </form>
-          </>
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center max-w-sm mx-auto space-y-4">
-            <Compass className="w-12 h-12 text-[#F28482]/40 animate-spin" style={{ animationDuration: '20s' }} />
-            <div>
-              <h3 className="font-serif font-extrabold text-[#2D231B] text-lg">Consultation Board Open</h3>
-              <p className="text-xs text-[#A89F94] mt-1 font-semibold">
-                {category === 'crochet-buddy' && 'Your companion for real-time tips, stitch calculations, and material suggestions.'}
-                {category === 'pattern-decoder' && 'Upload or snap photos of patterns and convert them into clear, understandable instructions you can follow.'}
-                {category === 'reverse-engineer' && 'Analyze finished crochet products or swatches to reverse-engineer and generate readable patterns.'}
-                {category === 'image-generator' && 'Generate hyper-detailed concept prompts to visualize designs before stitching.'}
-                {category === 'crochet-tutor' && 'A dedicated AI mentor to answer your questions, resolve doubts, and guide you through complex crochet techniques.'}
-              </p>
+              <div className="bg-white px-5 py-4 rounded-3xl rounded-tl-none border border-[#E8E2D9] warm-shadow flex items-center gap-1.5 self-start">
+                <span className="w-1.5 h-1.5 bg-[#F28482] rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                <span className="w-1.5 h-1.5 bg-[#F28482] rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                <span className="w-1.5 h-1.5 bg-[#F28482] rounded-full animate-bounce"></span>
+              </div>
             </div>
-            <button
-              onClick={handleCreateChat}
-              className="px-5 py-2.5 bg-[#F28482] hover:bg-[#F28482]/85 text-white font-bold rounded-xl text-xs tracking-wide inline-flex items-center gap-1.5 cursor-pointer shadow-md transform hover:-translate-y-0.5"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Spawn Chat Session
-            </button>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Error notifications */}
+        {error && (
+          <div className="px-6 py-2 bg-red-55 border-t border-b border-red-100 text-xs text-red-700 font-semibold flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-500" />
+            <span>{error}</span>
           </div>
         )}
+
+        {/* Input form area */}
+        <form onSubmit={handleSendMessage} className="p-4 border-t border-[#E8E2D9] bg-white bg-opacity-85 backdrop-blur-md z-10 shrink-0">
+
+          {/* Attachment Previews */}
+          {/* Image attachment preview drawer */}
+          {attachments.length > 0 && (
+            <div className="mb-3 p-2.5 bg-[#FDFCFB] border border-[#E8E2D9] rounded-xl flex items-center justify-between w-full gap-4 animate-scale-up">
+              <div className="flex flex-wrap gap-2.5 items-center">
+                {attachments.map((att, index) => (
+                  <div key={index} className="relative group w-12 h-12">
+                    <img src={att.preview} className="w-12 h-12 rounded-lg object-cover border border-[#E8E2D9]" alt={`attachment-${index}`} />
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(index)}
+                      className="absolute -top-1.5 -right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 shadow-md flex items-center justify-center cursor-pointer border border-white"
+                    >
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
+                ))}
+                <span className="text-[10px] text-[#7C7167] font-bold font-mono ml-2">
+                  {attachments.length} photo{attachments.length > 1 ? 's' : ''} attached
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={clearAttachments}
+                className="p-1 hover:bg-[#E8E2D9]/40 text-[#A89F94] hover:text-[#2D231B] rounded font-bold text-xs cursor-pointer"
+              >
+                Discard All
+              </button>
+            </div>
+          )}
+
+          {/* Camera capture screen */}
+          {cameraActive && (
+            <div className="mb-3 p-3 bg-[#F9F6F2] border border-[#E8E2D9] rounded-xl flex flex-col items-center gap-3 shrink-0 animate-fadeIn">
+              <div className="relative w-full max-w-sm rounded-xl overflow-hidden border border-[#E8E2D9] bg-black aspect-video shadow-inner">
+                <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
+                <canvas ref={canvasRef} className="hidden" />
+              </div>
+              <div className="flex gap-2.5">
+                <button
+                  type="button"
+                  onClick={capturePhoto}
+                  className="px-4 py-2 bg-[#F28482] hover:bg-[#F28482]/95 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  Capture Photo
+                </button>
+                <button
+                  type="button"
+                  onClick={stopCamera}
+                  className="px-4 py-2 bg-white border border-[#E8E2D9] text-[#7C7167] hover:bg-stone-50 font-bold text-xs rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2.5 bg-[#FDFCFB] px-4 py-3 border border-[#E8E2D9] focus-within:ring-1 focus-within:ring-[#F28482] focus-within:border-[#F28482] transition-all warm-shadow rounded-2xl">
+
+            {/* Image upload trigger button */}
+            <input
+              type="file"
+              id="inchat-file"
+              ref={fileInputRef}
+              accept="image/*"
+              multiple
+              onChange={handleAttachment}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={triggerAttachment}
+              className="p-2 rounded-xl text-[#A89F94] hover:text-[#F28482] hover:bg-[#F28482]/5 transition-colors cursor-pointer"
+              title="Attach image"
+            >
+              <Image className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={cameraActive ? stopCamera : startCamera}
+              className="p-2 rounded-xl text-[#A89F94] hover:text-[#F28482] hover:bg-[#F28482]/5 transition-colors cursor-pointer"
+              title="Take photo"
+            >
+              <Camera className="w-4 h-4" />
+            </button>
+
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={intro.placeholder}
+              disabled={loading}
+              className="flex-1 bg-transparent border-none text-xs text-[#2D231B] focus:outline-none placeholder-[#A89F94] font-semibold"
+            />
+
+            <button
+              type="submit"
+              disabled={loading || (!input.trim() && attachments.length === 0)}
+              className="p-2.5 bg-[#F28482] hover:bg-[#F28482]/85 text-white rounded-xl shadow-md transition-all transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-30 disabled:hover:translate-y-0 text-xs shrink-0 cursor-pointer"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </div>
+        </form>
       </div>
 
       {/* Visual in-app creation Modal window to circumvent standard sandboxed prompt block rules */}

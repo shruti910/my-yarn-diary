@@ -5,10 +5,11 @@ import { ChatCategory } from '../types';
 
 interface AiToolsProps {
   token: string;
+  initialTab?: ChatCategory;
 }
 
-export function AiTools({ token }: AiToolsProps) {
-  const [activeTab, setActiveTab] = useState<ChatCategory>('crochet-buddy');
+export function AiTools({ token, initialTab }: AiToolsProps) {
+  const [activeTab, setActiveTab] = useState<ChatCategory>(initialTab || 'crochet-buddy');
 
   const tabs = [
     {
