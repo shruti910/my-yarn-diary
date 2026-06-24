@@ -8,11 +8,12 @@ import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { ChatPanel } from './components/ChatPanel';
 import { AiTools } from './components/AiTools';
+import { FloatingAiBuddy } from './components/FloatingAiBuddy';
 import { ProjectDetail } from './components/ProjectDetail';
 import { AuthScreen } from './components/AuthScreen';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { CrochetLoader } from './components/CrochetLoader';
-import { Category, Project, JournalLog, ProjectStatus } from './types';
+import { Category, Project, JournalLog, ProjectStatus, ChatCategory } from './types';
 import { BookOpen, MessageSquare, Sparkles, X, Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth } from './lib/firebase';
@@ -22,6 +23,10 @@ export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('crochet_token'));
   const [user, setUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'aitools'>('dashboard');
+  const [aiToolsInitialTab, setAiToolsInitialTab] = useState<ChatCategory>('crochet-buddy');
+  const [isFloatingBuddyDismissed, setIsFloatingBuddyDismissed] = useState<boolean>(() => {
+    return localStorage.getItem('crochet_floating_buddy_dismissed') === 'true';
+  });
   const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     return localStorage.getItem('crochet_sidebar_collapsed') === 'true';
@@ -33,6 +38,19 @@ export default function App() {
       localStorage.setItem('crochet_sidebar_collapsed', String(nextVal));
       return nextVal;
     });
+  };
+
+  const handleSelectFloatingTool = (category: ChatCategory) => {
+    setAiToolsInitialTab(category);
+    setActiveTab('aitools');
+    setSelectedProject(null);
+    setIsSidebarCollapsed(true);
+    localStorage.setItem('crochet_sidebar_collapsed', 'true');
+  };
+
+  const handleDismissFloatingBuddy = () => {
+    setIsFloatingBuddyDismissed(true);
+    localStorage.setItem('crochet_floating_buddy_dismissed', 'true');
   };
 
   // Storage catalog
@@ -242,6 +260,8 @@ export default function App() {
     }
     localStorage.removeItem('crochet_token');
     localStorage.removeItem('crochet_user');
+    localStorage.removeItem('crochet_floating_buddy_dismissed');
+    setIsFloatingBuddyDismissed(false);
     setToken(null);
     setUser(null);
     setCategories([]);
@@ -444,10 +464,10 @@ export default function App() {
     }
   };
 
-  // Switch category trigger
   const handleSelectCategory = (categoryId: string) => {
     setActiveCategoryId(categoryId);
     setSelectedProject(null);
+    setActiveTab('dashboard');
   };
 
   const liveSelectedProject = selectedProject
@@ -577,7 +597,7 @@ export default function App() {
 
               {activeTab === 'aitools' && (
                 <ErrorBoundary>
-                  <AiTools token={token} />
+                  <AiTools key={aiToolsInitialTab} token={token} initialTab={aiToolsInitialTab} />
                 </ErrorBoundary>
               )}
             </motion.div>
@@ -612,6 +632,13 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {token && activeTab !== 'aitools' && !isFloatingBuddyDismissed && (
+        <FloatingAiBuddy
+          onSelectTool={handleSelectFloatingTool}
+          onDismiss={handleDismissFloatingBuddy}
+        />
+      )}
     </div>
   );
 }
