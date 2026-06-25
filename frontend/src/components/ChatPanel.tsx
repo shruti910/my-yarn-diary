@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Send, Image, Plus, Trash2, ArrowRight, MessageSquare, Compass, AlertCircle, Camera, X } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Send, Image, Plus, Trash2, ArrowRight, MessageSquare, Compass, AlertCircle, Camera, X, Edit2, Check, Pin, PinOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { ChatSession, ChatMessage, ChatCategory } from '../types';
@@ -15,7 +15,7 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const { showConfirm } = useDialog();
+  const { showConfirm, showAlert } = useDialog();
   const [error, setError] = useState<string | null>(null);
 
   // In-chat image attachments (multiple, up to 3)
@@ -33,6 +33,10 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
   // Custom creation modal to bypass iframe prompt sandbox restrictions
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newChatTitle, setNewChatTitle] = useState('Pattern Customizer');
+  const [editingChatId, setEditingChatId] = useState<string | null>(null);
+  const [editChatTitle, setEditChatTitle] = useState('');
+  const [isHeaderEditing, setIsHeaderEditing] = useState(false);
+  const [headerEditTitle, setHeaderEditTitle] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -82,7 +86,17 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
     loadSessions();
   }, [token, category]);
 
-  const filteredSessions = sessions.filter(s => (s.category || 'crochet-buddy') === category);
+  const filteredSessions = useMemo(() => {
+    const filtered = sessions.filter(s => (s.category || 'crochet-buddy') === category);
+    return [...filtered].sort((a, b) => {
+      const aPinned = a.pinned ? 1 : 0;
+      const bPinned = b.pinned ? 1 : 0;
+      if (aPinned !== bPinned) {
+        return bPinned - aPinned;
+      }
+      return new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime();
+    });
+  }, [sessions, category]);
 
   useEffect(() => {
     setActiveChatId(null);
@@ -174,14 +188,44 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
     setIsCreateModalOpen(true);
   };
 
-  const submitCreateChat = async () => {
-    try {
-      if (!newChatTitle.trim()) return;
+  const capitalizeWords = (str: string): string => {
+    if (!str) return '';
+    return str
+      .trim()
+      .split(/\s+/)
+      .map(word => {
+        const match = word.match(/\p{L}/u);
+        if (match && match.index !== undefined) {
+          const index = match.index;
+          return word.slice(0, index) + word[index].toUpperCase() + word.slice(index + 1);
+        }
+        return word.charAt(0).toUpperCase() + word.slice(1);
+      })
+      .join(' ');
+  };
 
+  const isValidName = (str: string): boolean => {
+    return /^[ \p{L}\p{N}\-_()#.]+$/u.test(str) && /[\p{L}\p{N}]/u.test(str);
+  };
+
+  const submitCreateChat = async () => {
+    const trimmed = newChatTitle.trim();
+    if (!trimmed) {
+      await showAlert('Session title cannot be empty.');
+      return;
+    }
+
+    const capitalized = capitalizeWords(trimmed);
+    if (!isValidName(capitalized)) {
+      await showAlert('Session title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, and brackets.');
+      return;
+    }
+
+    try {
       const res = await fetchWithToken('/api/v1/chats', {
         method: 'POST',
         body: JSON.stringify({
-          title: newChatTitle.trim(),
+          title: capitalized,
           category: category
         })
       });
@@ -212,6 +256,115 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
       console.error('Failed to delete chat:', err);
     }
   };
+
+  const startEditingChat = (sess: ChatSession, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingChatId(sess.chatId);
+    setEditChatTitle(sess.title);
+  };
+
+  const saveChatRename = async (sess: ChatSession, e: React.MouseEvent | React.FormEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const trimmed = editChatTitle.trim();
+    if (!trimmed) {
+      await showAlert('Session title cannot be empty.');
+      return;
+    }
+
+    const capitalized = capitalizeWords(trimmed);
+    if (!isValidName(capitalized)) {
+      await showAlert('Session title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, and brackets.');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/v1/chats/${sess.chatId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ title: capitalized })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setSessions(prev => prev.map(s => s.chatId === sess.chatId ? { ...s, title: updated.title } : s));
+        setEditingChatId(null);
+      }
+    } catch (err) {
+      console.error('Failed to rename chat session:', err);
+    }
+  };
+
+  const cancelChatRename = (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation();
+    setEditingChatId(null);
+  };
+
+  const togglePinChat = async (sess: ChatSession, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const currentlyPinned = filteredSessions.filter(s => s.pinned).length;
+    if (!sess.pinned && currentlyPinned >= 3) {
+      await showAlert('You can pin at most 3 chats to the top.');
+      return;
+    }
+
+    try {
+      const nextPinned = !sess.pinned;
+      const res = await fetch(`/api/v1/chats/${sess.chatId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ pinned: nextPinned })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setSessions(prev => prev.map(s => s.chatId === sess.chatId ? { ...s, pinned: updated.pinned } : s));
+      }
+    } catch (err) {
+      console.error('Failed to toggle pin state:', err);
+    }
+  };
+
+  const saveHeaderRename = async (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
+    if (!activeChat) return;
+    const trimmed = headerEditTitle.trim();
+    if (!trimmed) {
+      await showAlert('Session title cannot be empty.');
+      return;
+    }
+
+    const capitalized = capitalizeWords(trimmed);
+    if (!isValidName(capitalized)) {
+      await showAlert('Session title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, and brackets.');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/v1/chats/${activeChat.chatId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ title: capitalized })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setSessions(prev => prev.map(s => s.chatId === activeChat.chatId ? { ...s, title: updated.title } : s));
+        setIsHeaderEditing(false);
+      }
+    } catch (err) {
+      console.error('Failed to rename chat session from header:', err);
+    }
+  };
+
 
   const handleAttachment = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -455,25 +608,88 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
           ) : (
             filteredSessions.map((sess) => {
               const isActive = sess.chatId === activeChatId;
+              const isEditing = sess.chatId === editingChatId;
               return (
                 <div
                   key={sess.chatId}
-                  onClick={() => setActiveChatId(sess.chatId)}
+                  onClick={() => { if (!isEditing) setActiveChatId(sess.chatId); }}
                   className={`group p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${isActive
                     ? 'bg-[#F5CAC3]/15 border-[#F5CAC3]/30 text-[#2D231B] font-bold shadow-xs'
                     : 'bg-transparent border-transparent hover:bg-[#F9F6F2] text-[#7C7167]'
                     }`}
                 >
-                  <div className="flex items-center gap-2.5 truncate w-full">
-                    <MessageSquare className={`w-3.5 h-3.5 ${isActive ? 'text-[#F28482]' : 'text-[#A89F94]'}`} />
-                    <span className="text-xs truncate font-semibold">{sess.title}</span>
+                  <div className="flex items-center gap-2.5 truncate w-full mr-2">
+                    <MessageSquare className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-[#F28482]' : 'text-[#A89F94]'}`} />
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editChatTitle}
+                        onChange={(e) => setEditChatTitle(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveChatRename(sess, e);
+                          if (e.key === 'Escape') cancelChatRename(e);
+                        }}
+                        autoFocus
+                        className="bg-white border border-[#E8E2D9] rounded-lg text-xs p-1 focus:outline-none text-[#2D231B] font-semibold w-full"
+                      />
+                    ) : (
+                      <span className="text-xs truncate font-semibold">{sess.title}</span>
+                    )}
                   </div>
-                  <button
-                    onClick={(e) => handleDeleteChat(sess.chatId, e)}
-                    className="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity text-[#A89F94] hover:text-red-500 hover:bg-red-50"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {sess.pinned && !isEditing && (
+                      <button
+                        onClick={(e) => togglePinChat(sess, e)}
+                        className="p-1 rounded text-[#F28482] bg-[#F28482]/5 group-hover:hidden"
+                        title="Pinned (Click to Unpin)"
+                      >
+                        <Pin className="w-3.5 h-3.5 fill-current" />
+                      </button>
+                    )}
+                    {isEditing ? (
+                      <>
+                        <button
+                          onClick={(e) => saveChatRename(sess, e)}
+                          className="p-1 rounded text-green-600 hover:bg-green-50"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={cancelChatRename}
+                          className="p-1 rounded text-[#A89F94] hover:bg-stone-100"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    ) : (
+                      <div className="hidden group-hover:flex transition-opacity gap-0.5">
+                        <button
+                          onClick={(e) => togglePinChat(sess, e)}
+                          className={`p-1 rounded ${sess.pinned ? 'text-[#F28482] bg-[#F28482]/5' : 'text-[#A89F94] hover:text-[#F28482] hover:bg-[#F28482]/5'}`}
+                          title={sess.pinned ? "Unpin Thread" : "Pin Thread"}
+                        >
+                          <Pin className={`w-3.5 h-3.5 ${sess.pinned ? 'fill-current' : ''}`} />
+                        </button>
+                        <button
+                          onClick={(e) => startEditingChat(sess, e)}
+                          className="p-1 rounded text-[#A89F94] hover:text-[#F28482] hover:bg-[#F28482]/5"
+                          title="Rename Thread"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteChat(sess.chatId, e)}
+                          className="p-1 rounded text-[#A89F94] hover:text-red-500 hover:bg-red-50"
+                          title="Delete Thread"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })
@@ -484,16 +700,67 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
       {/* Main chat history section */}
       <div className="flex-1 bg-[#FDFBF7] flex flex-col h-full relative">
         <div className="px-6 py-4 border-b border-[#E8E2D9] bg-white flex justify-between items-center shadow-xs z-10 shrink-0">
-          <div className="flex items-center gap-2">
-            <h3 className="font-serif font-extrabold text-[#2D231B] text-sm">
-              {activeChat ? activeChat.title : (
-                category === 'crochet-buddy' ? 'New Crochet Buddy Thread' :
-                category === 'pattern-decoder' ? 'New Pattern Decoder Thread' :
-                category === 'reverse-engineer' ? 'New Reverse Engineer Thread' :
-                category === 'image-generator' ? 'New Image Generator Thread' :
-                'New Crochet Tutor Thread'
-              )}
-            </h3>
+          <div className="flex items-center gap-2 w-full">
+            {activeChat ? (
+              isHeaderEditing ? (
+                <form onSubmit={(e) => { e.preventDefault(); saveHeaderRename(); }} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={headerEditTitle}
+                    onChange={(e) => setHeaderEditTitle(e.target.value)}
+                    className="bg-white border border-[#E8E2D9] rounded-lg text-xs p-1.5 focus:outline-none text-[#2D231B] font-semibold w-64"
+                    autoFocus
+                  />
+                  <button
+                    type="submit"
+                    className="p-1 rounded text-green-600 hover:bg-green-50"
+                    title="Save Title"
+                  >
+                    <Check className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsHeaderEditing(false)}
+                    className="p-1 rounded text-[#A89F94] hover:bg-stone-100"
+                    title="Cancel"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </form>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <h3 className="font-serif font-extrabold text-[#2D231B] text-sm truncate max-w-md">
+                    {activeChat.title}
+                  </h3>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsHeaderEditing(true);
+                      setHeaderEditTitle(activeChat.title);
+                    }}
+                    className="p-1 rounded text-[#A89F94] hover:text-[#F28482] hover:bg-[#F28482]/5"
+                    title="Rename Thread"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={(e) => handleDeleteChat(activeChat.chatId, e)}
+                    className="p-1 rounded text-[#A89F94] hover:text-red-500 hover:bg-red-50"
+                    title="Delete Thread"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )
+            ) : (
+              <h3 className="font-serif font-extrabold text-[#2D231B] text-sm">
+                {category === 'crochet-buddy' ? 'New Crochet Buddy Thread' :
+                 category === 'pattern-decoder' ? 'New Pattern Decoder Thread' :
+                 category === 'reverse-engineer' ? 'New Reverse Engineer Thread' :
+                 category === 'image-generator' ? 'New Image Generator Thread' :
+                 'New Crochet Tutor Thread'}
+              </h3>
+            )}
           </div>
         </div>
 

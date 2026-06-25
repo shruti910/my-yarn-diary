@@ -41,6 +41,10 @@ public class ChatSessionEntity {
     @Builder.Default
     private ChatCategory category = ChatCategory.CROCHET_BUDDY;
 
+    @Column(name = "is_pinned", nullable = false)
+    @Builder.Default
+    private boolean pinned = false;
+
     @OneToMany(mappedBy = "chatSession", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @OrderBy("createdAt ASC")
     @Builder.Default

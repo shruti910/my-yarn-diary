@@ -71,4 +71,5 @@ export interface ChatSession {
   category?: ChatCategory;
   messages: ChatMessage[];
   createdAt: string;
+  pinned?: boolean;
 }
