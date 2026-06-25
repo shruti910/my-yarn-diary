@@ -65,6 +65,7 @@ public class AiService {
 
     @Transactional
     public ChatSessionDto createSession(String userId, ChatCreateRequest request) {
+        validateTitle(request.getTitle());
         ChatSessionEntity session = ChatSessionEntity.builder()
                 .chatId(UUID.randomUUID())
                 .userId(UUID.fromString(userId))
@@ -136,6 +137,39 @@ public class AiService {
         }
         chatSessionRepository.delete(session);
     }
+
+    @Transactional
+    public ChatSessionDto updateSession(String userId, String chatId, ChatUpdateRequest request) {
+        UUID chatUuid = UUID.fromString(chatId);
+        UUID userUuid = UUID.fromString(userId);
+        ChatSessionEntity session = chatSessionRepository.findByChatId(chatUuid)
+                .orElseThrow(() -> new ResourceNotFoundException("Consultation thread not found: " + chatId));
+        if (!session.getUserId().equals(userUuid)) {
+            throw new ForbiddenException("Forbidden session update context");
+        }
+        if (request.title() != null) {
+            validateTitle(request.title());
+            session.setTitle(request.title());
+        }
+        if (request.pinned() != null) {
+            session.setPinned(request.pinned());
+        }
+        ChatSessionEntity saved = chatSessionRepository.save(session);
+        return mapToSessionDto(saved);
+    }
+
+    private void validateTitle(String title) {
+        if (title == null || title.trim().isEmpty()) {
+            throw new BadRequestException("Session title cannot be empty");
+        }
+        String trimmed = title.trim();
+        boolean hasLetterOrDigit = java.util.regex.Pattern.compile("[\\p{L}\\p{N}]").matcher(trimmed).find();
+        boolean onlyAllowedChars = java.util.regex.Pattern.compile("^[ \\p{L}\\p{N}\\-_()#.]+$").matcher(trimmed).matches();
+        if (!hasLetterOrDigit || !onlyAllowedChars) {
+            throw new BadRequestException("Session title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, and brackets");
+        }
+    }
+
 
     // Connects to Gemini's Official Rest endpoints
     private String callGeminiApiKey(ChatSessionEntity session, String latestPrompt) {
@@ -245,6 +279,7 @@ public class AiService {
                 .category(session.getCategory())
                 .messages(msgs)
                 .createdAt(session.getCreatedAt())
+                .pinned(session.isPinned())
                 .build();
     }
 

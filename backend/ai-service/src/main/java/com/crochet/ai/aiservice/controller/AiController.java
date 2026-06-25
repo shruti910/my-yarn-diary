@@ -59,6 +59,15 @@ public class AiController {
         return ResponseEntity.noContent().build();
     }
 
+    @PutMapping("/chats/{chatId}")
+    public ResponseEntity<ChatSessionDto> updateSession(@RequestHeader("X-User-Id") String userId,
+            @PathVariable String chatId,
+            @RequestBody ChatUpdateRequest request) {
+        log.info("Updating AI chat session: {} for user: {} with new title: '{}'", chatId, userId, request.getTitle());
+        return ResponseEntity.ok(aiService.updateSession(userId, chatId, request));
+    }
+
+
     @PostMapping("/pattern-decoder")
     public ResponseEntity<PatternDecoderResponse> decodePattern(
             @RequestHeader("X-User-Id") String userId,

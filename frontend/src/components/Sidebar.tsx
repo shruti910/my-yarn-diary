@@ -26,7 +26,7 @@ const capitalizeWords = (str: string): string => {
 };
 
 const isValidName = (str: string): boolean => {
-  return /[\p{L}\p{N}]/u.test(str);
+  return /^[ \p{L}\p{N}\-_()#.]+$/u.test(str) && /[\p{L}\p{N}]/u.test(str);
 };
 
 const isStockOrEmptyAvatar = (url?: string): boolean => {
@@ -86,7 +86,7 @@ export function Sidebar({
 
     const capitalized = capitalizeWords(trimmed);
     if (!isValidName(capitalized)) {
-      await showAlert('Category name must contain at least one letter or digit.');
+      await showAlert('Category name can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, and brackets.');
       return;
     }
 
@@ -115,7 +115,7 @@ export function Sidebar({
 
     const capitalized = capitalizeWords(trimmed);
     if (!isValidName(capitalized)) {
-      await showAlert('Category name must contain at least one letter or digit.');
+      await showAlert('Category name can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, and brackets.');
       return;
     }
 
