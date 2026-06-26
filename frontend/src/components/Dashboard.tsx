@@ -4,10 +4,11 @@
  */
 
 import React, { useState } from 'react';
-import { Plus, Search, Calendar, Play, Heart, Trash2 } from 'lucide-react';
+import { Plus, Search, Calendar, Play, Heart, Trash2, Pin, PackageOpen, CheckCircle2, Clock, TrendingUp, Trophy, Library, Image as ImageIcon, Archive, Hourglass } from 'lucide-react';
 import { Project, Category, JournalLog, ProjectStatus } from '../types';
 import { ProjectGallery } from './ProjectGallery';
 import { useDialog } from './DialogProvider';
+import { KnittingNeedles } from './KnittingNeedles';
 
 const capitalizeWords = (str: string): string => {
   if (!str) return '';
@@ -37,7 +38,7 @@ interface DashboardProps {
   categories: Category[];
   token: string;
   onSelectProject: (proj: Project) => void;
-  onCreateProject: (categoryId: string, title: string, yarnBrand: string, yarnColorway: string, yarnBatch: string, hookSize: string, notes?: string) => Promise<any>;
+  onCreateProject: (categoryId: string, title: string, notes?: string) => Promise<any>;
   onDeleteProject: (projectId: string) => void;
   onToggleFavorite: (projectId: string) => void;
 }
@@ -60,10 +61,6 @@ export function Dashboard({
 
   // New project forms
   const [title, setTitle] = useState('');
-  const [yarnBrand, setYarnBrand] = useState('');
-  const [yarnColorway, setYarnColorway] = useState('');
-  const [yarnBatch, setYarnBatch] = useState('');
-  const [hookSize, setHookSize] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -72,16 +69,18 @@ export function Dashboard({
     activeCategory.name.trim().toLowerCase() === 'favourites ❤️' ||
     activeCategory.name.trim().toLowerCase() === 'favourites'
   );
-  const currentCategoryProjects = categoryId === 'all'
-    ? projects
-    : isFavouritesCategory
-      ? projects.filter(p => p.isFavorite)
-      : projects.filter(p => p.categoryId === categoryId);
+
+  const currentCategoryProjects = categoryId === 'archived'
+    ? projects.filter(p => p.isArchive)
+    : categoryId === 'all'
+      ? projects.filter(p => !p.isArchive)
+      : isFavouritesCategory
+        ? projects.filter(p => !p.isArchive && p.isFavorite)
+        : projects.filter(p => !p.isArchive && p.categoryId === categoryId);
 
   // Filter project cards by search text
   const filteredProjects = currentCategoryProjects.filter(p =>
     p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.yarnBrand.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (p.notes || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -98,14 +97,10 @@ export function Dashboard({
 
     setIsSubmitting(true);
     try {
-      await onCreateProject(categoryId, capitalized, yarnBrand, yarnColorway, yarnBatch, hookSize, notes);
+      await onCreateProject(categoryId, capitalized, notes);
 
       // Clear
       setTitle('');
-      setYarnBrand('');
-      setYarnColorway('');
-      setYarnBatch('');
-      setHookSize('');
       setNotes('');
       setShowAddModal(false);
     } catch (err) {
@@ -127,13 +122,13 @@ export function Dashboard({
   const getStatusBadge = (status: ProjectStatus) => {
     switch (status) {
       case ProjectStatus.Planning:
-        return <span className="text-[10px] bg-white text-[#7C7167] border border-[#E8E2D9] px-2.5 py-1 rounded-full font-bold">📌 Planning</span>;
+        return <span className="text-[10px] bg-[#E9C46A]/10 text-[#D9A05B] border border-[#E9C46A]/20 px-2.5 py-1 rounded-full font-bold flex items-center gap-1 w-fit"><Pin className="w-3 h-3 text-[#D9A05B]" /> Planning</span>;
       case ProjectStatus.InProgress:
-        return <span className="text-[10px] bg-[#F28482]/10 text-[#F28482] border border-[#F28482]/20 px-2.5 py-1 rounded-full font-bold">🧶 In Progress</span>;
+        return <span className="text-[10px] bg-[#F28482]/10 text-[#F28482] border border-[#F28482]/20 px-2.5 py-1 rounded-full font-bold flex items-center gap-1 w-fit"><KnittingNeedles className="w-3 h-3 text-[#F28482]" /> In Progress</span>;
       case ProjectStatus.Completed:
-        return <span className="text-[10px] bg-[#84A59D]/10 text-[#84A59D] border border-[#84A59D]/20 px-2.5 py-1 rounded-full font-bold">🌸 Completed</span>;
+        return <span className="text-[10px] bg-[#84A59D]/10 text-[#84A59D] border border-[#84A59D]/20 px-2.5 py-1 rounded-full font-bold flex items-center gap-1 w-fit"><CheckCircle2 className="w-3 h-3 text-[#84A59D]" /> Completed</span>;
       default:
-        return <span className="text-[10px] bg-[#F9F6F2] text-[#A89F94] border border-[#E8E2D9] px-2.5 py-1 rounded-full font-bold">⏳ On Hold</span>;
+        return <span className="text-[10px] bg-[#F9F6F2] text-[#A89F94] border border-[#E8E2D9] px-2.5 py-1 rounded-full font-bold flex items-center gap-1 w-fit"><Hourglass className="w-3 h-3 text-[#A89F94]" /> On Hold</span>;
     }
   };
 
@@ -147,7 +142,7 @@ export function Dashboard({
             <span className="text-[9px] uppercase font-extrabold tracking-wider text-[#A89F94] block font-mono leading-tight">In Progress</span>
             <span className="text-2xl font-extrabold font-serif text-[#2D231B] mt-1 block">{totalWips}</span>
           </div>
-          <span className="text-xl bg-[#F28482]/10 border border-[#F28482]/20 w-10 h-10 rounded-xl flex items-center justify-center">🧶</span>
+          <span className="text-xl bg-[#F28482]/10 border border-[#F28482]/20 w-10 h-10 rounded-xl flex items-center justify-center"><KnittingNeedles className="w-5 h-5 text-[#F28482]" /></span>
         </div>
 
         <div className="bg-white rounded-3xl p-4 border border-[#E8E2D9] warm-shadow flex items-center justify-between animate-fade-in animate-duration-75">
@@ -155,7 +150,7 @@ export function Dashboard({
             <span className="text-[9px] uppercase font-extrabold tracking-wider text-[#A89F94] block font-mono leading-tight">Completed</span>
             <span className="text-2xl font-extrabold font-serif text-[#2D231B] mt-1 block">{completedCount}</span>
           </div>
-          <span className="text-xl bg-[#84A59D]/10 border border-[#84A59D]/20 w-10 h-10 rounded-xl flex items-center justify-center">🎁</span>
+          <span className="text-xl bg-[#84A59D]/10 border border-[#84A59D]/20 w-10 h-10 rounded-xl flex items-center justify-center"><CheckCircle2 className="w-5 h-5 text-[#84A59D]" /></span>
         </div>
 
         <div className="bg-white rounded-3xl p-4 border border-[#E8E2D9] warm-shadow flex items-center justify-between animate-fade-in animate-duration-100">
@@ -163,7 +158,7 @@ export function Dashboard({
             <span className="text-[9px] uppercase font-extrabold tracking-wider text-[#A89F94] block font-mono leading-tight">Planning</span>
             <span className="text-2xl font-extrabold font-serif text-[#2D231B] mt-1 block">{planningCount}</span>
           </div>
-          <span className="text-xl bg-[#F5CAC3]/15 border border-[#F5CAC3]/30 w-10 h-10 rounded-xl flex items-center justify-center">📌</span>
+          <span className="text-xl bg-[#E9C46A]/10 border border-[#E9C46A]/20 w-10 h-10 rounded-xl flex items-center justify-center"><Pin className="w-5 h-5 text-[#D9A05B]" /></span>
         </div>
 
         <div className="bg-white rounded-3xl p-4 border border-[#E8E2D9] warm-shadow flex items-center justify-between animate-fade-in animate-duration-150">
@@ -171,7 +166,7 @@ export function Dashboard({
             <span className="text-[9px] uppercase font-extrabold tracking-wider text-[#A89F94] block font-mono leading-tight">On Hold</span>
             <span className="text-2xl font-extrabold font-serif text-[#2D231B] mt-1 block">{onHoldCount}</span>
           </div>
-          <span className="text-xl bg-stone-100 border border-stone-200 w-10 h-10 rounded-xl flex items-center justify-center">⏳</span>
+          <span className="text-xl bg-[#F9F6F2] border border-[#E8E2D9] w-10 h-10 rounded-xl flex items-center justify-center"><Hourglass className="w-5 h-5 text-[#A89F94]" /></span>
         </div>
 
         <div className="bg-white rounded-3xl p-4 border border-[#E8E2D9] warm-shadow flex items-center justify-between animate-fade-in animate-duration-200">
@@ -179,7 +174,7 @@ export function Dashboard({
             <span className="text-[9px] uppercase font-extrabold tracking-wider text-[#A89F94] block font-mono leading-tight">Total Rows</span>
             <span className="text-2xl font-extrabold font-serif text-[#2D231B] mt-1 block">{totalStitches}</span>
           </div>
-          <span className="text-xl bg-blue-50 border border-blue-100 w-10 h-10 rounded-xl flex items-center justify-center">📈</span>
+          <span className="text-xl bg-blue-50 border border-blue-100 w-10 h-10 rounded-xl flex items-center justify-center"><TrendingUp className="w-5 h-5 text-blue-400" /></span>
         </div>
 
         <div className="bg-white rounded-3xl p-4 border border-[#E8E2D9] warm-shadow flex items-center justify-between animate-fade-in animate-duration-300">
@@ -187,7 +182,7 @@ export function Dashboard({
             <span className="text-[9px] uppercase font-extrabold tracking-wider text-[#A89F94] block font-mono leading-tight">Success Rate</span>
             <span className="text-2xl font-extrabold font-serif text-[#2D231B] mt-1 block">{completionRate}%</span>
           </div>
-          <span className="text-xl bg-amber-50 border border-amber-100 w-10 h-10 rounded-xl flex items-center justify-center">🏆</span>
+          <span className="text-xl bg-amber-50 border border-amber-100 w-10 h-10 rounded-xl flex items-center justify-center"><Trophy className="w-5 h-5 text-amber-500" /></span>
         </div>
       </div>
 
@@ -197,21 +192,21 @@ export function Dashboard({
           type="button"
           onClick={() => setDashboardSubTab('projects')}
           className={`pb-3 text-xs font-extrabold uppercase tracking-wider border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${dashboardSubTab === 'projects'
-              ? 'border-[#F28482] text-[#2D231B]'
-              : 'border-transparent text-[#A89F94] hover:text-[#2D231B]'
+            ? 'border-[#F28482] text-[#2D231B]'
+            : 'border-transparent text-[#A89F94] hover:text-[#2D231B]'
             }`}
         >
-          <span>🧶 Project Tracker</span>
+          <span className="flex items-center gap-1.5"><Library className="w-4 h-4" /> Project Tracker</span>
         </button>
         <button
           type="button"
           onClick={() => setDashboardSubTab('gallery')}
           className={`pb-3 text-xs font-extrabold uppercase tracking-wider border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${dashboardSubTab === 'gallery'
-              ? 'border-[#F28482] text-[#2D231B]'
-              : 'border-transparent text-[#A89F94] hover:text-[#2D231B]'
+            ? 'border-[#F28482] text-[#2D231B]'
+            : 'border-transparent text-[#A89F94] hover:text-[#2D231B]'
             }`}
         >
-          <span>📷 Project Gallery</span>
+          <span className="flex items-center gap-1.5"><ImageIcon className="w-4 h-4" /> Project Gallery</span>
         </button>
       </div>
 
@@ -222,7 +217,9 @@ export function Dashboard({
           {/* Main projects grid workspace control segment */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-[#E8E2D9] pb-4 bg-white p-5 rounded-3xl mt-4 warm-shadow animate-fade-in">
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-extrabold font-serif text-[#2D231B]">{activeCategory?.name || 'My Projects'}</h2>
+              <h2 className="text-lg font-extrabold font-serif text-[#2D231B]">
+                {categoryId === 'archived' ? 'Archived Projects' : (categoryId === 'all' ? 'All Projects' : (activeCategory?.name || 'My Projects'))}
+              </h2>
             </div>
 
             <div className="flex items-center gap-3.5 w-full sm:w-auto">
@@ -240,39 +237,48 @@ export function Dashboard({
                 />
               </div>
 
-              <button
-                onClick={() => setShowAddModal(true)}
-                disabled={isFavouritesCategory}
-                title={isFavouritesCategory ? "Projects cannot be created directly inside the Favourites folder" : "Create Project"}
-                className={`px-4 py-2.5 font-bold rounded-xl text-xs flex items-center gap-1 transition-all shadow-md ${isFavouritesCategory
-                    ? "bg-[#A89F94]/50 text-white/50 cursor-not-allowed shadow-none"
-                    : "bg-[#F28482] hover:bg-[#F28482]/85 text-white cursor-pointer transform hover:-translate-y-0.5 active:translate-y-0"
-                  }`}
-              >
-                <Plus className="w-4 h-4" />
-                <span>Create Project</span>
-              </button>
+              {!isFavouritesCategory && categoryId !== 'archived' && (
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="px-4 py-2.5 font-bold rounded-xl text-xs flex items-center gap-1 transition-all shadow-md bg-[#F28482] hover:bg-[#F28482]/85 text-white cursor-pointer transform hover:-translate-y-0.5 active:translate-y-0"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Create Project</span>
+                </button>
+              )}
             </div>
           </div>
 
           {/* Grid container */}
           {filteredProjects.length === 0 ? (
-            <div className="p-12 text-center bg-white rounded-3xl border border-[#E8E2D9] warm-shadow-lg max-w-lg mx-auto space-y-3 animate-fade-in">
-              <div className="text-4xl text-vibrant-peach animate-pulse">
-                {isFavouritesCategory ? '❤️' : '🧶'}
+            <div className="p-12 text-center bg-white rounded-3xl border border-[#E8E2D9] warm-shadow-lg max-w-lg mx-auto space-y-3 animate-fade-in flex flex-col items-center">
+              <div className="text-4xl text-vibrant-peach animate-pulse flex justify-center mb-1">
+                {categoryId === 'archived' ? (
+                  <Archive className="w-10 h-10 text-[#A89F94]" />
+                ) : isFavouritesCategory ? (
+                  '❤️'
+                ) : (
+                  '🧶'
+                )}
               </div>
               <h3 className="font-serif font-extrabold text-[#2D231B] text-lg">
-                {isFavouritesCategory ? 'No Favourites Yet' : "It's So Quiet Here..."}
+                {categoryId === 'archived' 
+                  ? 'No Archived Projects' 
+                  : isFavouritesCategory 
+                    ? 'No Favourites Yet' 
+                    : "It's So Quiet Here..."}
               </h3>
-              <p className="text-xs text-[#7C7167] font-semibold">
-                {isFavouritesCategory
-                  ? 'Mark projects as favourites by clicking the heart icon on any project card to view them here.'
-                  : 'Add your first crochet project'}
+              <p className="text-xs text-[#7C7167] font-semibold max-w-[280px] mx-auto leading-relaxed">
+                {categoryId === 'archived'
+                  ? 'Projects you archive will be shown here. You can archive projects from the project details page.'
+                  : isFavouritesCategory
+                    ? 'Mark projects as favourites by clicking the heart icon on any project card to view them here.'
+                    : 'Add your first crochet project'}
               </p>
-              {!isFavouritesCategory && (
+              {categoryId !== 'archived' && !isFavouritesCategory && (
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="text-xs text-[#F28482] font-extrabold underline cursor-pointer"
+                  className="text-xs text-[#F28482] font-extrabold underline cursor-pointer mt-1"
                 >
                   New Project
                 </button>
@@ -298,17 +304,21 @@ export function Dashboard({
                       {getStatusBadge(p.status)}
                     </div>
 
-                    {/* Yarn attributes block */}
-                    <div className="bg-[#F9F6F2] p-3 rounded-2xl border border-[#E8E2D9] space-y-2 text-xs font-semibold text-[#4A3F35]">
-                      <div className="flex justify-between">
-                        <span className="text-[10px] text-[#7C7167] font-bold uppercase tracking-wider">Yarn Brand:</span>
-                        <span className="text-[#F28482] max-w-[120px] truncate">{p.yarnBrand || 'N/A'}</span>
+                    {/* Visual Project Thumbnail */}
+                    {p.productPhotos && p.productPhotos.length > 0 ? (
+                      <div className="w-full h-32 rounded-2xl border border-[#E8E2D9] overflow-hidden bg-[#F9F6F2] relative">
+                        <img
+                          src={p.productPhotos[p.thumbnailIndex !== undefined && p.thumbnailIndex < p.productPhotos.length ? p.thumbnailIndex : 0]}
+                          alt={p.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-350"
+                        />
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-[10px] text-[#7C7167] font-bold uppercase tracking-wider">Hook Size:</span>
-                        <span className="text-[#2D231B] font-mono">{p.hookSize || 'Not specified'}</span>
+                    ) : (
+                      <div className="w-full h-32 rounded-2xl border border-dashed border-[#E8E2D9] bg-[#FDFCFB] flex flex-col items-center justify-center text-[#A89F94] gap-1 shrink-0">
+                        <span className="text-2xl">🧶</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider">No photos yet</span>
                       </div>
-                    </div>
+                    )}
 
                     {p.notes && (
                       <p className="text-[11px] text-[#7C7167] italic max-w-full truncate font-semibold">"{p.notes}"</p>
@@ -318,7 +328,6 @@ export function Dashboard({
                   {/* Bottom footer bar row trigger */}
                   <div className="bg-[#FDFCFB] border-t border-[#E8E2D9] px-6 py-3.5 flex justify-between items-center group-hover:bg-[#F9F6F2] transition-colors shrink-0">
                     <div className="flex items-center gap-1.5 text-xs text-[#2D231B] font-extrabold">
-                      <span>🧶</span>
                       <span>Row Count Mark: <span className="text-[#F28482] font-mono">{p.rowCount}</span></span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -328,8 +337,8 @@ export function Dashboard({
                           onToggleFavorite(p.projectId);
                         }}
                         className={`p-1 px-1.5 bg-white border rounded-lg shrink-0 cursor-pointer transition-colors ${p.isFavorite
-                            ? 'text-[#F28482] border-rose-100 hover:bg-rose-50/50'
-                            : 'text-[#A89F94] hover:text-rose-500 border-[#E8E2D9] hover:bg-rose-50/50'
+                          ? 'text-[#F28482] border-rose-100 hover:bg-rose-50/50'
+                          : 'text-[#A89F94] hover:text-rose-500 border-[#E8E2D9] hover:bg-rose-50/50'
                           }`}
                         title={p.isFavorite ? 'Remove from Favourites' : 'Add to Favourites'}
                       >
@@ -395,58 +404,8 @@ export function Dashboard({
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-[#7C7167] uppercase tracking-wider block">Yarn Brand Name</label>
-                  <input
-                    type="text"
-                    disabled={isSubmitting}
-                    placeholder="e.g. Caron Simply Soft"
-                    value={yarnBrand}
-                    onChange={(e) => setYarnBrand(e.target.value)}
-                    className="w-full bg-[#FDFCFB] border border-[#E8E2D9] text-xs p-3 rounded-xl text-[#2D231B] focus:outline-none focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482] font-semibold disabled:opacity-60"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-[#7C7167] uppercase tracking-wider block">Colorway / Dye Code</label>
-                  <input
-                    type="text"
-                    disabled={isSubmitting}
-                    placeholder="e.g. Sage Green #42"
-                    value={yarnColorway}
-                    onChange={(e) => setYarnColorway(e.target.value)}
-                    className="w-full bg-[#FDFCFB] border border-[#E8E2D9] text-xs p-3 rounded-xl text-[#2D231B] focus:outline-none focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482] font-semibold disabled:opacity-60"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-[#7C7167] uppercase tracking-wider block">Batch/Lot #</label>
-                  <input
-                    type="text"
-                    disabled={isSubmitting}
-                    placeholder="e.g. Lot 12"
-                    value={yarnBatch}
-                    onChange={(e) => setYarnBatch(e.target.value)}
-                    className="w-full bg-[#FDFCFB] border border-[#E8E2D9] text-xs p-3 rounded-xl text-[#2D231B] focus:outline-none focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482] font-semibold disabled:opacity-60"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-[#7C7167] uppercase tracking-wider block">Hook size recommended</label>
-                  <input
-                    type="text"
-                    disabled={isSubmitting}
-                    placeholder="e.g. G-6 (4.0 mm)"
-                    value={hookSize}
-                    onChange={(e) => setHookSize(e.target.value)}
-                    className="w-full bg-[#FDFCFB] border border-[#E8E2D9] text-xs p-3 rounded-xl text-[#2D231B] focus:outline-none focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482] font-semibold disabled:opacity-60"
-                  />
-                </div>
-              </div>
-
               <div className="space-y-1">
-                <label className="text-[10px] font-extrabold text-[#7C7167] uppercase tracking-wider block">Notes / Material Checklist</label>
+                <label className="text-[10px] font-extrabold text-[#7C7167] uppercase tracking-wider block">Notes</label>
                 <textarea
                   rows={2}
                   disabled={isSubmitting}

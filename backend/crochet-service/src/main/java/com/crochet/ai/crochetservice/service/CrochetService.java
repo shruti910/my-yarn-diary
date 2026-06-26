@@ -210,18 +210,46 @@ public class CrochetService {
                 .category(category)
                 .categoryId(categoryUuid)
                 .title(request.getTitle())
-                .yarnBrand(request.getYarnBrand())
-                .yarnColorway(request.getYarnColorway())
-                .yarnBatch(request.getYarnBatch())
-                .hookSize(request.getHookSize())
                 .status(request.getStatus() != null ? request.getStatus() : ProjectStatus.IN_PROGRESS)
                 .rowCount(0)
                 .notes(request.getNotes())
+                .careInstructions(request.getCareInstructions())
+                .totalTime(request.getTotalTime())
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
                 .isFavorite(false)
+                .isArchive(false)
+                .thumbnailIndex(0)
                 .build();
         project.setProductPhotos(request.getProductPhotos() != null ? request.getProductPhotos() : new ArrayList<>());
+
+        if (request.getYarns() != null) {
+            for (YarnRequest yr : request.getYarns()) {
+                project.getYarnEntities().add(com.crochet.ai.crochetservice.entity.ProjectYarnEntity.builder()
+                        .project(project)
+                        .brand(yr.brand())
+                        .lineName(yr.lineName())
+                        .colorway(yr.colorway())
+                        .dyeLot(yr.dyeLot())
+                        .weight(yr.weight())
+                        .fiberContent(yr.fiberContent())
+                        .quantityUsed(yr.quantityUsed())
+                        .unit(yr.unit() != null ? yr.unit() : "meters")
+                        .build());
+            }
+        }
+        if (request.getHooks() != null) {
+            for (HookRequest hr : request.getHooks()) {
+                project.getHookEntities().add(com.crochet.ai.crochetservice.entity.ProjectHookEntity.builder()
+                        .project(project)
+                        .sizeMm(hr.sizeMm())
+                        .sizeUs(hr.sizeUs())
+                        .material(hr.material())
+                        .brand(hr.brand())
+                        .build());
+            }
+        }
+
         return projectRepository.save(project);
     }
 
@@ -244,18 +272,46 @@ public class CrochetService {
 
         project.setTitle(request.getTitle());
         
-        if (request.getYarnBrand() != null) project.setYarnBrand(request.getYarnBrand());
-        if (request.getYarnColorway() != null) project.setYarnColorway(request.getYarnColorway());
-        if (request.getYarnBatch() != null) project.setYarnBatch(request.getYarnBatch());
-        if (request.getHookSize() != null) project.setHookSize(request.getHookSize());
+        if (request.getYarns() != null) {
+            project.getYarnEntities().clear();
+            for (YarnRequest yr : request.getYarns()) {
+                project.getYarnEntities().add(com.crochet.ai.crochetservice.entity.ProjectYarnEntity.builder()
+                        .project(project)
+                        .brand(yr.brand())
+                        .lineName(yr.lineName())
+                        .colorway(yr.colorway())
+                        .dyeLot(yr.dyeLot())
+                        .weight(yr.weight())
+                        .fiberContent(yr.fiberContent())
+                        .quantityUsed(yr.quantityUsed())
+                        .unit(yr.unit() != null ? yr.unit() : "meters")
+                        .build());
+            }
+        }
+        if (request.getHooks() != null) {
+            project.getHookEntities().clear();
+            for (HookRequest hr : request.getHooks()) {
+                project.getHookEntities().add(com.crochet.ai.crochetservice.entity.ProjectHookEntity.builder()
+                        .project(project)
+                        .sizeMm(hr.sizeMm())
+                        .sizeUs(hr.sizeUs())
+                        .material(hr.material())
+                        .brand(hr.brand())
+                        .build());
+            }
+        }
         if (request.getStatus() != null) project.setStatus(request.getStatus());
         
         project.setRowCount(request.getRowCount());
         
         if (request.getNotes() != null) project.setNotes(request.getNotes());
+        if (request.getCareInstructions() != null) project.setCareInstructions(request.getCareInstructions());
+        if (request.getTotalTime() != null) project.setTotalTime(request.getTotalTime());
         if (request.getStartDate() != null) project.setStartDate(request.getStartDate());
         if (request.getEndDate() != null) project.setEndDate(request.getEndDate());
         if (request.getProductPhotos() != null) project.setProductPhotos(request.getProductPhotos());
+        if (request.getIsArchive() != null) project.setArchive(request.getIsArchive());
+        if (request.getThumbnailIndex() != null) project.setThumbnailIndex(request.getThumbnailIndex());
 
         return projectRepository.save(project);
     }
@@ -407,5 +463,101 @@ public class CrochetService {
                 throw new BadRequestException("Start date cannot be after end date");
             }
         }
+    }
+
+    @Transactional
+    public ProjectEntity toggleArchiveProject(String userId, String projectId) {
+        ProjectEntity project = getProjectDetails(userId, projectId);
+        project.setArchive(!project.isArchive());
+        return projectRepository.save(project);
+    }
+
+    @Transactional
+    public ProjectEntity duplicateProject(String userId, String projectId) {
+        ProjectEntity original = getProjectDetails(userId, projectId);
+
+        ProjectEntity duplicate = ProjectEntity.builder()
+                .projectId(UUID.randomUUID())
+                .userId(UUID.fromString(userId))
+                .category(original.getCategory())
+                .categoryId(original.getCategoryId())
+                .title("copy_" + original.getTitle())
+                .status(original.getStatus())
+                .rowCount(original.getRowCount())
+                .notes(original.getNotes())
+                .careInstructions(original.getCareInstructions())
+                .totalTime(original.getTotalTime())
+                .startDate(original.getStartDate())
+                .endDate(original.getEndDate())
+                .isFavorite(original.isFavorite())
+                .isArchive(false)
+                .thumbnailIndex(original.getThumbnailIndex())
+                .build();
+
+        // Copy photo entities
+        List<ProjectPhotoEntity> photos = new ArrayList<>();
+        if (original.getPhotoEntities() != null) {
+            for (ProjectPhotoEntity photo : original.getPhotoEntities()) {
+                photos.add(ProjectPhotoEntity.builder()
+                        .project(duplicate)
+                        .photoBase64(photo.getPhotoBase64())
+                        .createdAt(LocalDateTime.now())
+                        .build());
+            }
+        }
+        duplicate.setPhotoEntities(photos);
+
+        List<com.crochet.ai.crochetservice.entity.ProjectYarnEntity> yarns = new ArrayList<>();
+        if (original.getYarnEntities() != null) {
+            for (com.crochet.ai.crochetservice.entity.ProjectYarnEntity yarn : original.getYarnEntities()) {
+                yarns.add(com.crochet.ai.crochetservice.entity.ProjectYarnEntity.builder()
+                        .project(duplicate)
+                        .brand(yarn.getBrand())
+                        .lineName(yarn.getLineName())
+                        .colorway(yarn.getColorway())
+                        .dyeLot(yarn.getDyeLot())
+                        .weight(yarn.getWeight())
+                        .fiberContent(yarn.getFiberContent())
+                        .quantityUsed(yarn.getQuantityUsed())
+                        .unit(yarn.getUnit())
+                        .build());
+            }
+        }
+        duplicate.setYarnEntities(yarns);
+
+        List<com.crochet.ai.crochetservice.entity.ProjectHookEntity> hooks = new ArrayList<>();
+        if (original.getHookEntities() != null) {
+            for (com.crochet.ai.crochetservice.entity.ProjectHookEntity hook : original.getHookEntities()) {
+                hooks.add(com.crochet.ai.crochetservice.entity.ProjectHookEntity.builder()
+                        .project(duplicate)
+                        .sizeMm(hook.getSizeMm())
+                        .sizeUs(hook.getSizeUs())
+                        .material(hook.getMaterial())
+                        .brand(hook.getBrand())
+                        .build());
+            }
+        }
+        duplicate.setHookEntities(hooks);
+        ProjectEntity savedDuplicate = projectRepository.save(duplicate);
+
+        // Copy journal logs
+        List<JournalLogEntity> originalLogs = journalLogRepository.findByProjectId(original.getProjectId());
+        if (originalLogs != null) {
+            for (JournalLogEntity log : originalLogs) {
+                JournalLogEntity duplicateLog = JournalLogEntity.builder()
+                        .logId(UUID.randomUUID())
+                        .project(savedDuplicate)
+                        .projectId(savedDuplicate.getProjectId())
+                        .userId(UUID.fromString(userId))
+                        .textEntry(log.getTextEntry())
+                        .imageBase64(log.getImageBase64())
+                        .rowCountSnapshot(log.getRowCountSnapshot())
+                        .createdAt(LocalDateTime.now())
+                        .build();
+                journalLogRepository.save(duplicateLog);
+            }
+        }
+
+        return savedDuplicate;
     }
 }

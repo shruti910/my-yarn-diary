@@ -3,6 +3,8 @@ package com.crochet.ai.crochetservice.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
+import org.hibernate.annotations.Fetch;
+import org.hibernate.annotations.FetchMode;
 import org.hibernate.annotations.SoftDelete;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -45,17 +47,17 @@ public class ProjectEntity {
     @Column(name = "title", nullable = false, length = 150)
     private String title;
 
-    @Column(name = "yarn_brand", length = 100)
-    private String yarnBrand;
+    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @Fetch(FetchMode.SUBSELECT)
+    @JsonProperty("yarns")
+    @Builder.Default
+    private List<ProjectYarnEntity> yarnEntities = new ArrayList<>();
 
-    @Column(name = "yarn_colorway", length = 100)
-    private String yarnColorway;
-
-    @Column(name = "yarn_batch", length = 50)
-    private String yarnBatch;
-
-    @Column(name = "hook_size", length = 50)
-    private String hookSize;
+    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @Fetch(FetchMode.SUBSELECT)
+    @JsonProperty("hooks")
+    @Builder.Default
+    private List<ProjectHookEntity> hookEntities = new ArrayList<>();
 
     @Column(name = "status", nullable = false, length = 30)
     private ProjectStatus status; // PLANNING, IN_PROGRESS, COMPLETED, ON_HOLD
@@ -65,6 +67,12 @@ public class ProjectEntity {
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
+
+    @Column(name = "care_instructions", length = 500)
+    private String careInstructions;
+
+    @Column(name = "total_time")
+    private String totalTime;
 
     @Column(name = "start_date")
     private String startDate;
@@ -76,6 +84,16 @@ public class ProjectEntity {
     @Column(name = "is_favorite", nullable = false)
     @Builder.Default
     private boolean isFavorite = false;
+
+    @JsonProperty("isArchive")
+    @Column(name = "is_archive", nullable = false)
+    @Builder.Default
+    private boolean isArchive = false;
+
+    @JsonProperty("thumbnailIndex")
+    @Column(name = "thumbnail_index", nullable = false)
+    @Builder.Default
+    private int thumbnailIndex = 0;
 
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JsonIgnore

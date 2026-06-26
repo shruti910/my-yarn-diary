@@ -4,9 +4,12 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ChevronUp, ChevronDown, Trash2, Camera, Notebook, Save, FolderOpen, Calendar, Heart } from 'lucide-react';
-import { Project, JournalLog, Category, ProjectStatus } from '../types';
+import { ArrowLeft, ChevronUp, ChevronDown, Trash2, Camera, Notebook, Save, FolderOpen, Calendar, Heart, Copy, Archive, Star, FolderUp, Pin, PackageOpen, Play, Pause, CheckCircle2, Clock, Hourglass } from 'lucide-react';
+import { Project, JournalLog, Category, ProjectStatus, Yarn, Hook } from '../types';
 import { useDialog } from './DialogProvider';
+import { YarnManager } from './YarnManager';
+import { HookManager } from './HookManager';
+import { KnittingNeedles } from './KnittingNeedles';
 
 const capitalizeWords = (str: string): string => {
   if (!str) return '';
@@ -37,9 +40,21 @@ interface ProjectDetailProps {
   onUpdateProject: (updates: Partial<Project>) => Promise<any>;
   onToggleFavorite: (projectId: string) => void;
   onDeleteProject: (projectId: string) => void;
+  onDuplicateProject: (projectId: string) => void;
+  onArchiveProject: (projectId: string) => void;
 }
 
-export function ProjectDetail({ project, categories, token, onBack, onUpdateProject, onToggleFavorite, onDeleteProject }: ProjectDetailProps) {
+export function ProjectDetail({
+  project,
+  categories,
+  token,
+  onBack,
+  onUpdateProject,
+  onToggleFavorite,
+  onDeleteProject,
+  onDuplicateProject,
+  onArchiveProject
+}: ProjectDetailProps) {
   const [logs, setLogs] = useState<JournalLog[]>([]);
   const [textEntry, setTextEntry] = useState('');
   const [logImage, setLogImage] = useState<string | null>(null);
@@ -52,45 +67,52 @@ export function ProjectDetail({ project, categories, token, onBack, onUpdateProj
 
   // Edit fields
   const [title, setTitle] = useState(project.title);
-  const [yarnBrand, setYarnBrand] = useState(project.yarnBrand);
-  const [yarnColorway, setYarnColorway] = useState(project.yarnColorway);
-  const [yarnBatch, setYarnBatch] = useState(project.yarnBatch);
-  const [hookSize, setHookSize] = useState(project.hookSize);
+  const [yarns, setYarns] = useState<Yarn[]>(project.yarns || []);
+  const [hooks, setHooks] = useState<Hook[]>(project.hooks || []);
   const [status, setStatus] = useState(project.status);
   const [notes, setNotes] = useState(project.notes || '');
   const [targetCategoryId, setTargetCategoryId] = useState(project.categoryId);
   const [startDate, setStartDate] = useState(project.startDate || '');
   const [endDate, setEndDate] = useState(project.endDate || '');
   const [productPhotos, setProductPhotos] = useState<string[]>(project.productPhotos || []);
+  const [thumbnailIndex, setThumbnailIndex] = useState(project.thumbnailIndex || 0);
+  const [careInstructions, setCareInstructions] = useState(project.careInstructions || '');
+  const [totalTime, setTotalTime] = useState(project.totalTime || '');
   const [isSaved, setIsSaved] = useState(true);
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+
+  // Unsaved modal, lightbox & camera states
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraTarget, setCameraTarget] = useState<'product' | 'log' | null>(null);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
 
   const isDateRangeInvalid = !!(startDate && endDate && startDate > endDate);
 
   useEffect(() => {
     setTitle(project.title);
-    setYarnBrand(project.yarnBrand);
-    setYarnColorway(project.yarnColorway);
-    setYarnBatch(project.yarnBatch);
-    setHookSize(project.hookSize);
+    setYarns(project.yarns || []);
+    setHooks(project.hooks || []);
     setStatus(project.status);
     setNotes(project.notes || '');
     setTargetCategoryId(project.categoryId);
     setStartDate(project.startDate || '');
     setEndDate(project.endDate || '');
     setProductPhotos(project.productPhotos || []);
+    setCareInstructions(project.careInstructions || '');
+    setTotalTime(project.totalTime || '');
+    setThumbnailIndex(project.thumbnailIndex || 0);
     setIsSaved(true);
   }, [
     project.projectId,
     project.title,
-    project.yarnBrand,
-    project.yarnColorway,
-    project.yarnBatch,
-    project.hookSize,
-    project.status,
-    project.notes,
-    project.categoryId,
     project.startDate,
     project.endDate,
+    project.careInstructions,
+    project.totalTime,
+    project.thumbnailIndex,
     project.productPhotos?.join(',')
   ]);
 
@@ -166,16 +188,17 @@ export function ProjectDetail({ project, categories, token, onBack, onUpdateProj
     try {
       await onUpdateProject({
         title: capitalized,
-        yarnBrand: (yarnBrand || '').trim(),
-        yarnColorway: (yarnColorway || '').trim(),
-        yarnBatch: (yarnBatch || '').trim(),
-        hookSize: (hookSize || '').trim(),
+        yarns,
+        hooks,
         status,
         notes,
         categoryId: targetCategoryId,
         startDate,
         endDate,
-        productPhotos
+        careInstructions,
+        totalTime,
+        productPhotos,
+        thumbnailIndex
       });
       setTitle(capitalized);
       setIsSaved(true);
@@ -287,6 +310,11 @@ export function ProjectDetail({ project, categories, token, onBack, onUpdateProj
     setProductPhotos(prev => {
       const updated = prev.filter((_, i) => i !== index);
       setIsSaved(false);
+      if (thumbnailIndex === index) {
+        setThumbnailIndex(0);
+      } else if (thumbnailIndex > index) {
+        setThumbnailIndex(thumbnailIndex - 1);
+      }
       return updated;
     });
   };
@@ -403,6 +431,111 @@ export function ProjectDetail({ project, categories, token, onBack, onUpdateProj
     }
   };
 
+  const startCamera = async (target: 'product' | 'log') => {
+    try {
+      setCameraTarget(target);
+      setIsCameraActive(true);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1024 }, height: { ideal: 768 } }
+      });
+      setCameraStream(stream);
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(err => console.error("Error playing video stream:", err));
+        }
+      }, 150);
+    } catch (err) {
+      console.error("Camera access failed:", err);
+      await showAlert("Unable to access camera. Please check camera permissions in your browser.");
+      setIsCameraActive(false);
+      setCameraTarget(null);
+    }
+  };
+
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+    setIsCameraActive(false);
+    setCameraTarget(null);
+  };
+
+  const captureSnap = () => {
+    if (!videoRef.current || !cameraStream) return;
+
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const capturedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+
+      if (cameraTarget === 'product') {
+        if (productPhotos.length >= 6) {
+          showAlert("You have already uploaded the maximum limit of 6 photos.");
+        } else {
+          setProductPhotos(prev => {
+            const updated = [...prev, capturedBase64];
+            setIsSaved(false);
+            return updated;
+          });
+          if (status !== ProjectStatus.Completed) {
+            showConfirm('Do you want to move this project to the "Completed" stage?').then(confirmed => {
+              if (confirmed) {
+                setStatus(ProjectStatus.Completed);
+                setIsSaved(false);
+              }
+            });
+          }
+        }
+      } else if (cameraTarget === 'log') {
+        setLogImage(capturedBase64);
+        setLogImageBase64(capturedBase64.split(',')[1]);
+      }
+    }
+
+    stopCamera();
+  };
+
+  const handleDuplicate = async () => {
+    const confirmed = await showConfirm('Are you sure you want to duplicate this project?');
+    if (confirmed) {
+      onDuplicateProject(project.projectId);
+    }
+  };
+
+  const handleArchive = async () => {
+    const action = project.isArchive ? 'unarchive' : 'archive';
+    const confirmed = await showConfirm(`Are you sure you want to ${action} this project?`);
+    if (confirmed) {
+      onArchiveProject(project.projectId);
+    }
+  };
+
+  const handleSaveAndLeave = async () => {
+    await handleSaveFields();
+    setShowUnsavedModal(false);
+    onBack();
+  };
+
+  const handleDiscardAndLeave = () => {
+    setShowUnsavedModal(false);
+    onBack();
+  };
+
+  const handleBackCheck = () => {
+    if (!isSaved) {
+      setShowUnsavedModal(true);
+    } else {
+      onBack();
+    }
+  };
+
   const activeCategory = categories.find(c => c.categoryId === project.categoryId);
 
   return (
@@ -412,7 +545,7 @@ export function ProjectDetail({ project, categories, token, onBack, onUpdateProj
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[#E8E2D9] pb-6 bg-white p-5 rounded-3xl warm-shadow">
         <div className="flex items-center gap-4">
           <button
-            onClick={onBack}
+            onClick={handleBackCheck}
             className="p-2.5 rounded-xl bg-white border border-[#E8E2D9] hover:bg-[#F9F6F2] text-[#7C7167] transition-colors shadow-xs cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4 cursor-pointer" />
@@ -442,6 +575,29 @@ export function ProjectDetail({ project, categories, token, onBack, onUpdateProj
               </button>
 
               <button
+                onClick={handleDuplicate}
+                className="p-1 px-1.5 bg-white hover:bg-stone-50 text-[#A89F94] hover:text-[#84A59D] border border-[#E8E2D9] hover:border-[#84A59D]/30 rounded-lg shrink-0 cursor-pointer transition-colors"
+                title="Duplicate Project"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={handleArchive}
+                className={`p-1 px-1.5 bg-white border rounded-lg shrink-0 cursor-pointer transition-colors ${project.isArchive
+                  ? 'text-[#84A59D] border-emerald-100 hover:bg-emerald-50/50'
+                  : 'text-[#A89F94] hover:text-amber-600 border-[#E8E2D9] hover:bg-amber-50/50'
+                  }`}
+                title={project.isArchive ? 'Unarchive Project' : 'Archive Project'}
+              >
+                <Archive
+                  className="w-4 h-4 transition-colors"
+                  fill={project.isArchive ? '#84A59D' : 'none'}
+                  color={project.isArchive ? '#84A59D' : 'currentColor'}
+                />
+              </button>
+
+              <button
                 onClick={async () => {
                   const confirmed = await showConfirm('Are you sure you want to delete this project?');
                   if (confirmed) {
@@ -459,18 +615,67 @@ export function ProjectDetail({ project, categories, token, onBack, onUpdateProj
         </div>
 
         {/* Change status controls */}
-        <div className="flex items-center gap-3.5 w-full md:w-auto">
-          <select
-            value={status}
-            disabled={isSubmitting}
-            onChange={(e) => { setStatus(e.target.value as any); handleFieldChange(); }}
-            className="px-3.5 py-2.5 bg-white border border-[#E8E2D9] rounded-xl text-xs font-bold text-[#2D231B] focus:outline-none focus:ring-1 focus:ring-[#F28482] focus:border-[#F28482] disabled:opacity-60"
-          >
-            <option value={ProjectStatus.Planning}>📌 Planning</option>
-            <option value={ProjectStatus.InProgress}>🧶 In Progress</option>
-            <option value={ProjectStatus.Completed}>🌸 Completed</option>
-            <option value={ProjectStatus.OnHold}>⏳ On Hold</option>
-          </select>
+        <div className="flex items-center gap-3.5 w-full md:w-auto relative">
+          <div className="relative">
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+              className="px-3.5 py-2.5 bg-white border border-[#E8E2D9] rounded-xl text-xs font-bold text-[#2D231B] focus:outline-none focus:ring-1 focus:ring-[#F28482] focus:border-[#F28482] disabled:opacity-60 flex items-center gap-2 cursor-pointer min-w-[140px] justify-between transition-all"
+            >
+              <span className="flex items-center gap-1.5">
+                {status === ProjectStatus.Planning && <Pin className="w-3.5 h-3.5 text-[#D9A05B]" />}
+                {status === ProjectStatus.InProgress && <KnittingNeedles className="w-3.5 h-3.5 text-[#F28482]" />}
+                {status === ProjectStatus.Completed && <CheckCircle2 className="w-3.5 h-3.5 text-[#84A59D]" />}
+                {status === ProjectStatus.OnHold && <Hourglass className="w-3.5 h-3.5 text-[#A89F94]" />}
+                {status}
+              </span>
+              <ChevronDown className="w-3.5 h-3.5 text-[#A89F94] transition-transform duration-200" style={{ transform: isStatusDropdownOpen ? 'rotate(180deg)' : 'none' }} />
+            </button>
+
+            {isStatusDropdownOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-30"
+                  onClick={() => setIsStatusDropdownOpen(false)}
+                />
+                <div className="absolute left-0 mt-1.5 w-full min-w-[140px] bg-white border border-[#E8E2D9] rounded-xl shadow-lg z-40 overflow-hidden animate-fade-in py-1">
+                  <button
+                    type="button"
+                    onClick={() => { setStatus(ProjectStatus.Planning); handleFieldChange(); setIsStatusDropdownOpen(false); }}
+                    className="w-full px-3.5 py-2 text-left text-xs font-bold text-[#2D231B] hover:bg-[#FDFCFB] flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <Pin className="w-3.5 h-3.5 text-[#D9A05B]" />
+                    <span>Planning</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setStatus(ProjectStatus.InProgress); handleFieldChange(); setIsStatusDropdownOpen(false); }}
+                    className="w-full px-3.5 py-2 text-left text-xs font-bold text-[#2D231B] hover:bg-[#FDFCFB] flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <KnittingNeedles className="w-3.5 h-3.5 text-[#F28482]" />
+                    <span>In Progress</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setStatus(ProjectStatus.Completed); handleFieldChange(); setIsStatusDropdownOpen(false); }}
+                    className="w-full px-3.5 py-2 text-left text-xs font-bold text-[#2D231B] hover:bg-[#FDFCFB] flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#84A59D]" />
+                    <span>Completed</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setStatus(ProjectStatus.OnHold); handleFieldChange(); setIsStatusDropdownOpen(false); }}
+                    className="w-full px-3.5 py-2 text-left text-xs font-bold text-[#2D231B] hover:bg-[#FDFCFB] flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <Hourglass className="w-3.5 h-3.5 text-[#A89F94]" />
+                    <span>On Hold</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           <button
             onClick={handleSaveFields}
@@ -589,53 +794,20 @@ export function ProjectDetail({ project, categories, token, onBack, onUpdateProj
                 </select>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-extrabold text-[#7C7167] uppercase tracking-wider block">Yarn Brand Name</label>
-                <input
-                  type="text"
-                  value={yarnBrand}
+              <div className="pt-4 border-t border-[#FDFCFB]">
+                <YarnManager
+                  yarns={yarns}
+                  onChange={(newYarns) => { setYarns(newYarns); handleFieldChange(); }}
                   disabled={isSubmitting}
-                  placeholder="e.g. Red Heart Super Saver"
-                  onChange={(e) => { setYarnBrand(e.target.value); handleFieldChange(); }}
-                  className="w-full bg-[#FDFCFB] border border-[#E8E2D9] text-xs p-2.5 rounded-xl text-[#2D231B] focus:outline-none focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482] font-semibold disabled:opacity-60"
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-extrabold text-[#7C7167] uppercase tracking-wider block">Yarn Colorway / Dye Code</label>
-                <input
-                  type="text"
-                  value={yarnColorway}
+              <div className="pt-4 border-t border-[#FDFCFB]">
+                <HookManager
+                  hooks={hooks}
+                  onChange={(newHooks) => { setHooks(newHooks); handleFieldChange(); }}
                   disabled={isSubmitting}
-                  placeholder="e.g. Saffron Yellow #302"
-                  onChange={(e) => { setYarnColorway(e.target.value); handleFieldChange(); }}
-                  className="w-full bg-[#FDFCFB] border border-[#E8E2D9] text-xs p-2.5 rounded-xl text-[#2D231B] focus:outline-none focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482] font-semibold disabled:opacity-60"
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-[#7C7167] uppercase tracking-wider block">Batch Lot #</label>
-                  <input
-                    type="text"
-                    value={yarnBatch}
-                    disabled={isSubmitting}
-                    placeholder="e.g. Lot 59B"
-                    onChange={(e) => { setYarnBatch(e.target.value); handleFieldChange(); }}
-                    className="w-full bg-[#FDFCFB] border border-[#E8E2D9] text-xs p-2.5 rounded-xl text-[#2D231B] focus:outline-none focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482] font-semibold disabled:opacity-60"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-[#7C7167] uppercase tracking-wider block">Hook Size used</label>
-                  <input
-                    type="text"
-                    value={hookSize}
-                    disabled={isSubmitting}
-                    placeholder="e.g. 5.0 mm (H)"
-                    onChange={(e) => { setHookSize(e.target.value); handleFieldChange(); }}
-                    className="w-full bg-[#FDFCFB] border border-[#E8E2D9] text-xs p-2.5 rounded-xl text-[#2D231B] focus:outline-none focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482] font-semibold disabled:opacity-60"
-                  />
-                </div>
               </div>
 
               <div className="space-y-1">
@@ -646,6 +818,18 @@ export function ProjectDetail({ project, categories, token, onBack, onUpdateProj
                   disabled={isSubmitting}
                   placeholder="e.g. Increase 6 stitches on the ears in round 5..."
                   onChange={(e) => { setNotes(e.target.value); handleFieldChange(); }}
+                  className="w-full bg-[#FDFCFB] border border-[#E8E2D9] text-xs p-2.5 rounded-xl text-[#2D231B] focus:outline-none focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482] font-semibold resize-none disabled:opacity-60"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-extrabold text-[#7C7167] uppercase tracking-wider block">Care Instructions</label>
+                <textarea
+                  rows={2}
+                  value={careInstructions}
+                  disabled={isSubmitting}
+                  placeholder="e.g. Hand wash cold, lay flat to dry..."
+                  onChange={(e) => { setCareInstructions(e.target.value); handleFieldChange(); }}
                   className="w-full bg-[#FDFCFB] border border-[#E8E2D9] text-xs p-2.5 rounded-xl text-[#2D231B] focus:outline-none focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482] font-semibold resize-none disabled:opacity-60"
                 />
               </div>
@@ -692,12 +876,23 @@ export function ProjectDetail({ project, categories, token, onBack, onUpdateProj
             {isDateRangeInvalid && (
               <p className="text-[10px] text-red-500 font-semibold mt-1 animate-fade-in">Start date cannot be after end date.</p>
             )}
+            <div className="space-y-1 mt-4">
+              <label className="text-[10px] font-extrabold text-[#7C7167] uppercase tracking-wider block">Total Time Taken</label>
+              <input
+                type="text"
+                value={totalTime}
+                disabled={isSubmitting}
+                placeholder="e.g. 5 days, 12 hours"
+                onChange={(e) => { setTotalTime(e.target.value); handleFieldChange(); }}
+                className="w-full bg-[#FDFCFB] border border-[#E8E2D9] text-xs p-2.5 rounded-xl text-[#2D231B] focus:outline-none focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482] font-semibold disabled:opacity-60"
+              />
+            </div>
           </div>
 
           {/* END PRODUCT GALLERY */}
           <div className="bg-white rounded-3xl p-6 border border-[#E8E2D9] warm-shadow-lg space-y-4 animate-fade-in">
             <span className="text-[10px] uppercase font-extrabold tracking-widest text-[#A89F94] block pb-1 border-b border-[#FDFCFB] flex items-center justify-between">
-              <span className="flex items-center gap-1.5">🌸 End product Gallery</span>
+              <span className="flex items-center gap-1.5"><Camera className="w-3.5 h-3.5 text-[#84A59D]" /> End product Gallery</span>
               <span className="text-[9px] text-[#A89F94] font-mono font-normal">({productPhotos.length}/6)</span>
             </span>
 
@@ -709,7 +904,31 @@ export function ProjectDetail({ project, categories, token, onBack, onUpdateProj
               <div className="grid grid-cols-3 gap-2">
                 {productPhotos.map((photo, i) => (
                   <div key={i} className="relative aspect-square group rounded-xl overflow-hidden border border-[#E8E2D9] bg-[#FDFCFB]">
-                    <img src={photo} alt={`Finished product showcase ${i + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                    <img
+                      src={photo}
+                      alt={`Finished product showcase ${i + 1}`}
+                      onClick={() => setLightboxImage(photo)}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform cursor-pointer"
+                    />
+
+                    {productPhotos.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setThumbnailIndex(i);
+                          setIsSaved(false);
+                        }}
+                        className={`absolute bottom-1 left-1 p-1 rounded-lg text-[9px] font-extrabold transition-all flex items-center gap-0.5 shadow-xs cursor-pointer ${thumbnailIndex === i
+                          ? 'bg-[#84A59D] text-white'
+                          : 'bg-white/95 text-[#7C7167] hover:bg-white'
+                          }`}
+                        title="Use as cover"
+                      >
+                        <Star className="w-3 h-3" fill={thumbnailIndex === i ? 'white' : 'transparent'} />
+                        Use as cover
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => removeProductPhoto(i)}
@@ -725,7 +944,7 @@ export function ProjectDetail({ project, categories, token, onBack, onUpdateProj
             )}
 
             {productPhotos.length < 6 && (
-              <div>
+              <div className="grid grid-cols-2 gap-2">
                 <input
                   type="file"
                   id="product-photo-upload"
@@ -737,21 +956,31 @@ export function ProjectDetail({ project, categories, token, onBack, onUpdateProj
                 />
                 <label
                   htmlFor="product-photo-upload"
-                  className={`w-full py-2 bg-[#FDFCFB] hover:bg-[#84A59D]/10 border border-[#E8E2D9] hover:border-[#84A59D] text-[#7C7167] hover:text-[#84A59D] rounded-xl text-xs font-bold block text-center transition-colors ${isUploadingPhoto || isSubmitting ? 'opacity-55 pointer-events-none' : 'cursor-pointer'
+                  className={`py-2 bg-[#FDFCFB] hover:bg-[#84A59D]/10 border border-[#E8E2D9] hover:border-[#84A59D] text-[#7C7167] hover:text-[#84A59D] rounded-xl text-xs font-bold block text-center transition-colors ${isUploadingPhoto || isSubmitting ? 'opacity-55 pointer-events-none' : 'cursor-pointer'
                     }`}
                 >
                   {isUploadingPhoto ? (
-                    <span className="flex items-center justify-center gap-1.5">
+                    <span className="flex items-center justify-center gap-1">
                       <svg className="animate-spin h-3.5 w-3.5 text-[#84A59D]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      Processing Image...
+                      Loading...
                     </span>
                   ) : (
-                    '+ Add Product Photo'
+                    <span className="flex items-center justify-center gap-1.5"><FolderUp className="w-3.5 h-3.5" /> Upload Photo</span>
                   )}
                 </label>
+
+                <button
+                  type="button"
+                  disabled={isUploadingPhoto || isSubmitting}
+                  onClick={() => startCamera('product')}
+                  className="py-2 bg-[#FDFCFB] hover:bg-[#F28482]/10 border border-[#E8E2D9] hover:border-[#F28482] text-[#7C7167] hover:text-[#F28482] rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  Take Snap
+                </button>
               </div>
             )}
           </div>
@@ -764,7 +993,7 @@ export function ProjectDetail({ project, categories, token, onBack, onUpdateProj
           {/* PROGRESS WRITING LOGGER BOX */}
           <div className="bg-white rounded-3xl p-6 border border-[#E8E2D9] warm-shadow-lg">
             <h3 className="font-serif font-extrabold text-[#2D231B] text-sm flex items-center gap-2">
-              <Notebook className="w-4 h-4 text-[#F28482]" /> Write a Journal progress log
+              <Notebook className="w-4 h-4 text-[#F28482]" /> Log Today's Progress..
             </h3>
 
             <form onSubmit={handleAddLog} className="space-y-4 mt-4">
@@ -802,13 +1031,23 @@ export function ProjectDetail({ project, categories, token, onBack, onUpdateProj
                     onChange={handleImageUpload}
                     className="hidden"
                   />
-                  <label
-                    htmlFor="log-photo-file"
-                    className="px-3.5 py-2 bg-white border border-[#E8E2D9] hover:border-[#F28482] text-[#7C7167] rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 transition-colors"
-                  >
-                    <Camera className="w-3.5 h-3.5 text-[#F28482]" />
-                    Upload Image
-                  </label>
+                  <div className="flex gap-2">
+                    <label
+                      htmlFor="log-photo-file"
+                      className="px-3.5 py-2 bg-white border border-[#E8E2D9] hover:border-[#F28482] text-[#7C7167] rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 transition-colors"
+                    >
+                      <Camera className="w-3.5 h-3.5 text-[#F28482]" />
+                      Upload Image
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => startCamera('log')}
+                      className="px-3.5 py-2 bg-white border border-[#E8E2D9] hover:border-[#F28482] text-[#7C7167] rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 transition-colors"
+                    >
+                      <Camera className="w-3.5 h-3.5 text-[#F28482]" />
+                      Take Snap
+                    </button>
+                  </div>
 
                   {logImage && (
                     <div className="relative animate-scale-up">
@@ -869,6 +1108,7 @@ export function ProjectDetail({ project, categories, token, onBack, onUpdateProj
                           <img
                             src={log.imageBase64}
                             alt="Log snapshot snapshot"
+                            onClick={() => setLightboxImage(log.imageBase64)}
                             className="w-20 h-20 rounded-xl object-cover border border-[#E8E2D9] shadow-xs cursor-pointer hover:scale-105 transition-transform"
                           />
                         </div>
@@ -892,6 +1132,102 @@ export function ProjectDetail({ project, categories, token, onBack, onUpdateProj
 
       </div>
 
+      {/* UNSAVED CHANGES WARNING MODAL */}
+      {showUnsavedModal && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/45 backdrop-blur-xs select-none animate-fade-in">
+          <div className="bg-white rounded-[2rem] border border-[#E8E2D9] max-w-sm w-full p-6 space-y-5 shadow-2xl relative animate-scale-up">
+            <h4 className="font-serif font-extrabold text-[#2D231B] text-base leading-snug">Unsaved Changes ⚠️</h4>
+            <p className="text-xs text-[#7C7167] font-semibold leading-relaxed">
+              You have unsaved changes in this project. Would you like to save them before leaving?
+            </p>
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleSaveAndLeave}
+                className="w-full py-2.5 bg-[#84A59D] hover:bg-[#84A59D]/90 text-white font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer text-center font-sans"
+              >
+                Save and Leave
+              </button>
+              <button
+                type="button"
+                onClick={handleDiscardAndLeave}
+                className="w-full py-2.5 bg-white hover:bg-rose-50 text-[#F28482] border border-[#F28482]/20 hover:border-[#F28482] rounded-xl text-xs font-bold transition-all cursor-pointer text-center font-sans"
+              >
+                Discard Changes and Leave
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowUnsavedModal(false)}
+                className="w-full py-2 bg-[#FDFCFB] hover:bg-[#F9F6F2] text-[#7C7167] border border-[#E8E2D9] rounded-xl text-xs font-bold transition-all cursor-pointer text-center font-sans"
+              >
+                Cancel (Keep Editing)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CAMERA CAPTURE OVERLAY */}
+      {isCameraActive && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-[2rem] border border-[#E8E2D9] max-w-md w-full overflow-hidden shadow-2xl relative flex flex-col animate-scale-up">
+            <div className="p-5 border-b border-[#E8E2D9] flex justify-between items-center bg-[#FDFCFB]">
+              <h4 className="font-serif font-extrabold text-[#2D231B] text-base leading-snug flex items-center gap-2">
+                <Camera className="w-4 h-4 text-[#F28482]" /> Take Snap
+              </h4>
+              <button
+                type="button"
+                onClick={stopCamera}
+                className="text-xs font-bold text-[#7C7167] hover:text-[#2D231B] cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
+              <video
+                ref={videoRef}
+                className="w-full h-full object-cover"
+                playsInline
+                muted
+              />
+            </div>
+
+            <div className="p-6 bg-[#FDFCFB] border-t border-[#E8E2D9] flex justify-center items-center">
+              <button
+                type="button"
+                onClick={captureSnap}
+                className="w-16 h-16 rounded-full border-4 border-white bg-[#F28482] hover:bg-[#F28482]/95 active:scale-95 shadow-md transition-all flex items-center justify-center text-white cursor-pointer"
+                title="Shutter Button"
+              >
+                <Camera className="w-6 h-6" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LIGHTBOX OVERLAY */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in"
+          onClick={() => setLightboxImage(null)}
+        >
+          <button
+            onClick={() => setLightboxImage(null)}
+            className="absolute top-6 right-6 w-10 h-10 bg-white/10 hover:bg-white/20 text-white rounded-full text-xl flex items-center justify-center font-bold transition-colors cursor-pointer"
+            title="Close image"
+          >
+            ×
+          </button>
+          <img
+            src={lightboxImage}
+            alt="Enlarged preview"
+            className="max-w-full max-h-full object-contain rounded-2xl animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Folder, Plus, Trash2, Edit2, Check, X, LogOut, Scissors, ChevronLeft } from 'lucide-react';
+import { Folder, Plus, Trash2, Edit2, Check, X, LogOut, Scissors, ChevronLeft, Archive, Heart } from 'lucide-react';
 import { Category } from '../types';
 import { useDialog } from './DialogProvider';
 import packageJson from '../../package.json';
@@ -271,6 +271,20 @@ export function Sidebar({
             </div>
           </div>
 
+          <div
+            onClick={() => onSelectCategory('archived')}
+            className={`group flex items-center justify-between p-3 rounded-xl transition-all duration-200 cursor-pointer border ${
+              activeCategoryId === 'archived'
+                ? 'bg-white border-[#E8E2D9] text-[#F28482] font-semibold warm-shadow' 
+                : 'bg-transparent border-transparent hover:bg-white/40 text-[#4A3F35] hover:text-[#2D231B]'
+            }`}
+          >
+            <div className="flex items-center gap-3 w-full">
+              <Archive className={`w-4 h-4 shrink-0 ${activeCategoryId === 'archived' ? 'text-[#F28482] fill-[#F5CAC3]/20' : 'text-[#A89F94]'}`} />
+              <span className="text-xs truncate font-semibold">Archived Projects</span>
+            </div>
+          </div>
+
           {categories.map((cat, index) => {
             const catId = cat.categoryId || (cat as any).folderId || `cat-${index}`;
             const isActive = catId === activeCategoryId;
@@ -361,7 +375,7 @@ export function Sidebar({
         {/* Sidebar decorative footer badge */}
         <div className="p-4 border-t border-[#E8E2D9] bg-[#F9F6F2] text-center space-y-1">
           <p className="text-[10px] font-bold text-[#7C7167] uppercase tracking-widest flex items-center justify-center gap-1">
-            Stitched with Love 🧶
+            <span className="flex items-center gap-1.5 justify-center">Stitched with Love <Heart className="w-3.5 h-3.5 text-[#F28482] fill-current" /></span>
           </p>
         </div>
       </div>
