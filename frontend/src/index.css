@@ -123,3 +123,31 @@
   padding: 0;
   color: #2D231B;
 }
+
+/* Round color picker styles */
+.color-picker-round {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid #E8E2D9;
+  padding: 0;
+  cursor: pointer;
+  background: none;
+  overflow: hidden;
+  display: block;
+  flex-shrink: 0;
+}
+.color-picker-round::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.color-picker-round::-webkit-color-swatch {
+  border: none;
+  border-radius: 50%;
+}
+.color-picker-round::-moz-color-swatch {
+  border: none;
+  border-radius: 50%;
+}

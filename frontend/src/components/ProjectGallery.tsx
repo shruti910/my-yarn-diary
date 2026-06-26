@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Project } from '../types';
-import { Image, Filter, Calendar, BookOpen, Sparkles, X, ChevronLeft, ChevronRight, Projector } from 'lucide-react';
+import { Image, Filter, Calendar, BookOpen, Sparkles, X, ChevronLeft, ChevronRight, Projector, CheckCircle2, ImageIcon } from 'lucide-react';
 
 interface ProjectGalleryProps {
   projects: Project[];
@@ -82,7 +82,7 @@ export function ProjectGallery({ projects, token }: ProjectGalleryProps) {
       <div className="bg-white rounded-3xl p-6 border border-[#E8E2D9] warm-shadow space-y-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-xl">🌸</span>
+            <span className="text-xl flex items-center justify-center text-[#84A59D] bg-[#84A59D]/10 rounded-xl w-10 h-10"><ImageIcon className="w-5 h-5" /></span>
             <div>
               <h2 className="text-lg font-extrabold font-serif text-[#2D231B]">Project Media Gallery</h2>
               <p className="text-[10px] text-[#A89F94] font-bold uppercase tracking-widest block font-mono">
@@ -115,7 +115,7 @@ export function ProjectGallery({ projects, token }: ProjectGalleryProps) {
                     : 'text-[#7C7167] hover:text-[#2D231B]'
                 }`}
               >
-                🎁 Finished items
+                <span className="flex items-center gap-1.5 justify-center"><CheckCircle2 className="w-3 h-3" /> Finished items</span>
               </button>
               <button
                 type="button"
@@ -126,7 +126,7 @@ export function ProjectGallery({ projects, token }: ProjectGalleryProps) {
                     : 'text-[#7C7167] hover:text-[#2D231B]'
                 }`}
               >
-                📖 Journal updates
+                <span className="flex items-center gap-1.5 justify-center"><BookOpen className="w-3 h-3" /> Journal updates</span>
               </button>
             </div>
 
@@ -137,10 +137,10 @@ export function ProjectGallery({ projects, token }: ProjectGalleryProps) {
                 onChange={(e) => { setSelectedProjectId(e.target.value); setLightboxIndex(null); }}
                 className="w-full bg-[#FDFCFB] border border-[#E8E2D9] text-[11px] font-bold py-2 px-3 pr-8 rounded-xl text-[#2D231B] appearance-none focus:outline-none focus:ring-1 focus:ring-[#F28482] focus:border-[#F28482]"
               >
-                <option value="all">📁 All Projects</option>
+                <option value="all">All Projects</option>
                 {projects.map((p) => (
                   <option key={p.projectId} value={p.projectId}>
-                    🧵 {p.title}
+                    {p.title}
                   </option>
                 ))}
               </select>
@@ -159,7 +159,7 @@ export function ProjectGallery({ projects, token }: ProjectGalleryProps) {
         </div>
       ) : filteredItems.length === 0 ? (
         <div className="p-12 text-center bg-white rounded-3xl border border-[#E8E2D9] warm-shadow-lg max-w-lg mx-auto space-y-3">
-          <div className="text-4xl animate-pulse">📷</div>
+          <div className="text-4xl animate-pulse flex justify-center text-[#A89F94]"><ImageIcon className="w-12 h-12" /></div>
           <h3 className="font-serif font-extrabold text-[#2D231B] text-base">No Photos Found</h3>
           <p className="text-xs text-[#7C7167] font-semibold">
             {galleryItems.length === 0
@@ -187,12 +187,12 @@ export function ProjectGallery({ projects, token }: ProjectGalleryProps) {
                 {/* Badge label */}
                 <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
                   {item.type === 'endProduct' ? (
-                    <span className="text-[9px] bg-[#84A59D] text-white px-2 py-0.5 rounded-full font-bold shadow-xs">
-                      🎁 End Product
+                    <span className="text-[9px] bg-[#84A59D] text-white px-2 py-0.5 rounded-full font-bold shadow-xs flex items-center gap-1">
+                      <CheckCircle2 className="w-2.5 h-2.5" /> End Product
                     </span>
                   ) : (
-                    <span className="text-[9px] bg-[#F5CAC3] text-[#2D231B] px-2 py-0.5 rounded-full font-bold shadow-xs">
-                      📖 Journal Log
+                    <span className="text-[9px] bg-[#F5CAC3] text-[#2D231B] px-2 py-0.5 rounded-full font-bold shadow-xs flex items-center gap-1">
+                      <BookOpen className="w-2.5 h-2.5" /> Journal Log
                     </span>
                   )}
                 </div>
@@ -280,12 +280,12 @@ export function ProjectGallery({ projects, token }: ProjectGalleryProps) {
                 <div className="space-y-1.5 border-b border-[#F9F6F2] pb-3">
                   <div className="flex items-center gap-1.5">
                     {currentLightboxItem.type === 'endProduct' ? (
-                      <span className="text-[9px] uppercase bg-[#84A59D] text-white px-2 py-0.5 rounded-full font-bold">
-                        🎁 End Product
+                      <span className="text-[9px] uppercase bg-[#84A59D] text-white px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-2.5 h-2.5 text-white" /> End Product
                       </span>
                     ) : (
-                      <span className="text-[9px] uppercase bg-[#F5CAC3] text-[#2D231B] px-2 py-0.5 rounded-full font-bold">
-                        📖 Journal Log
+                      <span className="text-[9px] uppercase bg-[#F5CAC3] text-[#2D231B] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                        <BookOpen className="w-2.5 h-2.5 text-[#2D231B]" /> Journal Log
                       </span>
                     )}
                   </div>

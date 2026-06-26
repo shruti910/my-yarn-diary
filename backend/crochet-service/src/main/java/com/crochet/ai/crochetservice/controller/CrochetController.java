@@ -109,6 +109,20 @@ public class CrochetController {
         return ResponseEntity.ok(crochetService.toggleFavoriteProject(userId, projectId));
     }
 
+    @PostMapping("/projects/{projectId}/duplicate")
+    public ResponseEntity<ProjectEntity> duplicateProject(@RequestHeader("X-User-Id") String userId,
+            @PathVariable String projectId) {
+        log.info("Duplicating project: {} for user: {}", projectId, userId);
+        return ResponseEntity.ok(crochetService.duplicateProject(userId, projectId));
+    }
+
+    @PostMapping("/projects/{projectId}/archive")
+    public ResponseEntity<ProjectEntity> toggleArchiveProject(@RequestHeader("X-User-Id") String userId,
+            @PathVariable String projectId) {
+        log.info("Toggling archive status for project: {} and user: {}", projectId, userId);
+        return ResponseEntity.ok(crochetService.toggleArchiveProject(userId, projectId));
+    }
+
     // --- JOURNAL LOGS ---
 
     @GetMapping("/projects/{projectId}/logs")

@@ -10,6 +10,7 @@ import { ChatPanel } from './components/ChatPanel';
 import { AiTools } from './components/AiTools';
 import { FloatingAiBuddy } from './components/FloatingAiBuddy';
 import { ProjectDetail } from './components/ProjectDetail';
+import { Celebration } from './components/Celebration';
 import { AuthScreen } from './components/AuthScreen';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { CrochetLoader } from './components/CrochetLoader';
@@ -60,6 +61,7 @@ export default function App() {
 
   const [activeCategoryId, setActiveCategoryId] = useState<string>('all');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [showCelebrationTitle, setShowCelebrationTitle] = useState<string | null>(null);
 
   // Toast notifications state
   const [toast, setToast] = useState<{
@@ -344,10 +346,6 @@ export default function App() {
   const handleCreateProject = async (
     cid: string,
     title: string,
-    yarnBrand: string,
-    yarnColorway: string,
-    yarnBatch: string,
-    hookSize: string,
     notes?: string
   ) => {
     if (!user) return;
@@ -361,10 +359,8 @@ export default function App() {
     const payload = {
       categoryId: targetCid,
       title: title.trim(),
-      yarnBrand: (yarnBrand || '').trim(),
-      yarnColorway: (yarnColorway || '').trim(),
-      yarnBatch: (yarnBatch || '').trim(),
-      hookSize: (hookSize || '').trim(),
+      yarns: [],
+      hooks: [],
       status: ProjectStatus.InProgress,
       rowCount: 0,
       notes: notes || '',
@@ -395,19 +391,22 @@ export default function App() {
     const { projectId } = selectedProject;
     try {
       const fullProj = projects.find(p => p.projectId === projectId) || selectedProject;
+      const oldStatus = fullProj.status;
       const payload = {
         categoryId: updates.categoryId !== undefined ? updates.categoryId : fullProj.categoryId,
         title: updates.title !== undefined ? updates.title : fullProj.title,
-        yarnBrand: updates.yarnBrand !== undefined ? updates.yarnBrand : fullProj.yarnBrand,
-        yarnColorway: updates.yarnColorway !== undefined ? updates.yarnColorway : fullProj.yarnColorway,
-        yarnBatch: updates.yarnBatch !== undefined ? updates.yarnBatch : fullProj.yarnBatch,
-        hookSize: updates.hookSize !== undefined ? updates.hookSize : fullProj.hookSize,
+        yarns: updates.yarns !== undefined ? updates.yarns : fullProj.yarns,
+        hooks: updates.hooks !== undefined ? updates.hooks : fullProj.hooks,
+        careInstructions: updates.careInstructions !== undefined ? updates.careInstructions : fullProj.careInstructions,
+        totalTime: updates.totalTime !== undefined ? updates.totalTime : fullProj.totalTime,
         status: updates.status !== undefined ? updates.status : fullProj.status,
         rowCount: updates.rowCount !== undefined ? updates.rowCount : fullProj.rowCount,
         notes: updates.notes !== undefined ? updates.notes : fullProj.notes,
         startDate: updates.startDate !== undefined ? updates.startDate : (fullProj.startDate || ''),
         endDate: updates.endDate !== undefined ? updates.endDate : (fullProj.endDate || ''),
-        productPhotos: updates.productPhotos !== undefined ? updates.productPhotos : (fullProj.productPhotos || [])
+        productPhotos: updates.productPhotos !== undefined ? updates.productPhotos : (fullProj.productPhotos || []),
+        isArchive: updates.isArchive !== undefined ? updates.isArchive : (fullProj.isArchive !== undefined ? fullProj.isArchive : false),
+        thumbnailIndex: updates.thumbnailIndex !== undefined ? updates.thumbnailIndex : (fullProj.thumbnailIndex !== undefined ? fullProj.thumbnailIndex : 0)
       };
 
       const res = await fetchWithToken(`/api/v1/projects/${projectId}`, {
@@ -422,11 +421,55 @@ export default function App() {
         setProjects(prev => prev.map(p => p.projectId === projectId ? merged : p));
         setSelectedProject(merged);
         showToast('Project updated successfully!', 'success');
+
+        if (merged.status === ProjectStatus.Completed && oldStatus !== ProjectStatus.Completed) {
+          setShowCelebrationTitle(merged.title);
+        }
       }
     } catch (err: any) {
       console.error('Failed updating project:', err);
       showToast(err.message || 'Failed to update project.', 'error');
       throw err;
+    }
+  };
+
+  const handleDuplicateProject = async (projectId: string) => {
+    try {
+      const res = await fetchWithToken(`/api/v1/projects/${projectId}/duplicate`, {
+        method: 'POST'
+      });
+      if (res) {
+        const merged = {
+          ...res,
+          categoryId: res.categoryId || res.folderId
+        } as Project;
+        setProjects(prev => [merged, ...prev]);
+        showToast('Project duplicated successfully!', 'success');
+        setSelectedProject(null); // Return to list view
+      }
+    } catch (err: any) {
+      console.error('Failed duplicating project:', err);
+      showToast(err.message || 'Failed to duplicate project.', 'error');
+    }
+  };
+
+  const handleArchiveProject = async (projectId: string) => {
+    try {
+      const res = await fetchWithToken(`/api/v1/projects/${projectId}/archive`, {
+        method: 'POST'
+      });
+      if (res) {
+        const merged = {
+          ...res,
+          categoryId: res.categoryId || res.folderId
+        } as Project;
+        setProjects(prev => prev.map(p => p.projectId === projectId ? merged : p));
+        setSelectedProject(null); // Return to list view
+        showToast(merged.isArchive ? 'Project archived successfully!' : 'Project unarchived successfully!', 'success');
+      }
+    } catch (err: any) {
+      console.error('Failed toggling archive project status:', err);
+      showToast(err.message || 'Failed to archive project.', 'error');
     }
   };
 
@@ -576,6 +619,8 @@ export default function App() {
                       onUpdateProject={handleUpdateProject}
                       onToggleFavorite={handleToggleFavorite}
                       onDeleteProject={handleDeleteProject}
+                      onDuplicateProject={handleDuplicateProject}
+                      onArchiveProject={handleArchiveProject}
                     />
                   </ErrorBoundary>
                 ) : (
@@ -639,6 +684,15 @@ export default function App() {
           onDismiss={handleDismissFloatingBuddy}
         />
       )}
+
+      <AnimatePresence>
+        {showCelebrationTitle && (
+          <Celebration
+            projectTitle={showCelebrationTitle}
+            onClose={() => setShowCelebrationTitle(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
