@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { Plus, Search, Calendar, Play, Heart, Trash2, Pin, PackageOpen, CheckCircle2, Clock, TrendingUp, Trophy, Library, Image as ImageIcon, Archive, Hourglass } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Search, Calendar, Play, Heart, Trash2, Pin, PackageOpen, CheckCircle2, Clock, TrendingUp, Trophy, Library, Image as ImageIcon, Archive, Hourglass, Filter, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { Project, Category, JournalLog, ProjectStatus } from '../types';
 import { ProjectGallery } from './ProjectGallery';
 import { useDialog } from './DialogProvider';
@@ -64,6 +64,15 @@ export function Dashboard({
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Stage and sorting state
+  const [stageFilter, setStageFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('createdAt-desc');
+
+  // Reset stage filter when active category changes
+  useEffect(() => {
+    setStageFilter('all');
+  }, [categoryId]);
+
   const activeCategory = categories.find(c => c.categoryId === categoryId);
   const isFavouritesCategory = activeCategory && (
     activeCategory.name.trim().toLowerCase() === 'favourites ❤️' ||
@@ -78,11 +87,38 @@ export function Dashboard({
         ? projects.filter(p => !p.isArchive && p.isFavorite)
         : projects.filter(p => !p.isArchive && p.categoryId === categoryId);
 
-  // Filter project cards by search text
-  const filteredProjects = currentCategoryProjects.filter(p =>
-    p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (p.notes || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter project cards by stage filter, search text, and then sort them
+  const filteredProjects = useMemo(() => {
+    let result = currentCategoryProjects;
+
+    // Filter by stage
+    if (stageFilter !== 'all') {
+      result = result.filter(p => p.status === stageFilter);
+    }
+
+    // Filter by search text
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(p =>
+        p.title.toLowerCase().includes(q) ||
+        (p.notes || '').toLowerCase().includes(q)
+      );
+    }
+
+    // Sort projects
+    return [...result].sort((a, b) => {
+      if (sortBy === 'name-asc') {
+        return a.title.localeCompare(b.title);
+      } else if (sortBy === 'name-desc') {
+        return b.title.localeCompare(a.title);
+      } else if (sortBy === 'createdAt-asc') {
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      } else {
+        // default: newest first (createdAt-desc)
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+    });
+  }, [currentCategoryProjects, stageFilter, searchQuery, sortBy]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -215,14 +251,59 @@ export function Dashboard({
       ) : (
         <>
           {/* Main projects grid workspace control segment */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-[#E8E2D9] pb-4 bg-white p-5 rounded-3xl mt-4 warm-shadow animate-fade-in">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-extrabold font-serif text-[#2D231B]">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b border-[#E8E2D9] pb-4 bg-white p-5 rounded-3xl mt-4 warm-shadow animate-fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full lg:w-auto">
+              <h2 className="text-lg font-extrabold font-serif text-[#2D231B] whitespace-nowrap">
                 {categoryId === 'archived' ? 'Archived Projects' : (categoryId === 'all' ? 'All Projects' : (activeCategory?.name || 'My Projects'))}
               </h2>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Stage Filter */}
+                <div className="relative">
+                  <select
+                    id="stage-filter-select"
+                    value={stageFilter}
+                    onChange={(e) => setStageFilter(e.target.value)}
+                    className="appearance-none bg-[#FDFCFB] pl-8 pr-8 py-2.5 border border-[#E8E2D9] rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[#F28482] focus:border-[#F28482] transition-all text-[#2D231B] font-bold cursor-pointer"
+                  >
+                    <option value="all">All Stages</option>
+                    <option value="Planning">Planning</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                    <option value="On Hold">On Hold</option>
+                  </select>
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#A89F94] pointer-events-none">
+                    <Filter className="w-3.5 h-3.5" />
+                  </span>
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A89F94] pointer-events-none">
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </span>
+                </div>
+
+                {/* Sort selector */}
+                <div className="relative">
+                  <select
+                    id="sort-by-select"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="appearance-none bg-[#FDFCFB] pl-8 pr-8 py-2.5 border border-[#E8E2D9] rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[#F28482] focus:border-[#F28482] transition-all text-[#2D231B] font-bold cursor-pointer"
+                  >
+                    <option value="createdAt-desc">Newest First</option>
+                    <option value="createdAt-asc">Oldest First</option>
+                    <option value="name-asc">Name (A-Z)</option>
+                    <option value="name-desc">Name (Z-A)</option>
+                  </select>
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#A89F94] pointer-events-none">
+                    <ArrowUpDown className="w-3.5 h-3.5" />
+                  </span>
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A89F94] pointer-events-none">
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <div className="flex items-center gap-3.5 w-full sm:w-auto">
+            <div className="flex items-center gap-3.5 w-full lg:w-auto">
               {/* Search bar */}
               <div className="relative flex-1 sm:flex-initial">
                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-[#A89F94] pointer-events-none">
