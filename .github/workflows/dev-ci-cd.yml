@@ -70,7 +70,7 @@ jobs:
       - name: Execute Maven Package
         run: |
           cd backend
-          mvn clean package -DskipTests=false ---projects !gateway
+          mvn clean package -DskipTests=false --projects !gateway
 
   # JOB 4: Test and Compile Express TS Gateway
   express-gateway-validation:
