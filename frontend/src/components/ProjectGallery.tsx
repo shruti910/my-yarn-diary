@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Project } from '../types';
-import { Image, Filter, Calendar, BookOpen, Sparkles, X, ChevronLeft, ChevronRight, Projector, CheckCircle2, ImageIcon } from 'lucide-react';
+import { Image, Filter, Calendar, BookOpen, Sparkles, X, ChevronLeft, ChevronRight, Projector, CheckCircle2, ImageIcon, ChevronDown } from 'lucide-react';
 
 interface ProjectGalleryProps {
   projects: Project[];
@@ -144,8 +144,8 @@ export function ProjectGallery({ projects, token }: ProjectGalleryProps) {
                   </option>
                 ))}
               </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#7C7167]">
-                ▼
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-[#7C7167]">
+                <ChevronDown className="w-3.5 h-3.5" />
               </div>
             </div>
           </div>
