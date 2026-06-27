@@ -1,16 +1,35 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Send, Image, Plus, Trash2, ArrowRight, MessageSquare, Compass, AlertCircle, Camera, X, Edit2, Check, Pin, PinOff } from 'lucide-react';
+import { Send, Image, Plus, Trash2, ArrowRight, MessagesSquare, Compass, AlertCircle, Camera, X, Edit2, Check, Pin, PinOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { ChatSession, ChatMessage, ChatCategory } from '../types';
 import { useDialog } from './DialogProvider';
 
+const detectTerminology = (text: string): 'US' | 'UK' | null => {
+  const clean = text.toLowerCase();
+  if (/terminology:\s*uk/i.test(clean) || /uk standard/i.test(clean) || /uk terminology/i.test(clean)) {
+    return 'UK';
+  }
+  if (/terminology:\s*us/i.test(clean) || /us standard/i.test(clean) || /us terminology/i.test(clean)) {
+    return 'US';
+  }
+  if (/\bsc\b|\bsingle\s+crochet\b/i.test(clean)) {
+    return 'US';
+  }
+  if (/\bhtr\b|\bdtr\b|\bhalf\s+treble\b|\bdouble\s+treble\b/i.test(clean)) {
+    return 'UK';
+  }
+  return null;
+};
+
 interface ChatPanelProps {
   token: string;
   category: ChatCategory;
+  user?: any;
+  onUpdateCrochetTerminology?: (pref: 'US' | 'UK') => Promise<void>;
 }
 
-export function ChatPanel({ token, category }: ChatPanelProps) {
+export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }: ChatPanelProps) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [input, setInput] = useState('');
@@ -46,6 +65,7 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
     const headers = {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
+      'X-User-Terminology': user?.crochetTerminology || 'US',
       ...(options.headers || {})
     };
     try {
@@ -527,7 +547,8 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-User-Terminology': user?.crochetTerminology || 'US'
         },
         body: JSON.stringify({
           text: userText.trim() || 'Analyze this image',
@@ -571,6 +592,86 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
     }
   };
 
+  const sendAutoMessage = async (text: string) => {
+    if (loading) return;
+    let targetChatId = activeChatId;
+    if (!targetChatId) return;
+
+    setLoading(true);
+    setError(null);
+
+    const randomId = 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(4);
+    const userMsg: ChatMessage = {
+      id: randomId,
+      role: 'user',
+      text: text,
+      createdAt: new Date().toISOString()
+    };
+
+    // Instantly append locally
+    setSessions(prev => prev.map(s => {
+      if (s.chatId === targetChatId) {
+         return {
+           ...s,
+           messages: [...(s.messages || []), userMsg]
+         };
+      }
+      return s;
+    }));
+
+    try {
+      const res = await fetch(`/api/v1/chats/${targetChatId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-User-Terminology': user?.crochetTerminology || 'US'
+        },
+        body: JSON.stringify({
+          text: text,
+          imageData: ''
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 401) {
+          window.dispatchEvent(new Event('unauthorized'));
+        }
+        throw new Error(data.error || 'Interaction error with Gemini API.');
+      }
+
+      const responseMsg: ChatMessage = {
+        id: data.id || 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(4),
+        role: 'model',
+        text: data.text || 'Standard error interpreting feed.',
+        createdAt: data.createdAt || new Date().toISOString()
+      };
+
+      setSessions(prev => prev.map(s => {
+        if (s.chatId === targetChatId) {
+          const hasMessage = s.messages.some(m => m.id === responseMsg.id || (m.role === 'model' && m.text === responseMsg.text));
+          if (hasMessage) return s;
+          return {
+            ...s,
+            messages: [...(s.messages || []), responseMsg]
+          };
+        }
+        return s;
+      }));
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Connection lost to AI engine.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTranslateMessage = (fromTerm: 'US' | 'UK', toTerm: 'US' | 'UK') => {
+    const prompt = `Please translate the pattern above from ${fromTerm === 'US' ? 'US Standard' : 'UK Standard'} terminology to ${toTerm === 'US' ? 'US Standard' : 'UK Standard'} terminology. Keep all instructions and formatting intact.`;
+    sendAutoMessage(prompt);
+  };
+
   // Helper trigger
   const triggerAttachment = () => {
     fileInputRef.current?.click();
@@ -596,7 +697,7 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
         <div className="flex-1 overflow-y-auto p-3 space-y-1.5 scrollbar-thin">
           {filteredSessions.length === 0 ? (
             <div className="text-center py-12 px-4 text-[#A89F94]">
-              <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50 text-[#F5CAC3]" />
+              <MessagesSquare className="w-8 h-8 mx-auto mb-2 opacity-50 text-[#F5CAC3]" />
               <p className="text-xs font-bold uppercase tracking-wider">No Conversational Threads</p>
               <button
                 onClick={() => setActiveChatId(null)}
@@ -619,7 +720,7 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
                     }`}
                 >
                   <div className="flex items-center gap-2.5 truncate w-full mr-2">
-                    <MessageSquare className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-[#F28482]' : 'text-[#A89F94]'}`} />
+                    <MessagesSquare className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-[#F28482]' : 'text-[#A89F94]'}`} />
                     {isEditing ? (
                       <input
                         type="text"
@@ -789,7 +890,7 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
               </div>
             </div>
           ) : (
-            activeChat.messages.map((msg) => {
+            activeChat.messages.map((msg, index) => {
               const isUser = msg.role === 'user';
               return (
                 <div
@@ -825,9 +926,43 @@ export function ChatPanel({ token, category }: ChatPanelProps) {
                       {isUser ? (
                         <p className="text-xs font-semibold whitespace-pre-wrap leading-relaxed">{msg.text}</p>
                       ) : (
-                        <div className="markdown-body text-xs">
-                          <Markdown>{msg.text}</Markdown>
-                        </div>
+                        <>
+                          <div className="markdown-body text-xs">
+                            <Markdown>{msg.text}</Markdown>
+                          </div>
+
+                          {(() => {
+                            const prevMsg = index > 0 ? activeChat.messages[index - 1] : null;
+                            const isResponseToImage = prevMsg?.imageData || category === 'pattern-decoder';
+
+                            if (isResponseToImage) {
+                              const detectedTerm = detectTerminology(msg.text);
+                              const preferredTerm = user?.crochetTerminology || 'US';
+
+                              if (detectedTerm && detectedTerm !== preferredTerm && !msg.text.toLowerCase().includes('translated')) {
+                                return (
+                                  <div className="mt-3 p-3 bg-amber-50/70 border border-amber-200/50 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#6B5A45] animate-fade-in shadow-xs">
+                                    <div className="flex items-center gap-2">
+                                      <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 animate-pulse" />
+                                      <span>
+                                        Detected <strong>{detectedTerm === 'US' ? 'US' : 'UK'} Standard</strong> terminology standard in pattern.
+                                        Your preference is <strong>{preferredTerm} Standard</strong>.
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleTranslateMessage(detectedTerm, preferredTerm)}
+                                      className="px-2.5 py-1.5 bg-[#F28482] text-white font-extrabold rounded-lg hover:bg-[#E07A78] hover:scale-[1.02] active:scale-[0.98] transition-all whitespace-nowrap cursor-pointer shadow-xs"
+                                    >
+                                      Translate to {preferredTerm}
+                                    </button>
+                                  </div>
+                                );
+                              }
+                            }
+                            return null;
+                          })()}
+                        </>
                       )}
                     </div>
                     {/* Timestamp helper */}

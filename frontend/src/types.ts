@@ -8,6 +8,7 @@ export interface User {
   displayName: string;
   email: string;
   avatarUrl: string;
+  crochetTerminology?: 'US' | 'UK';
   createdAt: string;
 }
 
@@ -62,6 +63,7 @@ export interface Project {
   isFavorite?: boolean;
   isArchive?: boolean;
   thumbnailIndex?: number;
+  updatedAt?: string;
 }
 
 export interface JournalLog {

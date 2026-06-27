@@ -16,6 +16,7 @@ public class UserResponse {
     private String avatarUrl;
     private MembershipStatus membershipStatus;
     private boolean membershipActive;
+    private String crochetTerminology;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

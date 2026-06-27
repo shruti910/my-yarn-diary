@@ -15,7 +15,8 @@ import { AuthScreen } from './components/AuthScreen';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { CrochetLoader } from './components/CrochetLoader';
 import { Category, Project, JournalLog, ProjectStatus, ChatCategory } from './types';
-import { BookOpen, MessageSquare, Sparkles, X, Menu } from 'lucide-react';
+import { BookOpen, Sparkles, X, Menu } from 'lucide-react';
+import { TerminologyToggle } from './components/TerminologyToggle';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -154,6 +155,7 @@ export default function App() {
     const headers = {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
+      'X-User-Terminology': user?.crochetTerminology || 'US',
       ...(options.headers || {})
     };
     try {
@@ -183,6 +185,36 @@ export default function App() {
     } catch (err) {
       console.error(`%c[Pipeline Fetch Failure] unable to resolve: ${url}`, 'color: #f97316; font-weight: bold;', err);
       throw err;
+    }
+  };
+
+  const updateCrochetTerminology = async (pref: 'US' | 'UK') => {
+    if (!token || !user) return;
+    try {
+      const response = await fetch('/api/v1/users/profile', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'X-User-Terminology': pref
+        },
+        body: JSON.stringify({
+          displayName: user.displayName,
+          email: user.email,
+          phoneNumber: user.phoneNumber || '',
+          avatarUrl: user.avatarUrl || '',
+          crochetTerminology: pref
+        })
+      });
+      if (response.ok) {
+        const dbUser = await response.json();
+        setUser(dbUser);
+        localStorage.setItem('crochet_user', JSON.stringify(dbUser));
+        showToast(`Terminology set to ${pref} Standard`, 'success');
+      }
+    } catch (err) {
+      console.error('Failed to update terminology preference:', err);
+      showToast('Failed to save terminology preference', 'error');
     }
   };
 
@@ -567,33 +599,41 @@ export default function App() {
           </div>
 
           {/* Interactive Navigation Triggers */}
-          <div className="flex bg-[#F9F6F2] p-1 rounded-2xl border border-vibrant-border w-max shadow-inner">
-            <button
-              onClick={() => { setActiveTab('dashboard'); setSelectedProject(null); }}
-              className={`px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer ${activeTab === 'dashboard'
-                ? 'bg-vibrant-coral text-white shadow-sm'
-                : 'text-vibrant-muted hover:bg-vibrant-coral/5 hover:text-vibrant-dark'
-                }`}
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>Project Journal</span>
-            </button>
+          <div className="flex items-center gap-4">
+            {user && (
+              <TerminologyToggle
+                value={user.crochetTerminology || 'US'}
+                onChange={updateCrochetTerminology}
+              />
+            )}
+            <div className="flex bg-[#F9F6F2] p-1 rounded-2xl border border-vibrant-border w-max shadow-inner">
+              <button
+                onClick={() => { setActiveTab('dashboard'); setSelectedProject(null); }}
+                className={`px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer ${activeTab === 'dashboard'
+                  ? 'bg-vibrant-coral text-white shadow-sm'
+                  : 'text-vibrant-muted hover:bg-vibrant-coral/5 hover:text-vibrant-dark'
+                  }`}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Project Journal</span>
+              </button>
 
-            <button
-              onClick={() => {
-                setActiveTab('aitools');
-                setSelectedProject(null);
-                setIsSidebarCollapsed(true);
-                localStorage.setItem('crochet_sidebar_collapsed', 'true');
-              }}
-              className={`px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer ${activeTab === 'aitools'
-                ? 'bg-vibrant-coral text-white shadow-sm'
-                : 'text-vibrant-muted hover:bg-vibrant-coral/5 hover:text-vibrant-dark'
-                }`}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>AI Tools Studio</span>
-            </button>
+              <button
+                onClick={() => {
+                  setActiveTab('aitools');
+                  setSelectedProject(null);
+                  setIsSidebarCollapsed(true);
+                  localStorage.setItem('crochet_sidebar_collapsed', 'true');
+                }}
+                className={`px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer ${activeTab === 'aitools'
+                  ? 'bg-vibrant-coral text-white shadow-sm'
+                  : 'text-vibrant-muted hover:bg-vibrant-coral/5 hover:text-vibrant-dark'
+                  }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>AI Tools Studio</span>
+              </button>
+            </div>
           </div>
         </header>
 
@@ -621,6 +661,8 @@ export default function App() {
                       onDeleteProject={handleDeleteProject}
                       onDuplicateProject={handleDuplicateProject}
                       onArchiveProject={handleArchiveProject}
+                      user={user}
+                      onUpdateCrochetTerminology={updateCrochetTerminology}
                     />
                   </ErrorBoundary>
                 ) : (
@@ -635,6 +677,10 @@ export default function App() {
                       onCreateProject={handleCreateProject}
                       onDeleteProject={handleDeleteProject}
                       onToggleFavorite={handleToggleFavorite}
+                      isSidebarCollapsed={isSidebarCollapsed}
+                      onSelectCategory={handleSelectCategory}
+                      user={user}
+                      onUpdateCrochetTerminology={updateCrochetTerminology}
                     />
                   </ErrorBoundary>
                 )
@@ -642,7 +688,13 @@ export default function App() {
 
               {activeTab === 'aitools' && (
                 <ErrorBoundary>
-                  <AiTools key={aiToolsInitialTab} token={token} initialTab={aiToolsInitialTab} />
+                  <AiTools
+                    key={aiToolsInitialTab}
+                    token={token}
+                    initialTab={aiToolsInitialTab}
+                    user={user}
+                    onUpdateCrochetTerminology={updateCrochetTerminology}
+                  />
                 </ErrorBoundary>
               )}
             </motion.div>

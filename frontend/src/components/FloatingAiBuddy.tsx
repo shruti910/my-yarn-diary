@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MessageSquare, Layers, Eye, Image, GraduationCap, X, Sparkles } from 'lucide-react';
+import { MessagesSquare, Layers, Eye, Image, GraduationCap, X, Sparkles } from 'lucide-react';
 import { ChatCategory } from '../types';
 
 interface FloatingAiBuddyProps {
@@ -15,7 +15,7 @@ export function FloatingAiBuddy({ onSelectTool, onDismiss }: FloatingAiBuddyProp
     {
       id: 'crochet-buddy' as const,
       name: 'AI Crochet Buddy',
-      icon: MessageSquare,
+      icon: MessagesSquare,
       color: 'bg-[#F28482]'
     },
     {

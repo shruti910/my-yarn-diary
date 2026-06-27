@@ -53,6 +53,9 @@ public class UserEntity {
     @Column(name = "membership_active", nullable = false)
     private boolean membershipActive;
 
+    @Column(name = "crochet_terminology", nullable = false, length = 10)
+    private String crochetTerminology;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -65,6 +68,9 @@ public class UserEntity {
         this.updatedAt = LocalDateTime.now();
         if (this.membershipStatus == null) {
             this.membershipStatus = MembershipStatus.FREE;
+        }
+        if (this.crochetTerminology == null) {
+            this.crochetTerminology = "US";
         }
     }
 

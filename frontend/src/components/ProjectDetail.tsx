@@ -4,12 +4,11 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ChevronUp, ChevronDown, Trash2, Camera, Notebook, Save, FolderOpen, Calendar, Heart, Copy, Archive, Star, FolderUp, Pin, PackageOpen, Play, Pause, CheckCircle2, Clock, Hourglass } from 'lucide-react';
+import { ArrowLeft, ChevronUp, ChevronDown, Trash2, Camera, NotebookPen, Save, FolderOpen, Calendar, Heart, Copy, Archive, Star, FolderUp, ClipboardList, PackageOpen, Play, Pause, CircleCheckBig, Clock, CirclePause, Route, ReceiptText } from 'lucide-react';
 import { Project, JournalLog, Category, ProjectStatus, Yarn, Hook } from '../types';
 import { useDialog } from './DialogProvider';
 import { YarnManager } from './YarnManager';
 import { HookManager } from './HookManager';
-import { KnittingNeedles } from './KnittingNeedles';
 
 const capitalizeWords = (str: string): string => {
   if (!str) return '';
@@ -42,6 +41,8 @@ interface ProjectDetailProps {
   onDeleteProject: (projectId: string) => void;
   onDuplicateProject: (projectId: string) => void;
   onArchiveProject: (projectId: string) => void;
+  user?: any;
+  onUpdateCrochetTerminology?: (pref: 'US' | 'UK') => Promise<void>;
 }
 
 export function ProjectDetail({
@@ -53,7 +54,9 @@ export function ProjectDetail({
   onToggleFavorite,
   onDeleteProject,
   onDuplicateProject,
-  onArchiveProject
+  onArchiveProject,
+  user,
+  onUpdateCrochetTerminology
 }: ProjectDetailProps) {
   const [logs, setLogs] = useState<JournalLog[]>([]);
   const [textEntry, setTextEntry] = useState('');
@@ -624,10 +627,10 @@ export function ProjectDetail({
               className="px-3.5 py-2.5 bg-white border border-[#E8E2D9] rounded-xl text-xs font-bold text-[#2D231B] focus:outline-none focus:ring-1 focus:ring-[#F28482] focus:border-[#F28482] disabled:opacity-60 flex items-center gap-2 cursor-pointer min-w-[140px] justify-between transition-all"
             >
               <span className="flex items-center gap-1.5">
-                {status === ProjectStatus.Planning && <Pin className="w-3.5 h-3.5 text-[#D9A05B]" />}
-                {status === ProjectStatus.InProgress && <KnittingNeedles className="w-3.5 h-3.5 text-[#F28482]" />}
-                {status === ProjectStatus.Completed && <CheckCircle2 className="w-3.5 h-3.5 text-[#84A59D]" />}
-                {status === ProjectStatus.OnHold && <Hourglass className="w-3.5 h-3.5 text-[#A89F94]" />}
+                {status === ProjectStatus.Planning && <ClipboardList className="w-3.5 h-3.5 text-[#D9A05B]" />}
+                {status === ProjectStatus.InProgress && <Route className="w-3.5 h-3.5 text-[#F28482]" />}
+                {status === ProjectStatus.Completed && <CircleCheckBig className="w-3.5 h-3.5 text-[#84A59D]" />}
+                {status === ProjectStatus.OnHold && <CirclePause className="w-3.5 h-3.5 text-[#A89F94]" />}
                 {status}
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-[#A89F94] transition-transform duration-200" style={{ transform: isStatusDropdownOpen ? 'rotate(180deg)' : 'none' }} />
@@ -645,7 +648,7 @@ export function ProjectDetail({
                     onClick={() => { setStatus(ProjectStatus.Planning); handleFieldChange(); setIsStatusDropdownOpen(false); }}
                     className="w-full px-3.5 py-2 text-left text-xs font-bold text-[#2D231B] hover:bg-[#FDFCFB] flex items-center gap-2 transition-colors cursor-pointer"
                   >
-                    <Pin className="w-3.5 h-3.5 text-[#D9A05B]" />
+                    <ClipboardList className="w-3.5 h-3.5 text-[#D9A05B]" />
                     <span>Planning</span>
                   </button>
                   <button
@@ -653,7 +656,7 @@ export function ProjectDetail({
                     onClick={() => { setStatus(ProjectStatus.InProgress); handleFieldChange(); setIsStatusDropdownOpen(false); }}
                     className="w-full px-3.5 py-2 text-left text-xs font-bold text-[#2D231B] hover:bg-[#FDFCFB] flex items-center gap-2 transition-colors cursor-pointer"
                   >
-                    <KnittingNeedles className="w-3.5 h-3.5 text-[#F28482]" />
+                    <Route className="w-3.5 h-3.5 text-[#F28482]" />
                     <span>In Progress</span>
                   </button>
                   <button
@@ -661,7 +664,7 @@ export function ProjectDetail({
                     onClick={() => { setStatus(ProjectStatus.Completed); handleFieldChange(); setIsStatusDropdownOpen(false); }}
                     className="w-full px-3.5 py-2 text-left text-xs font-bold text-[#2D231B] hover:bg-[#FDFCFB] flex items-center gap-2 transition-colors cursor-pointer"
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5 text-[#84A59D]" />
+                    <CircleCheckBig className="w-3.5 h-3.5 text-[#84A59D]" />
                     <span>Completed</span>
                   </button>
                   <button
@@ -669,7 +672,7 @@ export function ProjectDetail({
                     onClick={() => { setStatus(ProjectStatus.OnHold); handleFieldChange(); setIsStatusDropdownOpen(false); }}
                     className="w-full px-3.5 py-2 text-left text-xs font-bold text-[#2D231B] hover:bg-[#FDFCFB] flex items-center gap-2 transition-colors cursor-pointer"
                   >
-                    <Hourglass className="w-3.5 h-3.5 text-[#A89F94]" />
+                    <CirclePause className="w-3.5 h-3.5 text-[#A89F94]" />
                     <span>On Hold</span>
                   </button>
                 </div>
@@ -761,7 +764,7 @@ export function ProjectDetail({
 
           {/* PROJECT INFO FORM SPECIFICATIONS */}
           <div className="bg-white rounded-3xl p-6 border border-[#E8E2D9] warm-shadow space-y-4 animate-fade-in">
-            <span className="text-[10px] uppercase font-extrabold tracking-widest text-[#A89F94] block pb-1 border-b border-[#FDFCFB]">Details</span>
+            <span className="text-[10px] uppercase font-extrabold tracking-widest text-[#A89F94] pb-1 border-b border-[#FDFCFB] flex items-center gap-1.5"><ReceiptText className="w-3.5 h-3.5" /> Details</span>
 
             <div className="space-y-3.5">
               <div className="space-y-1">
@@ -993,7 +996,7 @@ export function ProjectDetail({
           {/* PROGRESS WRITING LOGGER BOX */}
           <div className="bg-white rounded-3xl p-6 border border-[#E8E2D9] warm-shadow-lg">
             <h3 className="font-serif font-extrabold text-[#2D231B] text-sm flex items-center gap-2">
-              <Notebook className="w-4 h-4 text-[#F28482]" /> Log Today's Progress..
+              <NotebookPen className="w-4 h-4 text-[#F28482]" /> Log Today's Progress..
             </h3>
 
             <form onSubmit={handleAddLog} className="space-y-4 mt-4">

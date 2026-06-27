@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Project } from '../types';
-import { Image, Filter, Calendar, BookOpen, Sparkles, X, ChevronLeft, ChevronRight, Projector, CheckCircle2, ImageIcon, ChevronDown } from 'lucide-react';
+import { Image, Filter, Calendar, BookOpen, Sparkles, X, ChevronLeft, ChevronRight, Projector, CircleCheckBig, ImageIcon, ChevronDown } from 'lucide-react';
 
 interface ProjectGalleryProps {
   projects: Project[];
@@ -115,7 +115,7 @@ export function ProjectGallery({ projects, token }: ProjectGalleryProps) {
                     : 'text-[#7C7167] hover:text-[#2D231B]'
                 }`}
               >
-                <span className="flex items-center gap-1.5 justify-center"><CheckCircle2 className="w-3 h-3" /> Finished items</span>
+                <span className="flex items-center gap-1.5 justify-center"><CircleCheckBig className="w-3 h-3" /> Finished items</span>
               </button>
               <button
                 type="button"
@@ -188,7 +188,7 @@ export function ProjectGallery({ projects, token }: ProjectGalleryProps) {
                 <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
                   {item.type === 'endProduct' ? (
                     <span className="text-[9px] bg-[#84A59D] text-white px-2 py-0.5 rounded-full font-bold shadow-xs flex items-center gap-1">
-                      <CheckCircle2 className="w-2.5 h-2.5" /> End Product
+                      <CircleCheckBig className="w-2.5 h-2.5" /> End Product
                     </span>
                   ) : (
                     <span className="text-[9px] bg-[#F5CAC3] text-[#2D231B] px-2 py-0.5 rounded-full font-bold shadow-xs flex items-center gap-1">
@@ -281,7 +281,7 @@ export function ProjectGallery({ projects, token }: ProjectGalleryProps) {
                   <div className="flex items-center gap-1.5">
                     {currentLightboxItem.type === 'endProduct' ? (
                       <span className="text-[9px] uppercase bg-[#84A59D] text-white px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                        <CheckCircle2 className="w-2.5 h-2.5 text-white" /> End Product
+                        <CircleCheckBig className="w-2.5 h-2.5 text-white" /> End Product
                       </span>
                     ) : (
                       <span className="text-[9px] uppercase bg-[#F5CAC3] text-[#2D231B] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">

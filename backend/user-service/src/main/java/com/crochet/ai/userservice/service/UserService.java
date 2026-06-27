@@ -84,6 +84,7 @@ public class UserService {
                 .avatarUrl(avatarUrl != null && !avatarUrl.isBlank() ? avatarUrl : "")
                 .membershipStatus(MembershipStatus.FREE)
                 .membershipActive(false)
+                .crochetTerminology("US")
                 .build();
 
         UserEntity savedUser = userRepository.save(user);
@@ -109,6 +110,9 @@ public class UserService {
         }
         if (updateRequest.getAvatarUrl() != null) {
             user.setAvatarUrl(updateRequest.getAvatarUrl());
+        }
+        if (updateRequest.getCrochetTerminology() != null) {
+            user.setCrochetTerminology(updateRequest.getCrochetTerminology());
         }
 
         UserEntity updatedUser = userRepository.save(user);
@@ -160,6 +164,7 @@ public class UserService {
                 .avatarUrl(user.getAvatarUrl())
                 .membershipStatus(user.getMembershipStatus())
                 .membershipActive(user.isMembershipActive())
+                .crochetTerminology(user.getCrochetTerminology())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();

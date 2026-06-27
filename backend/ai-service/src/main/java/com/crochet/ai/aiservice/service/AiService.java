@@ -79,7 +79,7 @@ public class AiService {
     }
 
     @Transactional
-    public ChatMessageDto sendMessage(String userId, String chatId, MessageRequest request) {
+    public ChatMessageDto sendMessage(String userId, String chatId, MessageRequest request, String userTerminology) {
         UUID chatUuid = UUID.fromString(chatId);
         UUID userUuid = UUID.fromString(userId);
         ChatSessionEntity session = chatSessionRepository.findByChatId(chatUuid)
@@ -102,7 +102,7 @@ public class AiService {
         chatMessageRepository.save(userMsg);
 
         // 2. Call external Gemini LLM
-        String assistantReply = callGeminiApiKey(session, request.getText());
+        String assistantReply = callGeminiApiKey(session, request.getText(), userTerminology);
 
         // 3. Save and append Model reply
         ChatMessageEntity modelMsg = ChatMessageEntity.builder()
@@ -172,7 +172,7 @@ public class AiService {
 
 
     // Connects to Gemini's Official Rest endpoints
-    private String callGeminiApiKey(ChatSessionEntity session, String latestPrompt) {
+    private String callGeminiApiKey(ChatSessionEntity session, String latestPrompt, String userTerminology) {
         if (geminiApiKey == null || geminiApiKey.isBlank()) {
             return "Apologies! Our AI service is currently experiencing high traffic or is temporarily unavailable.";
         }
@@ -230,7 +230,14 @@ public class AiService {
             // Inject Custom Crochet System Instructions
             Map<String, Object> systemInstruction = new HashMap<>();
             Map<String, Object> promptPart = new HashMap<>();
-            promptPart.put("text", getSystemInstructions(session.getCategory()));
+            String instructions = getSystemInstructions(session.getCategory());
+            if (userTerminology != null && !userTerminology.isBlank()) {
+                instructions += "\n\n# User Preference\n" +
+                        "The user prefers " + userTerminology + " crochet terminology standard. " +
+                        "Ensure that any crochet patterns, stitches, instructions, or tutorials you provide or explain are written using " + userTerminology + " terminology (e.g., if US, use 'sc' and 'hdc'; if UK, use 'dc' and 'htr' and 'tr'). " +
+                        "If the user uploads an image using a different terminology, you must still output your final pattern/instructions in the user's preferred " + userTerminology + " standard, or explicitly mention that you are translating it for them.";
+            }
+            promptPart.put("text", instructions);
 
             systemInstruction.put("parts", Collections.singletonList(promptPart));
             requestBody.put("systemInstruction", systemInstruction);
@@ -284,7 +291,7 @@ public class AiService {
     }
 
     @Transactional
-    public PatternDecoderResponse decodePattern(String userId, PatternDecoderRequest request) {
+    public PatternDecoderResponse decodePattern(String userId, PatternDecoderRequest request, String userTerminology) {
         UUID userUuid = UUID.fromString(userId);
 
         // 1. Create a new Chat Session specifically for this decoding operation
@@ -316,7 +323,7 @@ public class AiService {
         chatMessageRepository.save(userMsg);
 
         // 3. Request analysis from Gemini API
-        String decodedText = callGeminiForPatternDecoder(request.imageBase64(), request.imageMime());
+        String decodedText = callGeminiForPatternDecoder(request.imageBase64(), request.imageMime(), userTerminology);
 
         // 4. Save the Model response message
         ChatMessageEntity modelMsg = ChatMessageEntity.builder()
@@ -335,7 +342,7 @@ public class AiService {
         return new PatternDecoderResponse(decodedText);
     }
 
-    private String callGeminiForPatternDecoder(String base64Image, String mimeType) {
+    private String callGeminiForPatternDecoder(String base64Image, String mimeType, String userTerminology) {
         if (geminiApiKey == null || geminiApiKey.isBlank()) {
             return "Apologies! Our AI service is currently experiencing high traffic or is temporarily unavailable.";
         }
@@ -358,7 +365,13 @@ public class AiService {
 
             // Prompt text part
             Map<String, Object> textPart = new HashMap<>();
-            textPart.put("text", getSystemInstructions(ChatCategory.PATTERN_DECODER));
+            String instructions = getSystemInstructions(ChatCategory.PATTERN_DECODER);
+            if (userTerminology != null && !userTerminology.isBlank()) {
+                instructions += "\n\n# User Preference\n" +
+                        "The user prefers " + userTerminology + " crochet terminology standard. " +
+                        "Please analyze the uploaded document, detect its terminology standard, and present your output using the user's preferred " + userTerminology + " standard.";
+            }
+            textPart.put("text", instructions);
             partsList.add(textPart);
 
             // Image part
@@ -401,7 +414,7 @@ public class AiService {
     }
 
     @Transactional
-    public PatternDecoderResponse reverseEngineer(String userId, PatternDecoderRequest request) {
+    public PatternDecoderResponse reverseEngineer(String userId, PatternDecoderRequest request, String userTerminology) {
         UUID userUuid = UUID.fromString(userId);
 
         // 1. Create a new Chat Session specifically for this reverse engineering
@@ -434,7 +447,7 @@ public class AiService {
         chatMessageRepository.save(userMsg);
 
         // 3. Request analysis from Gemini API
-        String decodedText = callGeminiForReverseEngineer(request.imageBase64(), request.imageMime());
+        String decodedText = callGeminiForReverseEngineer(request.imageBase64(), request.imageMime(), userTerminology);
 
         // 4. Save the Model response message
         ChatMessageEntity modelMsg = ChatMessageEntity.builder()
@@ -453,7 +466,7 @@ public class AiService {
         return new PatternDecoderResponse(decodedText);
     }
 
-    private String callGeminiForReverseEngineer(String base64Image, String mimeType) {
+    private String callGeminiForReverseEngineer(String base64Image, String mimeType, String userTerminology) {
         if (geminiApiKey == null || geminiApiKey.isBlank()) {
             return "Apologies! Our AI service is currently experiencing high traffic or is temporarily unavailable.";
         }
@@ -476,7 +489,13 @@ public class AiService {
 
             // Prompt text part
             Map<String, Object> textPart = new HashMap<>();
-            textPart.put("text", getSystemInstructions(ChatCategory.REVERSE_ENGINEER));
+            String instructions = getSystemInstructions(ChatCategory.REVERSE_ENGINEER);
+            if (userTerminology != null && !userTerminology.isBlank()) {
+                instructions += "\n\n# User Preference\n" +
+                        "The user prefers " + userTerminology + " crochet terminology standard. " +
+                        "Please analyze the uploaded finished item, reverse-engineer it, and present your reconstructed pattern using the user's preferred " + userTerminology + " standard.";
+            }
+            textPart.put("text", instructions);
             partsList.add(textPart);
 
             // Image part

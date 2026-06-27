@@ -7,11 +7,11 @@ import React, { useState } from 'react';
 import { Mail, Lock, User as UserIcon, Heart, Sparkles, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'motion/react';
 import { auth, googleProvider } from '../lib/firebase';
-import { 
-  signInWithPopup, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  updateProfile 
+import {
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile
 } from 'firebase/auth';
 
 interface AuthScreenProps {
@@ -61,20 +61,20 @@ const parseMessage = (message: string, code: string = ''): string => {
 
 const getFriendlyErrorMessage = (err: any): string => {
   if (!err) return 'An unexpected error occurred.';
-  
+
   if (typeof err === 'string') {
     return parseMessage(err);
   }
-  
+
   let code = err.code || '';
   let message = err.message || '';
-  
+
   // Handle nested Firebase REST API response format (e.g. { error: { message: "EMAIL_EXISTS", ... } })
   if (err.error && typeof err.error === 'object') {
     if (err.error.message) message = err.error.message;
     if (err.error.code) code = String(err.error.code);
   }
-  
+
   return parseMessage(message, code);
 };
 
@@ -85,7 +85,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   const [showPassword, setShowPassword] = useState(false);
   const [displayNameError, setDisplayNameError] = useState('');
   const [emailError, setEmailError] = useState('');
@@ -153,7 +153,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
     setLoading(true);
 
     let isValid = true;
-    
+
     if (!isLogin) {
       const nameErr = validateField('displayName', displayName);
       if (nameErr) {
@@ -161,13 +161,13 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
         isValid = false;
       }
     }
-    
+
     const emailErr = validateField('email', email);
     if (emailErr) {
       setEmailError(emailErr);
       isValid = false;
     }
-    
+
     const passwordErr = validateField('password', password);
     if (passwordErr) {
       setPasswordError(passwordErr);
@@ -225,7 +225,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
       const userCredential = await signInWithPopup(auth, googleProvider);
       const user = userCredential.user;
       const token = await user.getIdToken();
-      
+
       const profileObj = {
         userId: user.uid,
         displayName: user.displayName || user.email?.split('@')[0] || 'Google Crafter',
@@ -246,7 +246,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
     <div id="auth-screen-container" className="min-h-screen bg-[#FDFBF7] flex flex-col items-center justify-center p-4 selection:bg-vibrant-peach/20 relative overflow-hidden">
 
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
@@ -257,23 +257,23 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
             🧶
           </div>
           <h1 className="font-serif text-4xl font-extrabold text-[#2D231B] tracking-tight text-center">
-            crochet<span className="text-[#F28482]">.ai</span>
+            My Yarn <span className="text-[#F28482]">Diary</span>
           </h1>
           <p className="font-sans text-sm text-[#7C7167] mt-2 text-center font-semibold max-w-[280px]">
-            Your AI-enabled companion and journal ecosystem for modern crocheting
+            Your AI-enabled companion and journal ecosystem for modern crocheting.
           </p>
         </div>
 
         {/* Tab Controls */}
         <div className="flex bg-[#F9F6F2] p-1 rounded-xl mb-6 border border-[#E8E2D9]">
-          <button 
+          <button
             type="button"
             className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all cursor-pointer ${isLogin ? 'bg-[#F28482] text-white shadow-sm' : 'text-[#7C7167] hover:text-[#F28482]'}`}
             onClick={() => { setIsLogin(true); setError(''); setDisplayNameError(''); setEmailError(''); setPasswordError(''); }}
           >
             Sign In
           </button>
-          <button 
+          <button
             type="button"
             className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all cursor-pointer ${!isLogin ? 'bg-[#F28482] text-white shadow-sm' : 'text-[#7C7167] hover:text-[#F28482]'}`}
             onClick={() => { setIsLogin(false); setError(''); setDisplayNameError(''); setEmailError(''); setPasswordError(''); }}
@@ -297,16 +297,15 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#A89F94]">
                   <UserIcon className="w-4 h-4" />
                 </span>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={displayName}
                   onChange={handleDisplayNameChange}
                   placeholder="e.g. GrandmaStitches"
-                  className={`w-full pl-10 pr-4 py-3 bg-[#FDFCFB] border rounded-xl text-sm focus:outline-none transition-all text-[#2D231B] placeholder-[#A89F94] font-semibold ${
-                    displayNameError 
-                      ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500' 
+                  className={`w-full pl-10 pr-4 py-3 bg-[#FDFCFB] border rounded-xl text-sm focus:outline-none transition-all text-[#2D231B] placeholder-[#A89F94] font-semibold ${displayNameError
+                      ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
                       : 'border-[#E8E2D9] focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482]'
-                  }`}
+                    }`}
                 />
               </div>
               {displayNameError && (
@@ -324,16 +323,15 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
               <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#A89F94]">
                 <Mail className="w-4 h-4" />
               </span>
-              <input 
-                type="email" 
+              <input
+                type="email"
                 value={email}
                 onChange={handleEmailChange}
                 placeholder="crafter@example.com"
-                className={`w-full pl-10 pr-4 py-3 bg-[#FDFCFB] border rounded-xl text-sm focus:outline-none transition-all text-[#2D231B] placeholder-[#A89F94] font-semibold ${
-                  emailError 
-                    ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500' 
+                className={`w-full pl-10 pr-4 py-3 bg-[#FDFCFB] border rounded-xl text-sm focus:outline-none transition-all text-[#2D231B] placeholder-[#A89F94] font-semibold ${emailError
+                    ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
                     : 'border-[#E8E2D9] focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482]'
-                }`}
+                  }`}
               />
             </div>
             {emailError && (
@@ -350,16 +348,15 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
               <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#A89F94]">
                 <Lock className="w-4 h-4" />
               </span>
-              <input 
-                type={showPassword ? 'text' : 'password'} 
+              <input
+                type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={handlePasswordChange}
                 placeholder="••••••••"
-                className={`w-full pl-10 pr-10 py-3 bg-[#FDFCFB] border rounded-xl text-sm focus:outline-none transition-all text-[#2D231B] placeholder-[#A89F94] font-semibold ${
-                  passwordError 
-                    ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500' 
+                className={`w-full pl-10 pr-10 py-3 bg-[#FDFCFB] border rounded-xl text-sm focus:outline-none transition-all text-[#2D231B] placeholder-[#A89F94] font-semibold ${passwordError
+                    ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
                     : 'border-[#E8E2D9] focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482]'
-                }`}
+                  }`}
               />
               <button
                 type="button"

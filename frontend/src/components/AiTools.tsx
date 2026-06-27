@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { MessageSquare, Layers, Eye, Image, GraduationCap, Sparkles } from 'lucide-react';
+import { MessagesSquare, Layers, Eye, Image, GraduationCap, Sparkles } from 'lucide-react';
 import { ChatPanel } from './ChatPanel';
 import { ChatCategory } from '../types';
 
 interface AiToolsProps {
   token: string;
   initialTab?: ChatCategory;
+  user?: any;
+  onUpdateCrochetTerminology?: (pref: 'US' | 'UK') => Promise<void>;
 }
 
-export function AiTools({ token, initialTab }: AiToolsProps) {
+export function AiTools({ token, initialTab, user, onUpdateCrochetTerminology }: AiToolsProps) {
   const [activeTab, setActiveTab] = useState<ChatCategory>(initialTab || 'crochet-buddy');
 
   const tabs = [
@@ -16,7 +18,7 @@ export function AiTools({ token, initialTab }: AiToolsProps) {
       id: 'crochet-buddy' as const,
       name: 'AI Crochet Buddy',
       description: 'Your companion for real-time tips, stitch calculations, and material suggestions.',
-      icon: MessageSquare,
+      icon: MessagesSquare,
       color: 'bg-[#F28482]'
     },
     {
@@ -86,7 +88,13 @@ export function AiTools({ token, initialTab }: AiToolsProps) {
 
       {/* Main chat interface panel */}
       <div className="flex-1 overflow-hidden">
-        <ChatPanel key={activeTab} token={token} category={activeTab} />
+        <ChatPanel
+          key={activeTab}
+          token={token}
+          category={activeTab}
+          user={user}
+          onUpdateCrochetTerminology={onUpdateCrochetTerminology}
+        />
       </div>
     </div>
   );

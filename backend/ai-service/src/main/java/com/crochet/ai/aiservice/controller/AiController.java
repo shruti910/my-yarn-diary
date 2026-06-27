@@ -44,12 +44,14 @@ public class AiController {
     }
 
     @PostMapping("/chats/{chatId}/messages")
-    public ResponseEntity<ChatMessageDto> sendMessage(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<ChatMessageDto> sendMessage(
+            @RequestHeader("X-User-Id") String userId,
+            @RequestHeader(value = "X-User-Terminology", defaultValue = "US") String userTerminology,
             @PathVariable String chatId,
             @RequestBody MessageRequest request) {
         log.info("Sending message to AI chat session: {} by user: {} (prompt excerpt: '{}')",
                 chatId, userId, request.getText().substring(0, Math.min(request.getText().length(), 40)));
-        return ResponseEntity.ok(aiService.sendMessage(userId, chatId, request));
+        return ResponseEntity.ok(aiService.sendMessage(userId, chatId, request, userTerminology));
     }
 
     @DeleteMapping("/chats/{chatId}")
@@ -71,16 +73,18 @@ public class AiController {
     @PostMapping("/pattern-decoder")
     public ResponseEntity<PatternDecoderResponse> decodePattern(
             @RequestHeader("X-User-Id") String userId,
+            @RequestHeader(value = "X-User-Terminology", defaultValue = "US") String userTerminology,
             @RequestBody PatternDecoderRequest request) {
         log.info("Decoding pattern from image for user: {}", userId);
-        return ResponseEntity.ok(aiService.decodePattern(userId, request));
+        return ResponseEntity.ok(aiService.decodePattern(userId, request, userTerminology));
     }
 
     @PostMapping("/reverse-engineer")
     public ResponseEntity<PatternDecoderResponse> reverseEngineer(
             @RequestHeader("X-User-Id") String userId,
+            @RequestHeader(value = "X-User-Terminology", defaultValue = "US") String userTerminology,
             @RequestBody PatternDecoderRequest request) {
         log.info("Reverse-engineering pattern from image for user: {}", userId);
-        return ResponseEntity.ok(aiService.reverseEngineer(userId, request));
+        return ResponseEntity.ok(aiService.reverseEngineer(userId, request, userTerminology));
     }
 }

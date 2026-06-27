@@ -4,11 +4,10 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Calendar, Play, Heart, Trash2, Pin, PackageOpen, CheckCircle2, Clock, TrendingUp, Trophy, Library, Image as ImageIcon, Archive, Hourglass, Filter, ArrowUpDown, ChevronDown } from 'lucide-react';
+import { Plus, Search, Calendar, Play, Heart, Trash2, ClipboardList, PackageOpen, CircleCheckBig, Clock, TrendingUp, Trophy, FolderOpenDot, Image as ImageIcon, Archive, CirclePause, Filter, ArrowUpDown, ChevronDown, Route } from 'lucide-react';
 import { Project, Category, JournalLog, ProjectStatus } from '../types';
 import { ProjectGallery } from './ProjectGallery';
 import { useDialog } from './DialogProvider';
-import { KnittingNeedles } from './KnittingNeedles';
 
 const capitalizeWords = (str: string): string => {
   if (!str) return '';
@@ -41,6 +40,10 @@ interface DashboardProps {
   onCreateProject: (categoryId: string, title: string, notes?: string) => Promise<any>;
   onDeleteProject: (projectId: string) => void;
   onToggleFavorite: (projectId: string) => void;
+  isSidebarCollapsed?: boolean;
+  onSelectCategory?: (categoryId: string) => void;
+  user?: any;
+  onUpdateCrochetTerminology?: (pref: 'US' | 'UK') => Promise<void>;
 }
 
 export function Dashboard({
@@ -52,7 +55,11 @@ export function Dashboard({
   onSelectProject,
   onCreateProject,
   onDeleteProject,
-  onToggleFavorite
+  onToggleFavorite,
+  isSidebarCollapsed = false,
+  onSelectCategory,
+  user,
+  onUpdateCrochetTerminology
 }: DashboardProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -113,6 +120,16 @@ export function Dashboard({
         return b.title.localeCompare(a.title);
       } else if (sortBy === 'createdAt-asc') {
         return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      } else if (sortBy === 'createdAt-desc') {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      } else if (sortBy === 'updatedAt-asc') {
+        const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : new Date(a.createdAt).getTime();
+        const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : new Date(b.createdAt).getTime();
+        return timeA - timeB;
+      } else if (sortBy === 'updatedAt-desc') {
+        const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : new Date(a.createdAt).getTime();
+        const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : new Date(b.createdAt).getTime();
+        return timeB - timeA;
       } else {
         // default: newest first (createdAt-desc)
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -158,13 +175,13 @@ export function Dashboard({
   const getStatusBadge = (status: ProjectStatus) => {
     switch (status) {
       case ProjectStatus.Planning:
-        return <span className="text-[10px] bg-[#E9C46A]/10 text-[#D9A05B] border border-[#E9C46A]/20 px-2.5 py-1 rounded-full font-bold flex items-center gap-1 w-fit"><Pin className="w-3 h-3 text-[#D9A05B]" /> Planning</span>;
+        return <span className="text-[10px] bg-[#E9C46A]/10 text-[#D9A05B] border border-[#E9C46A]/20 px-2.5 py-1 rounded-full font-bold flex items-center gap-1 w-fit"><ClipboardList className="w-3 h-3 text-[#D9A05B]" /> Planning</span>;
       case ProjectStatus.InProgress:
-        return <span className="text-[10px] bg-[#F28482]/10 text-[#F28482] border border-[#F28482]/20 px-2.5 py-1 rounded-full font-bold flex items-center gap-1 w-fit"><KnittingNeedles className="w-3 h-3 text-[#F28482]" /> In Progress</span>;
+        return <span className="text-[10px] bg-[#F28482]/10 text-[#F28482] border border-[#F28482]/20 px-2.5 py-1 rounded-full font-bold flex items-center gap-1 w-fit"><Route className="w-3 h-3 text-[#F28482]" /> In Progress</span>;
       case ProjectStatus.Completed:
-        return <span className="text-[10px] bg-[#84A59D]/10 text-[#84A59D] border border-[#84A59D]/20 px-2.5 py-1 rounded-full font-bold flex items-center gap-1 w-fit"><CheckCircle2 className="w-3 h-3 text-[#84A59D]" /> Completed</span>;
+        return <span className="text-[10px] bg-[#84A59D]/10 text-[#84A59D] border border-[#84A59D]/20 px-2.5 py-1 rounded-full font-bold flex items-center gap-1 w-fit"><CircleCheckBig className="w-3 h-3 text-[#84A59D]" /> Completed</span>;
       default:
-        return <span className="text-[10px] bg-[#F9F6F2] text-[#A89F94] border border-[#E8E2D9] px-2.5 py-1 rounded-full font-bold flex items-center gap-1 w-fit"><Hourglass className="w-3 h-3 text-[#A89F94]" /> On Hold</span>;
+        return <span className="text-[10px] bg-[#F9F6F2] text-[#A89F94] border border-[#E8E2D9] px-2.5 py-1 rounded-full font-bold flex items-center gap-1 w-fit"><CirclePause className="w-3 h-3 text-[#A89F94]" /> On Hold</span>;
     }
   };
 
@@ -172,58 +189,58 @@ export function Dashboard({
     <div id="dashboard-manager-stage" className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
 
       {/* Dynamic stats cards container */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div className="bg-white rounded-3xl p-4 border border-[#E8E2D9] warm-shadow flex items-center justify-between animate-fade-in">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="bg-white rounded-2xl p-3 border border-[#E8E2D9] warm-shadow flex items-center justify-between animate-fade-in">
           <div>
-            <span className="text-[9px] uppercase font-extrabold tracking-wider text-[#A89F94] block font-mono leading-tight">In Progress</span>
-            <span className="text-2xl font-extrabold font-serif text-[#2D231B] mt-1 block">{totalWips}</span>
+            <span className="text-[9px] uppercase font-semibold tracking-wider text-[#A89F94] block font-mono leading-tight">In Progress</span>
+            <span className="text-xl font-bold font-serif text-[#2D231B] mt-1 block">{totalWips}</span>
           </div>
-          <span className="text-xl bg-[#F28482]/10 border border-[#F28482]/20 w-10 h-10 rounded-xl flex items-center justify-center"><KnittingNeedles className="w-5 h-5 text-[#F28482]" /></span>
+          <span className="bg-[#F28482]/10 border border-[#F28482]/20 w-8 h-8 rounded-lg flex items-center justify-center"><Route className="w-4 h-4 text-[#F28482]" /></span>
         </div>
 
-        <div className="bg-white rounded-3xl p-4 border border-[#E8E2D9] warm-shadow flex items-center justify-between animate-fade-in animate-duration-75">
+        <div className="bg-white rounded-2xl p-3 border border-[#E8E2D9] warm-shadow flex items-center justify-between animate-fade-in animate-duration-75">
           <div>
-            <span className="text-[9px] uppercase font-extrabold tracking-wider text-[#A89F94] block font-mono leading-tight">Completed</span>
-            <span className="text-2xl font-extrabold font-serif text-[#2D231B] mt-1 block">{completedCount}</span>
+            <span className="text-[9px] uppercase font-semibold tracking-wider text-[#A89F94] block font-mono leading-tight">Completed</span>
+            <span className="text-xl font-bold font-serif text-[#2D231B] mt-1 block">{completedCount}</span>
           </div>
-          <span className="text-xl bg-[#84A59D]/10 border border-[#84A59D]/20 w-10 h-10 rounded-xl flex items-center justify-center"><CheckCircle2 className="w-5 h-5 text-[#84A59D]" /></span>
+          <span className="bg-[#84A59D]/10 border border-[#84A59D]/20 w-8 h-8 rounded-lg flex items-center justify-center"><CircleCheckBig className="w-4 h-4 text-[#84A59D]" /></span>
         </div>
 
-        <div className="bg-white rounded-3xl p-4 border border-[#E8E2D9] warm-shadow flex items-center justify-between animate-fade-in animate-duration-100">
+        <div className="bg-white rounded-2xl p-3 border border-[#E8E2D9] warm-shadow flex items-center justify-between animate-fade-in animate-duration-100">
           <div>
-            <span className="text-[9px] uppercase font-extrabold tracking-wider text-[#A89F94] block font-mono leading-tight">Planning</span>
-            <span className="text-2xl font-extrabold font-serif text-[#2D231B] mt-1 block">{planningCount}</span>
+            <span className="text-[9px] uppercase font-semibold tracking-wider text-[#A89F94] block font-mono leading-tight">Planning</span>
+            <span className="text-xl font-bold font-serif text-[#2D231B] mt-1 block">{planningCount}</span>
           </div>
-          <span className="text-xl bg-[#E9C46A]/10 border border-[#E9C46A]/20 w-10 h-10 rounded-xl flex items-center justify-center"><Pin className="w-5 h-5 text-[#D9A05B]" /></span>
+          <span className="bg-[#E9C46A]/10 border border-[#E9C46A]/20 w-8 h-8 rounded-lg flex items-center justify-center"><ClipboardList className="w-4 h-4 text-[#D9A05B]" /></span>
         </div>
 
-        <div className="bg-white rounded-3xl p-4 border border-[#E8E2D9] warm-shadow flex items-center justify-between animate-fade-in animate-duration-150">
+        <div className="bg-white rounded-2xl p-3 border border-[#E8E2D9] warm-shadow flex items-center justify-between animate-fade-in animate-duration-150">
           <div>
-            <span className="text-[9px] uppercase font-extrabold tracking-wider text-[#A89F94] block font-mono leading-tight">On Hold</span>
-            <span className="text-2xl font-extrabold font-serif text-[#2D231B] mt-1 block">{onHoldCount}</span>
+            <span className="text-[9px] uppercase font-semibold tracking-wider text-[#A89F94] block font-mono leading-tight">On Hold</span>
+            <span className="text-xl font-bold font-serif text-[#2D231B] mt-1 block">{onHoldCount}</span>
           </div>
-          <span className="text-xl bg-[#F9F6F2] border border-[#E8E2D9] w-10 h-10 rounded-xl flex items-center justify-center"><Hourglass className="w-5 h-5 text-[#A89F94]" /></span>
+          <span className="bg-[#F9F6F2] border border-[#E8E2D9] w-8 h-8 rounded-lg flex items-center justify-center"><CirclePause className="w-4 h-4 text-[#A89F94]" /></span>
         </div>
 
-        <div className="bg-white rounded-3xl p-4 border border-[#E8E2D9] warm-shadow flex items-center justify-between animate-fade-in animate-duration-200">
+        <div className="bg-white rounded-2xl p-3 border border-[#E8E2D9] warm-shadow flex items-center justify-between animate-fade-in animate-duration-200">
           <div>
-            <span className="text-[9px] uppercase font-extrabold tracking-wider text-[#A89F94] block font-mono leading-tight">Total Rows</span>
-            <span className="text-2xl font-extrabold font-serif text-[#2D231B] mt-1 block">{totalStitches}</span>
+            <span className="text-[9px] uppercase font-semibold tracking-wider text-[#A89F94] block font-mono leading-tight">Total Rows</span>
+            <span className="text-xl font-bold font-serif text-[#2D231B] mt-1 block">{totalStitches}</span>
           </div>
-          <span className="text-xl bg-blue-50 border border-blue-100 w-10 h-10 rounded-xl flex items-center justify-center"><TrendingUp className="w-5 h-5 text-blue-400" /></span>
+          <span className="bg-blue-50 border border-blue-100 w-8 h-8 rounded-lg flex items-center justify-center"><TrendingUp className="w-4 h-4 text-blue-400" /></span>
         </div>
 
-        <div className="bg-white rounded-3xl p-4 border border-[#E8E2D9] warm-shadow flex items-center justify-between animate-fade-in animate-duration-300">
+        <div className="bg-white rounded-2xl p-3 border border-[#E8E2D9] warm-shadow flex items-center justify-between animate-fade-in animate-duration-300">
           <div>
-            <span className="text-[9px] uppercase font-extrabold tracking-wider text-[#A89F94] block font-mono leading-tight">Success Rate</span>
-            <span className="text-2xl font-extrabold font-serif text-[#2D231B] mt-1 block">{completionRate}%</span>
+            <span className="text-[9px] uppercase font-semibold tracking-wider text-[#A89F94] block font-mono leading-tight">Success Rate</span>
+            <span className="text-xl font-bold font-serif text-[#2D231B] mt-1 block">{completionRate}%</span>
           </div>
-          <span className="text-xl bg-amber-50 border border-amber-100 w-10 h-10 rounded-xl flex items-center justify-center"><Trophy className="w-5 h-5 text-amber-500" /></span>
+          <span className="bg-amber-50 border border-amber-100 w-8 h-8 rounded-lg flex items-center justify-center"><Trophy className="w-4 h-4 text-amber-500" /></span>
         </div>
       </div>
 
       {/* Sub-navigation Tabs */}
-      <div className="flex border-b border-[#E8E2D9] gap-6 px-1 pt-1 shrink-0">
+      <div className="flex border-b border-[#E8E2D9] gap-6 px-1 pt-1 shrink-0 -mt-3">
         <button
           type="button"
           onClick={() => setDashboardSubTab('projects')}
@@ -232,7 +249,7 @@ export function Dashboard({
             : 'border-transparent text-[#A89F94] hover:text-[#2D231B]'
             }`}
         >
-          <span className="flex items-center gap-1.5"><Library className="w-4 h-4" /> Project Tracker</span>
+          <span className="flex items-center gap-1.5"><FolderOpenDot className="w-4 h-4" /> Project Tracker</span>
         </button>
         <button
           type="button"
@@ -253,9 +270,31 @@ export function Dashboard({
           {/* Main projects grid workspace control segment */}
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b border-[#E8E2D9] pb-4 bg-white p-5 rounded-3xl mt-4 warm-shadow animate-fade-in">
             <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full lg:w-auto">
-              <h2 className="text-lg font-extrabold font-serif text-[#2D231B] whitespace-nowrap">
-                {categoryId === 'archived' ? 'Archived Projects' : (categoryId === 'all' ? 'All Projects' : (activeCategory?.name || 'My Projects'))}
-              </h2>
+              {isSidebarCollapsed ? (
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <select
+                      value={categoryId}
+                      onChange={(e) => onSelectCategory?.(e.target.value)}
+                      className="appearance-none bg-[#FDFCFB] pl-8 pr-8 py-2.5 border border-[#E8E2D9] rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[#F28482] focus:border-[#F28482] transition-all text-[#2D231B] font-extrabold cursor-pointer min-w-[175px]"
+                    >
+                      <option value="all">All Projects</option>
+                      <option value="archived">Archived Projects</option>
+                      {categories.map((cat) => (
+                        <option key={cat.categoryId} value={cat.categoryId}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                    <FolderOpenDot className="w-3.5 h-3.5 text-[#F28482] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <ChevronDown className="w-3.5 h-3.5 text-[#A89F94] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+              ) : (
+                <h2 className="text-lg font-extrabold font-serif text-[#2D231B] whitespace-nowrap">
+                  {categoryId === 'archived' ? 'Archived Projects' : (categoryId === 'all' ? 'All Projects' : (activeCategory?.name || 'My Projects'))}
+                </h2>
+              )}
 
               <div className="flex flex-wrap items-center gap-2">
                 {/* Stage Filter */}
@@ -288,10 +327,12 @@ export function Dashboard({
                     onChange={(e) => setSortBy(e.target.value)}
                     className="appearance-none bg-[#FDFCFB] pl-8 pr-8 py-2.5 border border-[#E8E2D9] rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[#F28482] focus:border-[#F28482] transition-all text-[#2D231B] font-bold cursor-pointer"
                   >
-                    <option value="createdAt-desc">Newest First</option>
-                    <option value="createdAt-asc">Oldest First</option>
-                    <option value="name-asc">Name (A-Z)</option>
-                    <option value="name-desc">Name (Z-A)</option>
+                    <option value="createdAt-desc">Date Created: Newest</option>
+                    <option value="createdAt-asc">Date Created: Oldest</option>
+                    <option value="updatedAt-desc">Recently Updated</option>
+                    <option value="updatedAt-asc">Least Recently Updated</option>
+                    <option value="name-asc">Alphabetical: A-Z</option>
+                    <option value="name-desc">Alphabetical: Z-A</option>
                   </select>
                   <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#A89F94] pointer-events-none">
                     <ArrowUpDown className="w-3.5 h-3.5" />

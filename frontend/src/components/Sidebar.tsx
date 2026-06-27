@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Folder, Plus, Trash2, Edit2, Check, X, LogOut, Scissors, ChevronLeft, Archive, Heart } from 'lucide-react';
+import { Folder, Plus, Trash2, Edit2, Check, X, LogOut, Scissors, ChevronLeft, Archive, Heart, Settings, CircleUserRound } from 'lucide-react';
 import { Category } from '../types';
 import { useDialog } from './DialogProvider';
 import packageJson from '../../package.json';
@@ -157,7 +157,7 @@ export function Sidebar({
             <div className="text-3xl">🧶</div>
             <div>
               <h2 className="font-sans font-bold text-xl text-[#2D231B] tracking-tight leading-tight">
-                crochet<span className="text-[#F28482]">.ai</span>
+                My Yarn <span className="text-[#F28482]">Diary</span>
               </h2>
               <span className="text-[10px] uppercase font-extrabold tracking-widest text-[#84A59D]">Crafter Companion</span>
             </div>
@@ -175,32 +175,56 @@ export function Sidebar({
         </div>
 
         {/* User profile segment */}
-        <div className="p-4 mx-4 my-3 bg-white border border-[#E8E2D9] rounded-2xl flex items-center justify-between shadow-xs">
-          <div className="flex items-center gap-3">
-            {!isStockOrEmptyAvatar(currentUser?.avatarUrl) ? (
-              <img 
-                src={currentUser.avatarUrl} 
-                alt="User avatar" 
-                referrerPolicy="no-referrer"
-                className="w-10 h-10 rounded-xl object-cover border border-[#E8E2D9]"
-              />
-            ) : (
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold text-white bg-gradient-to-br from-[#F28482] to-[#F5CAC3] border border-[#E8E2D9] select-none shadow-xs">
-                {getInitials(currentUser?.displayName || currentUser?.email)}
+        <div className="p-4 mx-4 my-3 bg-white border border-[#E8E2D9] rounded-2xl flex flex-col gap-3.5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {!isStockOrEmptyAvatar(currentUser?.avatarUrl) ? (
+                <img 
+                  src={currentUser.avatarUrl} 
+                  alt="User avatar" 
+                  referrerPolicy="no-referrer"
+                  className="w-10 h-10 rounded-xl object-cover border border-[#E8E2D9]"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold text-white bg-gradient-to-br from-[#F28482] to-[#F5CAC3] border border-[#E8E2D9] select-none shadow-xs">
+                  {getInitials(currentUser?.displayName || currentUser?.email)}
+                </div>
+              )}
+              <div className="max-w-[120px]">
+                <h4 className="font-sans text-xs font-bold text-[#2D231B] truncate">{currentUser?.displayName}</h4>
+                <p className="text-[10px] text-[#F28482] font-semibold truncate uppercase tracking-wider">{currentUser?.email.split('@')[0]}</p>
               </div>
-            )}
-            <div className="max-w-[120px]">
-              <h4 className="font-sans text-xs font-bold text-[#2D231B] truncate">{currentUser?.displayName}</h4>
-              <p className="text-[10px] text-[#F28482] font-semibold truncate uppercase tracking-wider">{currentUser?.email.split('@')[0]}</p>
             </div>
+            <button 
+              onClick={async () => {
+                const confirmed = await showConfirm('Are you sure you want to sign out?');
+                if (confirmed) onLogout();
+              }}
+              title="Sign Out"
+              className="p-2 rounded-lg hover:bg-red-50 text-[#7C7167] hover:text-red-500 transition-colors cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
-          <button 
-            onClick={onLogout}
-            title="Sign Out"
-            className="p-2 rounded-lg hover:bg-red-50 text-[#7C7167] hover:text-red-500 transition-colors cursor-pointer"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+
+          <div className="flex gap-2 border-t border-[#F9F6F2] pt-2.5">
+            <button 
+              className="flex-1 py-1.5 px-2 bg-[#F9F6F2] hover:bg-[#E8E2D9]/40 border border-[#E8E2D9]/60 rounded-xl text-[10px] font-bold text-[#7C7167] flex items-center justify-center gap-1.5 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              title="User Profile"
+              onClick={async () => { await showAlert("User Profile details will be manageable here soon! 🧶"); }}
+            >
+              <CircleUserRound className="w-3.5 h-3.5 text-[#F28482]" />
+              Profile
+            </button>
+            <button 
+              className="flex-1 py-1.5 px-2 bg-[#F9F6F2] hover:bg-[#E8E2D9]/40 border border-[#E8E2D9]/60 rounded-xl text-[10px] font-bold text-[#7C7167] flex items-center justify-center gap-1.5 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              title="Account Settings"
+              onClick={async () => { await showAlert("Account Settings will be manageable here soon! ⚙️"); }}
+            >
+              <Settings className="w-3.5 h-3.5 text-[#84A59D]" />
+              Settings
+            </button>
+          </div>
         </div>
 
         {/* Categories List Title */}

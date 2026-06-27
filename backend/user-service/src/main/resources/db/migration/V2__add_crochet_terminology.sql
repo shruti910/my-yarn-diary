@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN crochet_terminology VARCHAR(10) NOT NULL DEFAULT 'US';
