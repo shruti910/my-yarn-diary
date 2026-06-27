@@ -5,7 +5,7 @@
 
 import React, { createContext, useContext, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { AlertTriangle, HelpCircle } from 'lucide-react';
+import { AlertTriangle, HelpCircle, CheckCircle2 } from 'lucide-react';
 
 interface DialogOptions {
   title?: string;
@@ -66,53 +66,69 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
               className="bg-white rounded-[2rem] border border-[#E8E2D9] max-w-sm w-full p-6 space-y-5 shadow-2xl relative"
             >
               {/* Header section with themed color icon */}
-              <div className="flex items-start gap-4">
-                <div 
-                  className={`p-3 rounded-2xl shrink-0 ${
-                    activeDialog.type === 'confirm' 
-                      ? 'bg-[#84A59D]/15 text-[#84A59D] border border-[#84A59D]/20' 
-                      : 'bg-[#F28482]/15 text-[#F28482] border border-[#F28482]/20'
-                  }`}
-                >
-                  {activeDialog.type === 'confirm' ? (
-                    <HelpCircle className="w-5 h-5 animate-pulse" />
-                  ) : (
-                    <AlertTriangle className="w-5 h-5 animate-bounce" style={{ animationDuration: '3s' }} />
-                  )}
-                </div>
-                <div className="flex-1 space-y-1">
-                  <h4 className="font-serif font-extrabold text-[#2D231B] text-base leading-snug">
-                    {activeDialog.title}
-                  </h4>
-                  <p className="text-xs text-[#7C7167] font-semibold leading-relaxed whitespace-pre-wrap">
-                    {activeDialog.message}
-                  </p>
-                </div>
-              </div>
+              {(() => {
+                const isSuccess = activeDialog.title && (
+                  activeDialog.title.toLowerCase().includes('success') ||
+                  activeDialog.title.toLowerCase().includes('copied') ||
+                  activeDialog.title.toLowerCase().includes('saved') ||
+                  activeDialog.title.toLowerCase().includes('completed') ||
+                  activeDialog.title.toLowerCase().includes('deactivated')
+                );
+                
+                return (
+                  <>
+                    <div className="flex items-start gap-4">
+                      <div 
+                        className={`p-3 rounded-2xl shrink-0 ${
+                          activeDialog.type === 'confirm' || isSuccess
+                            ? 'bg-[#84A59D]/15 text-[#84A59D] border border-[#84A59D]/20' 
+                            : 'bg-[#F28482]/15 text-[#F28482] border border-[#F28482]/20'
+                        }`}
+                      >
+                        {activeDialog.type === 'confirm' ? (
+                          <HelpCircle className="w-5 h-5 animate-pulse" />
+                        ) : isSuccess ? (
+                          <CheckCircle2 className="w-5 h-5" />
+                        ) : (
+                          <AlertTriangle className="w-5 h-5" />
+                        )}
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <h4 className="font-serif font-extrabold text-[#2D231B] text-base leading-snug">
+                          {activeDialog.title}
+                        </h4>
+                        <p className="text-xs text-[#7C7167] font-semibold leading-relaxed whitespace-pre-wrap">
+                          {activeDialog.message}
+                        </p>
+                      </div>
+                    </div>
 
-              {/* Action buttons footer */}
-              <div className="flex justify-end gap-2.5 pt-1">
-                {activeDialog.type === 'confirm' && (
-                  <button
-                    type="button"
-                    onClick={() => activeDialog.resolve(false)}
-                    className="px-4 py-2 bg-[#FDFCFB] hover:bg-[#F9F6F2] text-[#7C7167] border border-[#E8E2D9] rounded-xl text-xs font-bold transition-all cursor-pointer hover:border-[#84A59D]"
-                  >
-                    Cancel
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => activeDialog.resolve(true)}
-                  className={`px-5 py-2.5 text-white font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer ${
-                    activeDialog.type === 'confirm' 
-                      ? 'bg-[#84A59D] hover:bg-[#84A59D]/90 shadow-[#84A59D]/20' 
-                      : 'bg-[#F28482] hover:bg-[#F28482]/90 shadow-[#F28482]/20'
-                  }`}
-                >
-                  {activeDialog.type === 'confirm' ? 'Confirm' : 'OK'}
-                </button>
-              </div>
+                    {/* Action buttons footer */}
+                    <div className="flex justify-end gap-2.5 pt-1">
+                      {activeDialog.type === 'confirm' && (
+                        <button
+                          type="button"
+                          onClick={() => activeDialog.resolve(false)}
+                          className="px-4 py-2 bg-[#FDFCFB] hover:bg-[#F9F6F2] text-[#7C7167] border border-[#E8E2D9] rounded-xl text-xs font-bold transition-all cursor-pointer hover:border-[#84A59D]"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => activeDialog.resolve(true)}
+                        className={`px-5 py-2.5 text-white font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer ${
+                          activeDialog.type === 'confirm' || isSuccess
+                            ? 'bg-[#84A59D] hover:bg-[#84A59D]/90 shadow-[#84A59D]/20' 
+                            : 'bg-[#F28482] hover:bg-[#F28482]/90 shadow-[#F28482]/20'
+                        }`}
+                      >
+                        {activeDialog.type === 'confirm' ? 'Confirm' : 'OK'}
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
             </motion.div>
           </div>
         )}

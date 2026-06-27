@@ -40,11 +40,8 @@ public class UserEntity {
     @Column(name = "password_hash", nullable = false, length = 100)
     private String passwordHash;
 
-    @Column(name = "phone_number", length = 30)
-    private String phoneNumber;
-
-    @Column(name = "avatar_url", length = 500)
-    private String avatarUrl;
+    @Column(name = "profile_picture", columnDefinition = "TEXT")
+    private String profilePicture;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "membership_status", nullable = false, length = 30)
