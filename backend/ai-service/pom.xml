@@ -10,9 +10,9 @@
     </parent>
     <groupId>com.crochet.ai</groupId>
     <artifactId>ai-service</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>ai-service</name>
-    <description>Crochet.ai Assistant &amp; Tutor Microservice</description>
+    <description>My Yarn Diary AI Assistant &amp; Tutor Microservice</description>
     <properties>
         <java.version>21</java.version>
     </properties>
