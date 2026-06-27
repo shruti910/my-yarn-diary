@@ -68,23 +68,4 @@ public class AiController {
         log.info("Updating AI chat session: {} for user: {} with new title: '{}'", chatId, userId, request.getTitle());
         return ResponseEntity.ok(aiService.updateSession(userId, chatId, request));
     }
-
-
-    @PostMapping("/pattern-decoder")
-    public ResponseEntity<PatternDecoderResponse> decodePattern(
-            @RequestHeader("X-User-Id") String userId,
-            @RequestHeader(value = "X-User-Terminology", defaultValue = "US") String userTerminology,
-            @RequestBody PatternDecoderRequest request) {
-        log.info("Decoding pattern from image for user: {}", userId);
-        return ResponseEntity.ok(aiService.decodePattern(userId, request, userTerminology));
-    }
-
-    @PostMapping("/reverse-engineer")
-    public ResponseEntity<PatternDecoderResponse> reverseEngineer(
-            @RequestHeader("X-User-Id") String userId,
-            @RequestHeader(value = "X-User-Terminology", defaultValue = "US") String userTerminology,
-            @RequestBody PatternDecoderRequest request) {
-        log.info("Reverse-engineering pattern from image for user: {}", userId);
-        return ResponseEntity.ok(aiService.reverseEngineer(userId, request, userTerminology));
-    }
 }

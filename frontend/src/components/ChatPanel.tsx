@@ -270,7 +270,8 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
       const nextSessions = sessions.filter(s => s.chatId !== chatId);
       setSessions(nextSessions);
       if (activeChatId === chatId) {
-        setActiveChatId(nextSessions.length > 0 ? nextSessions[0].chatId : null);
+        const nextFilteredSessions = nextSessions.filter(s => (s.category || 'crochet-buddy') === category);
+        setActiveChatId(nextFilteredSessions.length > 0 ? nextFilteredSessions[0].chatId : null);
       }
     } catch (err) {
       console.error('Failed to delete chat:', err);
