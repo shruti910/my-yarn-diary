@@ -189,7 +189,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           userId: user.uid,
           displayName: user.displayName || user.email?.split('@')[0] || 'Crafter',
           email: user.email || '',
-          avatarUrl: user.photoURL || '',
+          profilePicture: user.photoURL || '',
           createdAt: user.metadata.creationTime || new Date().toISOString()
         };
         onAuthSuccess(token, profileObj);
@@ -205,7 +205,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           userId: user.uid,
           displayName: displayName.trim() || 'Crafter',
           email: user.email || '',
-          avatarUrl: user.photoURL || '',
+          profilePicture: user.photoURL || '',
           createdAt: user.metadata.creationTime || new Date().toISOString()
         };
         onAuthSuccess(token, profileObj);
@@ -230,7 +230,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
         userId: user.uid,
         displayName: user.displayName || user.email?.split('@')[0] || 'Google Crafter',
         email: user.email || '',
-        avatarUrl: user.photoURL || '',
+        profilePicture: user.photoURL || '',
         createdAt: user.metadata.creationTime || new Date().toISOString()
       };
       onAuthSuccess(token, profileObj);

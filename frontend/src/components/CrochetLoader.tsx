@@ -66,10 +66,10 @@ export function CrochetLoader({ onComplete }: CrochetLoaderProps) {
         className="w-full max-w-lg bg-white p-8 md:p-12 rounded-[2.5rem] border-[3px] border-dashed border-[#E8E2D9] relative warm-shadow-lg flex flex-col items-center"
       >
         {/* Cute decorative crochet flower label in top corner */}
-        <div className="absolute -top-4 -right-4 bg-[#F5CAC3] text-[#2D231B] text-xl p-3 rounded-full warm-shadow border-2 border-white animate-bounce" style={{ animationDuration: '3s' }}>
+        <div className="absolute -top-4 -right-4 bg-[#F5CAC3] text-[#2D231B] text-xl p-3 rounded-full warm-shadow border-2 border-white">
           🌸
         </div>
-        <div className="absolute -bottom-4 -left-4 bg-[#84A59D] text-white text-xl p-3 rounded-full warm-shadow border-2 border-white animate-bounce" style={{ animationDuration: '4s' }}>
+        <div className="absolute -bottom-4 -left-4 bg-[#84A59D] text-white text-xl p-3 rounded-full warm-shadow border-2 border-white">
           🧶
         </div>
 

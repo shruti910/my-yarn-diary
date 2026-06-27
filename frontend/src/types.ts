@@ -7,7 +7,7 @@ export interface User {
   userId: string;
   displayName: string;
   email: string;
-  avatarUrl: string;
+  profilePicture: string;
   crochetTerminology?: 'US' | 'UK';
   createdAt: string;
 }

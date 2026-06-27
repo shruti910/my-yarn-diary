@@ -102,7 +102,7 @@ export default function App() {
           'Content-Type': 'application/json',
           'X-User-Name': fallbackProfile?.displayName || '',
           'X-User-Email': fallbackProfile?.email || '',
-          'X-User-Avatar': fallbackProfile?.avatarUrl || ''
+          'X-User-Avatar': fallbackProfile?.profilePicture || ''
         }
       });
       if (response.ok) {
@@ -126,7 +126,7 @@ export default function App() {
           userId: firebaseUser.uid,
           displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Crafter',
           email: firebaseUser.email || '',
-          avatarUrl: firebaseUser.photoURL || '',
+          profilePicture: firebaseUser.photoURL || '',
           createdAt: firebaseUser.metadata.creationTime || new Date().toISOString()
         };
 
@@ -201,8 +201,7 @@ export default function App() {
         body: JSON.stringify({
           displayName: user.displayName,
           email: user.email,
-          phoneNumber: user.phoneNumber || '',
-          avatarUrl: user.avatarUrl || '',
+          profilePicture: user.profilePicture || '',
           crochetTerminology: pref
         })
       });
@@ -572,6 +571,12 @@ export default function App() {
         onLogout={handleLogout}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={toggleSidebar}
+        onUpdateUser={setUser}
+        token={token}
+        onUpdateToken={(newToken) => {
+          setToken(newToken);
+          localStorage.setItem('crochet_token', newToken);
+        }}
       />
 
       {/* 2. Main working content frame */}

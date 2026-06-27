@@ -12,8 +12,7 @@ public class UserResponse {
     private String userId;
     private String displayName;
     private String email;
-    private String phoneNumber;
-    private String avatarUrl;
+    private String profilePicture;
     private MembershipStatus membershipStatus;
     private boolean membershipActive;
     private String crochetTerminology;

@@ -4,9 +4,12 @@
  */
 
 import React, { useState } from 'react';
-import { Folder, Plus, Trash2, Edit2, Check, X, LogOut, Scissors, ChevronLeft, Archive, Heart, Settings, CircleUserRound } from 'lucide-react';
+import { Folder, Plus, Trash2, Edit2, Check, X, LogOut, Scissors, ChevronLeft, Archive, Heart, Settings, CircleUserRound, Camera } from 'lucide-react';
 import { Category } from '../types';
 import { useDialog } from './DialogProvider';
+import { motion, AnimatePresence } from 'motion/react';
+import { updateProfile } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 import packageJson from '../../package.json';
 
 const capitalizeWords = (str: string): string => {
@@ -31,8 +34,8 @@ const isValidName = (str: string): boolean => {
 
 const isStockOrEmptyAvatar = (url?: string): boolean => {
   if (!url) return true;
-  return url.includes('images.unsplash.com/photo-1535713875002-d1d0cf377fde') || 
-         url.includes('images.unsplash.com/photo-1544005313-94ddf0286df2');
+  return url.includes('images.unsplash.com/photo-1535713875002-d1d0cf377fde') ||
+    url.includes('images.unsplash.com/photo-1544005313-94ddf0286df2');
 };
 
 const getInitials = (name?: string): string => {
@@ -58,6 +61,9 @@ interface SidebarProps {
   onLogout: () => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  onUpdateUser: (user: any) => void;
+  token: string | null;
+  onUpdateToken?: (token: string) => void;
 }
 
 export function Sidebar({
@@ -70,7 +76,10 @@ export function Sidebar({
   currentUser,
   onLogout,
   isCollapsed,
-  onToggleCollapse
+  onToggleCollapse,
+  onUpdateUser,
+  token,
+  onUpdateToken
 }: SidebarProps) {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -78,6 +87,129 @@ export function Sidebar({
   const [editCategoryName, setEditCategoryName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { showAlert, showConfirm } = useDialog();
+
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [tempDisplayName, setTempDisplayName] = useState('');
+  const [tempProfilePicture, setTempProfilePicture] = useState('');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isDeactivating, setIsDeactivating] = useState(false);
+
+  const openProfileModal = () => {
+    setTempDisplayName(currentUser?.displayName || '');
+    setTempProfilePicture(currentUser?.profilePicture || '');
+    setIsProfileOpen(true);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check size limit: 2MB
+    const maxBytes = 2 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      showAlert('Profile picture size exceeds the maximum allowed limit of 2MB.', 'File Too Large');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setTempProfilePicture(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!token) return;
+    const name = tempDisplayName.trim();
+    if (!name) return;
+
+    setIsSavingProfile(true);
+    let activeToken = token;
+    try {
+      // 1. Synchronize the display name update with Firebase Auth profile
+      if (auth.currentUser) {
+        try {
+          await updateProfile(auth.currentUser, {
+            displayName: name
+          });
+          // Force refresh token to update the displayName claim inside the ID Token
+          const newToken = await auth.currentUser.getIdToken(true);
+          activeToken = newToken;
+          if (onUpdateToken) {
+            onUpdateToken(newToken);
+          }
+        } catch (firebaseErr) {
+          console.warn('Failed to update Firebase profile display name:', firebaseErr);
+        }
+      }
+
+      // 2. Submit display name and profile picture to backend
+      const response = await fetch('/api/v1/users/profile', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${activeToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          displayName: name,
+          profilePicture: tempProfilePicture,
+          crochetTerminology: currentUser?.crochetTerminology || 'US'
+        })
+      });
+
+      if (response.ok) {
+        const updatedUser = await response.json();
+        onUpdateUser(updatedUser);
+        localStorage.setItem('crochet_user', JSON.stringify(updatedUser));
+        setIsProfileOpen(false);
+        await showAlert('Profile updated successfully!', 'Success');
+      } else {
+        let errorMsg = 'Failed to update profile. Please try again.';
+        try {
+          const data = await response.json();
+          if (data && data.message) errorMsg = data.message;
+        } catch (_) { }
+        await showAlert(errorMsg, 'Error');
+      }
+    } catch (err) {
+      console.error(err);
+      await showAlert('A network error occurred. Please check your connection.', 'Error');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleDeactivateAccount = async () => {
+    if (!token) return;
+    const confirmed = await showConfirm(
+      'Are you sure you want to deactivate your account? This will log you out immediately and make your profile inactive.',
+      'Deactivate Account'
+    );
+    if (!confirmed) return;
+
+    setIsDeactivating(true);
+    try {
+      const response = await fetch('/api/v1/users/profile/deactivate', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        setIsSettingsOpen(false);
+        await showAlert('Your account has been successfully deactivated.', 'Account Deactivated');
+        onLogout();
+      } else {
+        await showAlert('Failed to deactivate your account. Please try again.', 'Error');
+      }
+    } catch (err) {
+      console.error(err);
+      await showAlert('A network error occurred. Please try again.', 'Error');
+    } finally {
+      setIsDeactivating(false);
+    }
+  };
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,11 +276,10 @@ export function Sidebar({
   };
 
   return (
-    <div 
-      id="sidebar-container" 
-      className={`bg-[#F9F6F2] flex flex-col h-full shrink-0 transition-all duration-300 ease-in-out ${
-        isCollapsed ? 'w-0 border-r-0 overflow-hidden' : 'w-80 border-r border-[#E8E2D9]'
-      }`}
+    <div
+      id="sidebar-container"
+      className={`bg-[#F9F6F2] flex flex-col h-full shrink-0 transition-all duration-300 ease-in-out ${isCollapsed ? 'w-0 border-r-0 overflow-hidden' : 'w-80 border-r border-[#E8E2D9]'
+        }`}
     >
       <div className="w-80 h-full flex flex-col shrink-0">
         {/* Brand area */}
@@ -164,7 +295,7 @@ export function Sidebar({
           </div>
           <div className="flex items-center gap-3">
             <span className="text-[#A89F94] text-[10px] font-mono">v{packageJson.version}</span>
-            <button 
+            <button
               onClick={onToggleCollapse}
               className="p-2 bg-white border border-[#E8E2D9] text-[#7C7167] hover:text-[#F28482] hover:border-[#F28482]/30 rounded-xl shadow-xs transition-all duration-200 cursor-pointer flex items-center justify-center hover:scale-105 active:scale-95"
               title="Collapse Sidebar"
@@ -178,10 +309,10 @@ export function Sidebar({
         <div className="p-4 mx-4 my-3 bg-white border border-[#E8E2D9] rounded-2xl flex flex-col gap-3.5 shadow-xs">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {!isStockOrEmptyAvatar(currentUser?.avatarUrl) ? (
-                <img 
-                  src={currentUser.avatarUrl} 
-                  alt="User avatar" 
+              {!isStockOrEmptyAvatar(currentUser?.profilePicture) ? (
+                <img
+                  src={currentUser.profilePicture}
+                  alt="User avatar"
                   referrerPolicy="no-referrer"
                   className="w-10 h-10 rounded-xl object-cover border border-[#E8E2D9]"
                 />
@@ -195,7 +326,7 @@ export function Sidebar({
                 <p className="text-[10px] text-[#F28482] font-semibold truncate uppercase tracking-wider">{currentUser?.email.split('@')[0]}</p>
               </div>
             </div>
-            <button 
+            <button
               onClick={async () => {
                 const confirmed = await showConfirm('Are you sure you want to sign out?');
                 if (confirmed) onLogout();
@@ -208,18 +339,18 @@ export function Sidebar({
           </div>
 
           <div className="flex gap-2 border-t border-[#F9F6F2] pt-2.5">
-            <button 
+            <button
               className="flex-1 py-1.5 px-2 bg-[#F9F6F2] hover:bg-[#E8E2D9]/40 border border-[#E8E2D9]/60 rounded-xl text-[10px] font-bold text-[#7C7167] flex items-center justify-center gap-1.5 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
               title="User Profile"
-              onClick={async () => { await showAlert("User Profile details will be manageable here soon! 🧶"); }}
+              onClick={openProfileModal}
             >
               <CircleUserRound className="w-3.5 h-3.5 text-[#F28482]" />
               Profile
             </button>
-            <button 
+            <button
               className="flex-1 py-1.5 px-2 bg-[#F9F6F2] hover:bg-[#E8E2D9]/40 border border-[#E8E2D9]/60 rounded-xl text-[10px] font-bold text-[#7C7167] flex items-center justify-center gap-1.5 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
               title="Account Settings"
-              onClick={async () => { await showAlert("Account Settings will be manageable here soon! ⚙️"); }}
+              onClick={() => setIsSettingsOpen(true)}
             >
               <Settings className="w-3.5 h-3.5 text-[#84A59D]" />
               Settings
@@ -230,7 +361,7 @@ export function Sidebar({
         {/* Categories List Title */}
         <div className="px-6 py-2 flex items-center justify-between mt-2">
           <span className="text-[11px] font-bold text-[#7C7167] uppercase tracking-widest">categories</span>
-          <button 
+          <button
             onClick={() => setIsAdding(!isAdding)}
             className="p-1 rounded-md hover:bg-white text-[#F28482] transition-colors cursor-pointer"
             title="New Category"
@@ -243,7 +374,7 @@ export function Sidebar({
         {isAdding && (
           <form onSubmit={handleAddSubmit} className="px-6 py-2">
             <div className="flex items-center gap-1 bg-white p-1 border border-[#E8E2D9] rounded-xl shadow-xs">
-              <input 
+              <input
                 type="text"
                 autoFocus
                 disabled={isSubmitting}
@@ -252,8 +383,8 @@ export function Sidebar({
                 placeholder="Category tag name..."
                 className="bg-transparent border-none text-xs text-[#2D231B] p-1.5 focus:outline-none w-full placeholder-[#A89F94] font-semibold disabled:opacity-60"
               />
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 disabled={isSubmitting}
                 className="p-1 bg-[#F28482] text-white rounded-lg hover:bg-[#F28482]/80 transition-colors disabled:opacity-60"
               >
@@ -266,10 +397,10 @@ export function Sidebar({
                   <Check className="w-3.5 h-3.5" />
                 )}
               </button>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 disabled={isSubmitting}
-                onClick={() => setIsAdding(false)} 
+                onClick={() => setIsAdding(false)}
                 className="p-1 text-[#A89F94] hover:text-[#7C7167] disabled:opacity-40"
               >
                 <X className="w-3.5 h-3.5" />
@@ -283,11 +414,10 @@ export function Sidebar({
           {/* All Projects Option */}
           <div
             onClick={() => onSelectCategory('all')}
-            className={`group flex items-center justify-between p-3 rounded-xl transition-all duration-200 cursor-pointer border ${
-              activeCategoryId === 'all'
-                ? 'bg-white border-[#E8E2D9] text-[#F28482] font-semibold warm-shadow' 
-                : 'bg-transparent border-transparent hover:bg-white/40 text-[#4A3F35] hover:text-[#2D231B]'
-            }`}
+            className={`group flex items-center justify-between p-3 rounded-xl transition-all duration-200 cursor-pointer border ${activeCategoryId === 'all'
+              ? 'bg-white border-[#E8E2D9] text-[#F28482] font-semibold warm-shadow'
+              : 'bg-transparent border-transparent hover:bg-white/40 text-[#4A3F35] hover:text-[#2D231B]'
+              }`}
           >
             <div className="flex items-center gap-3 w-full">
               <Folder className={`w-4 h-4 shrink-0 ${activeCategoryId === 'all' ? 'text-[#F28482] fill-[#F5CAC3]/20' : 'text-[#A89F94]'}`} />
@@ -297,11 +427,10 @@ export function Sidebar({
 
           <div
             onClick={() => onSelectCategory('archived')}
-            className={`group flex items-center justify-between p-3 rounded-xl transition-all duration-200 cursor-pointer border ${
-              activeCategoryId === 'archived'
-                ? 'bg-white border-[#E8E2D9] text-[#F28482] font-semibold warm-shadow' 
-                : 'bg-transparent border-transparent hover:bg-white/40 text-[#4A3F35] hover:text-[#2D231B]'
-            }`}
+            className={`group flex items-center justify-between p-3 rounded-xl transition-all duration-200 cursor-pointer border ${activeCategoryId === 'archived'
+              ? 'bg-white border-[#E8E2D9] text-[#F28482] font-semibold warm-shadow'
+              : 'bg-transparent border-transparent hover:bg-white/40 text-[#4A3F35] hover:text-[#2D231B]'
+              }`}
           >
             <div className="flex items-center gap-3 w-full">
               <Archive className={`w-4 h-4 shrink-0 ${activeCategoryId === 'archived' ? 'text-[#F28482] fill-[#F5CAC3]/20' : 'text-[#A89F94]'}`} />
@@ -322,22 +451,21 @@ export function Sidebar({
               <div
                 key={catId}
                 onClick={() => { if (!isEditing) onSelectCategory(catId); }}
-                className={`group flex items-center justify-between p-3 rounded-xl transition-all duration-200 cursor-pointer border ${
-                  isActive 
-                    ? 'bg-white border-[#E8E2D9] text-[#F28482] font-semibold warm-shadow' 
-                    : 'bg-transparent border-transparent hover:bg-white/40 text-[#4A3F35] hover:text-[#2D231B]'
-                }`}
+                className={`group flex items-center justify-between p-3 rounded-xl transition-all duration-200 cursor-pointer border ${isActive
+                  ? 'bg-white border-[#E8E2D9] text-[#F28482] font-semibold warm-shadow'
+                  : 'bg-transparent border-transparent hover:bg-white/40 text-[#4A3F35] hover:text-[#2D231B]'
+                  }`}
               >
                 <div className="flex items-center gap-3 w-full">
                   <Folder className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#F28482] fill-[#F5CAC3]/20' : 'text-[#A89F94]'}`} />
                   {isEditing ? (
                     <input
-                       type="text"
-                       value={editCategoryName}
-                       disabled={isSubmitting}
-                       onClick={(e) => e.stopPropagation()}
-                       onChange={(e) => setEditCategoryName(e.target.value)}
-                       className="w-full bg-white border border-[#E8E2D9] rounded-lg text-xs p-1 focus:outline-none text-[#2D231B] disabled:opacity-60"
+                      type="text"
+                      value={editCategoryName}
+                      disabled={isSubmitting}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => setEditCategoryName(e.target.value)}
+                      className="w-full bg-white border border-[#E8E2D9] rounded-lg text-xs p-1 focus:outline-none text-[#2D231B] disabled:opacity-60"
                     />
                   ) : (
                     <span className="text-xs truncate font-semibold">{cat.name}</span>
@@ -348,8 +476,8 @@ export function Sidebar({
                 <div className="flex items-center gap-1">
                   {isEditing ? (
                     <>
-                      <button 
-                        onClick={(e) => saveRename(cat, e)} 
+                      <button
+                        onClick={(e) => saveRename(cat, e)}
                         disabled={isSubmitting}
                         className="p-1 rounded text-green-600 hover:bg-green-50 disabled:opacity-40"
                       >
@@ -362,8 +490,8 @@ export function Sidebar({
                           <Check className="w-3 h-3" />
                         )}
                       </button>
-                      <button 
-                        onClick={cancelRename} 
+                      <button
+                        onClick={cancelRename}
                         disabled={isSubmitting}
                         className="p-1 rounded text-[#A89F94] hover:bg-stone-100 disabled:opacity-40"
                       >
@@ -403,6 +531,232 @@ export function Sidebar({
           </p>
         </div>
       </div>
+
+      {/* Profile Settings Modal */}
+      <AnimatePresence>
+        {isProfileOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/45 backdrop-blur-xs select-none">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="bg-white rounded-[2rem] border border-[#E8E2D9] max-w-md w-full p-6 space-y-5 shadow-2xl relative text-left"
+            >
+              {/* Header */}
+              <div className="flex justify-between items-center pb-2 border-b border-[#F9F6F2]">
+                <h3 className="font-serif font-extrabold text-[#2D231B] text-lg flex items-center gap-2">
+                  <CircleUserRound className="w-5 h-5 text-[#F28482]" />
+                  Profile Settings
+                </h3>
+                <button
+                  onClick={() => setIsProfileOpen(false)}
+                  className="p-1.5 rounded-lg hover:bg-stone-100 text-[#7C7167] transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Form Body */}
+              <div className="space-y-4">
+                {/* Profile Picture */}
+                <div className="flex flex-col items-center gap-3">
+                  <span className="text-[11px] font-bold text-[#7C7167] uppercase tracking-widest self-start">Profile Picture</span>
+                  <div className="relative group w-24 h-24 rounded-full overflow-hidden border border-[#E8E2D9] shadow-xs bg-[#F5CAC3] flex items-center justify-center">
+                    {tempProfilePicture ? (
+                      <img
+                        src={tempProfilePicture}
+                        alt="Profile Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="text-[#2D231B] font-serif font-extrabold text-2xl">
+                        {getInitials(tempDisplayName || currentUser?.email)}
+                      </div>
+                    )}
+
+                    {/* Hover Overlay */}
+                    <label className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white">
+                      <Camera className="w-5 h-5" />
+                      <span className="text-[9px] font-bold uppercase tracking-wider">Upload</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleFileChange}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const fileInput = document.createElement('input');
+                        fileInput.type = 'file';
+                        fileInput.accept = 'image/*';
+                        fileInput.onchange = (e: any) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            // File size validation (2MB)
+                            if (file.size > 2 * 1024 * 1024) {
+                              showAlert('Profile picture size exceeds the maximum allowed limit of 2MB.', 'File Too Large');
+                              return;
+                            }
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setTempProfilePicture(reader.result as string);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        };
+                        fileInput.click();
+                      }}
+                      className="py-1 px-3 bg-[#F9F6F2] hover:bg-[#E8E2D9]/40 border border-[#E8E2D9]/60 rounded-lg text-[10px] font-bold text-[#7C7167] transition-all cursor-pointer"
+                    >
+                      Choose Photo
+                    </button>
+                    {tempProfilePicture && (
+                      <button
+                        type="button"
+                        onClick={() => setTempProfilePicture('')}
+                        className="py-1 px-3 bg-red-50 hover:bg-red-100/60 border border-red-200 rounded-lg text-[10px] font-bold text-red-500 transition-all cursor-pointer"
+                      >
+                        Remove Photo
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Display Name */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-[#7C7167] uppercase tracking-widest">Display Name</label>
+                  <input
+                    type="text"
+                    value={tempDisplayName}
+                    onChange={(e) => setTempDisplayName(e.target.value)}
+                    placeholder="Enter your name"
+                    maxLength={100}
+                    className="w-full px-4 py-2.5 bg-white border border-[#E8E2D9] rounded-xl text-xs font-semibold text-[#2D231B] focus:border-[#F28482] outline-none transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#F9F6F2]">
+                <button
+                  type="button"
+                  onClick={() => setIsProfileOpen(false)}
+                  className="px-4 py-2 bg-[#FDFCFB] hover:bg-[#F9F6F2] text-[#7C7167] border border-[#E8E2D9] rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveProfile}
+                  disabled={isSavingProfile || !tempDisplayName.trim()}
+                  className="px-5 py-2.5 bg-[#84A59D] hover:bg-[#84A59D]/90 text-white font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                >
+                  {isSavingProfile ? (
+                    <>
+                      <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Saving...
+                    </>
+                  ) : 'Save Changes'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Account Settings Modal */}
+      <AnimatePresence>
+        {isSettingsOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/45 backdrop-blur-xs select-none">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="bg-white rounded-[2rem] border border-[#E8E2D9] max-w-md w-full p-6 space-y-5 shadow-2xl relative text-left"
+            >
+              {/* Header */}
+              <div className="flex justify-between items-center pb-2 border-b border-[#F9F6F2]">
+                <h3 className="font-serif font-extrabold text-[#2D231B] text-lg flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-[#84A59D]" />
+                  Account Settings
+                </h3>
+                <button
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="p-1.5 rounded-lg hover:bg-stone-100 text-[#7C7167] transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="space-y-6">
+                {/* Deactivate Account Section */}
+                <div className="space-y-2 bg-[#F9F6F2]/30 p-4 border border-[#E8E2D9]/40 rounded-2xl">
+                  <h4 className="text-xs font-bold text-red-500 uppercase tracking-widest">Deactivate Account</h4>
+                  <p className="text-[11px] text-[#7C7167] font-semibold leading-relaxed">
+                    Deactivating your account will make your profile inactive and log you out immediately. You can reactivate it later by logging back in.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleDeactivateAccount}
+                    disabled={isDeactivating}
+                    className="mt-2 px-4 py-2 border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl text-xs transition-all cursor-pointer disabled:opacity-40"
+                  >
+                    {isDeactivating ? 'Deactivating...' : 'Deactivate Account'}
+                  </button>
+                </div>
+
+                {/* Delete Account Section */}
+                <div className="space-y-2 bg-stone-50/50 p-4 border border-[#E8E2D9]/40 rounded-2xl">
+                  <h4 className="text-xs font-bold text-[#2D231B] uppercase tracking-widest">Delete Account</h4>
+                  <p className="text-[11px] text-[#7C7167] font-semibold leading-relaxed">
+                    To permanently delete your account and all associated patterns, projects, and chat history, please email us to delete your account at:
+                  </p>
+                  <div className="flex items-center justify-between bg-white border border-[#E8E2D9]/60 px-3.5 py-2.5 rounded-xl mt-1">
+                    <a
+                      href="mailto:shrujith8320@gmail.com?subject=Delete%20My%20Yarn%20Diary%20Account"
+                      className="text-xs font-bold text-[#84A59D] hover:underline transition-all"
+                    >
+                      shrujith8320@gmail.com
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText('shrujith8320@gmail.com');
+                        showAlert('Email copied to clipboard!', 'Copied');
+                      }}
+                      className="text-[10px] font-bold text-[#7C7167] bg-[#F9F6F2] hover:bg-[#E8E2D9]/60 px-2 py-1 rounded-md border border-[#E8E2D9]/30 transition-all cursor-pointer"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions Footer */}
+              <div className="flex justify-end pt-2 border-t border-[#F9F6F2]">
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="px-5 py-2.5 bg-[#7C7167] hover:bg-[#7C7167]/90 text-white font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

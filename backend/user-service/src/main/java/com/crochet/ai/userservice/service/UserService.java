@@ -23,7 +23,7 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponse syncUser(String userIdStr, String email, String displayName, String avatarUrl) {
+    public UserResponse syncUser(String userIdStr, String email, String displayName, String profilePicture) {
         if (userIdStr == null || userIdStr.isBlank()) {
             throw new BadRequestException("User ID is required for synchronization");
         }
@@ -35,6 +35,13 @@ public class UserService {
             throw new BadRequestException("Invalid User ID format: " + userIdStr);
         }
 
+        // Reactivate user if they are deactivated
+        if (userRepository.existsByUserIdIncludeDeactivated(userId)) {
+            userRepository.reactivateUser(userId);
+        } else if (email != null && !email.isBlank() && userRepository.existsByEmailIncludeDeactivated(email)) {
+            userRepository.reactivateUserByEmail(email);
+        }
+
         Optional<UserEntity> existingUserOpt = userRepository.findByUserId(userId);
         if (existingUserOpt.isPresent()) {
             UserEntity user = existingUserOpt.get();
@@ -43,8 +50,8 @@ public class UserService {
                 user.setDisplayName(displayName);
                 modified = true;
             }
-            if (avatarUrl != null && !avatarUrl.isBlank() && !avatarUrl.equals(user.getAvatarUrl())) {
-                user.setAvatarUrl(avatarUrl);
+            if (profilePicture != null && !profilePicture.isBlank() && !profilePicture.equals(user.getProfilePicture())) {
+                user.setProfilePicture(profilePicture);
                 modified = true;
             }
             if (email != null && !email.isBlank() && !email.equals(user.getEmail())) {
@@ -66,8 +73,8 @@ public class UserService {
                 if (displayName != null && !displayName.isBlank()) {
                     user.setDisplayName(displayName);
                 }
-                if (avatarUrl != null && !avatarUrl.isBlank()) {
-                    user.setAvatarUrl(avatarUrl);
+                if (profilePicture != null && !profilePicture.isBlank()) {
+                    user.setProfilePicture(profilePicture);
                 }
                 user = userRepository.save(user);
                 return mapToResponse(user);
@@ -80,8 +87,7 @@ public class UserService {
                 .displayName(displayName != null && !displayName.isBlank() ? displayName : "Crafter")
                 .email(email != null && !email.isBlank() ? email : "")
                 .passwordHash("firebase_managed")
-                .phoneNumber("")
-                .avatarUrl(avatarUrl != null && !avatarUrl.isBlank() ? avatarUrl : "")
+                .profilePicture(profilePicture != null && !profilePicture.isBlank() ? profilePicture : "")
                 .membershipStatus(MembershipStatus.FREE)
                 .membershipActive(false)
                 .crochetTerminology("US")
@@ -105,11 +111,9 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User profile not found with ID: " + userId));
 
         user.setDisplayName(updateRequest.getDisplayName());
-        if (updateRequest.getPhoneNumber() != null) {
-            user.setPhoneNumber(updateRequest.getPhoneNumber());
-        }
-        if (updateRequest.getAvatarUrl() != null) {
-            user.setAvatarUrl(updateRequest.getAvatarUrl());
+        if (updateRequest.getProfilePicture() != null) {
+            validateProfilePicture(updateRequest.getProfilePicture());
+            user.setProfilePicture(updateRequest.getProfilePicture());
         }
         if (updateRequest.getCrochetTerminology() != null) {
             user.setCrochetTerminology(updateRequest.getCrochetTerminology());
@@ -117,6 +121,29 @@ public class UserService {
 
         UserEntity updatedUser = userRepository.save(user);
         return mapToResponse(updatedUser);
+    }
+
+    private void validateProfilePicture(String base64Data) {
+        if (base64Data == null || base64Data.isBlank()) {
+            return;
+        }
+        // If it's a web URL (e.g. from initial OAuth sync), bypass base64 validation
+        if (base64Data.startsWith("http://") || base64Data.startsWith("https://")) {
+            return;
+        }
+        String base64Content = base64Data;
+        if (base64Data.contains(",")) {
+            base64Content = base64Data.substring(base64Data.indexOf(",") + 1);
+        }
+        try {
+            byte[] decodedBytes = java.util.Base64.getDecoder().decode(base64Content.trim());
+            long maxBytes = 2 * 1024 * 1024; // 2MB
+            if (decodedBytes.length > maxBytes) {
+                throw new BadRequestException("Profile picture size exceeds the maximum allowed limit of 2MB.");
+            }
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("Invalid profile picture format. Must be a valid Base64 image data string.");
+        }
     }
 
     @Transactional
@@ -160,8 +187,7 @@ public class UserService {
                 .userId(user.getUserId().toString())
                 .displayName(user.getDisplayName())
                 .email(user.getEmail())
-                .phoneNumber(user.getPhoneNumber())
-                .avatarUrl(user.getAvatarUrl())
+                .profilePicture(user.getProfilePicture())
                 .membershipStatus(user.getMembershipStatus())
                 .membershipActive(user.isMembershipActive())
                 .crochetTerminology(user.getCrochetTerminology())

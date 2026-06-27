@@ -59,6 +59,13 @@ public class UserController {
         return ResponseEntity.ok(userService.updateMembership(userId, request));
     }
 
+    @PutMapping("/profile/deactivate")
+    public ResponseEntity<Void> deactivateUser(@RequestHeader("X-User-Id") String userId) {
+        log.warn("Deactivating user account (setting is_active to false) for userId: {}", userId);
+        userService.deleteUser(userId); // This triggers @SoftDelete setting is_active = false
+        return ResponseEntity.noContent().build();
+    }
+
     @DeleteMapping("/profile")
     public ResponseEntity<Void> deleteUser(@RequestHeader("X-User-Id") String userId) {
         log.warn("Deleting user account for userId from header: {}", userId);
