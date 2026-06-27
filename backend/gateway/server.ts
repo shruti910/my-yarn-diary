@@ -134,8 +134,6 @@ app.use('/api/v1/categories', authenticate, proxyTo(CROCHET_SERVICE_URL));
 app.use('/api/v1/gallery', authenticate, proxyTo(CROCHET_SERVICE_URL));
 
 // 3. Generative Multimodal AI Analytics Routing
-app.use('/api/v1/pattern-decoder', authenticate, proxyTo(AI_SERVICE_URL));
-app.use('/api/v1/reverse-engineer', authenticate, proxyTo(AI_SERVICE_URL));
 app.use('/api/v1/ai', authenticate, proxyTo(AI_SERVICE_URL));
 app.use('/api/v1/chats', authenticate, proxyTo(AI_SERVICE_URL));
 
