@@ -1107,14 +1107,17 @@ public class CrochetService {
             yarn.getColorway() != null ? yarn.getColorway() : "",
             yarn.getDyeLot() != null ? yarn.getDyeLot() : "",
             yarn.getWeight() != null ? yarn.getWeight() : "",
-            yarn.getQuantityUsed() != null ? String.valueOf(yarn.getQuantityUsed()) : ""
+            yarn.getFiberContent() != null ? yarn.getFiberContent() : "",
+            yarn.getQuantityUsed(),
+            yarn.getUnit() != null ? yarn.getUnit() : "meters"
         );
     }
 
     private HookResponse mapToHookResponse(Hook hook) {
         return new HookResponse(
             hook.getId(),
-            hook.getSizeMm() != null ? String.valueOf(hook.getSizeMm()) : "",
+            hook.getSizeMm(),
+            hook.getSizeUs() != null ? hook.getSizeUs() : "",
             hook.getMaterial() != null ? hook.getMaterial() : "",
             hook.getBrand() != null ? hook.getBrand() : ""
         );

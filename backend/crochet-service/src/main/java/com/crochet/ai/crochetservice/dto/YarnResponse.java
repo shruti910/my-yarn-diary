@@ -2,10 +2,12 @@ package com.crochet.ai.crochetservice.dto;
 
 public record YarnResponse(
     Long yarnId,
-    String name,
-    String colorName,
-    String colorCode,
+    String brand,
+    String lineName,
+    String colorway,
+    String dyeLot,
     String weight,
-    String yardage,
-    String quantity
+    String fiberContent,
+    Double quantityUsed,
+    String unit
 ) {}

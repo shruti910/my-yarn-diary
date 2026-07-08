@@ -2,7 +2,8 @@ package com.crochet.ai.crochetservice.dto;
 
 public record HookResponse(
     Long hookId,
-    String size,
+    Double sizeMm,
+    String sizeUs,
     String material,
     String brand
 ) {}
