@@ -426,6 +426,12 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
   const handleAttachment = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const files = Array.from(e.target.files);
+      const maxBytes = 2 * 1024 * 1024;
+      const oversizedFile = files.find(f => f.size > maxBytes);
+      if (oversizedFile) {
+        setError(`Photo "${oversizedFile.name}" exceeds the maximum allowed limit of 2MB.`);
+        return;
+      }
       if (attachments.length + files.length > 3) {
         setError('You can attach up to 3 photos per message.');
         return;

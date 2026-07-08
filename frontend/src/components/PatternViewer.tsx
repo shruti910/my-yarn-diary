@@ -246,6 +246,29 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
     const file = e.target.files[0];
     const fileType = file.type;
 
+    const isPdf = fileType === 'application/pdf' || file.name.endsWith('.pdf');
+    const isImage = fileType.startsWith('image/');
+
+    if (isPdf) {
+      const maxPdfBytes = 5 * 1024 * 1024;
+      if (file.size > maxPdfBytes) {
+        showToast('Pattern PDF file size exceeds the maximum allowed limit of 5MB.', 'error');
+        return;
+      }
+    } else if (isImage) {
+      const maxImgBytes = 2 * 1024 * 1024;
+      if (file.size > maxImgBytes) {
+        showToast('Pattern Image file size exceeds the maximum allowed limit of 2MB.', 'error');
+        return;
+      }
+    } else {
+      const maxBytes = 2 * 1024 * 1024;
+      if (file.size > maxBytes) {
+        showToast('File size exceeds the maximum allowed limit of 2MB.', 'error');
+        return;
+      }
+    }
+
     setIsUploading(true);
 
     const reader = new FileReader();

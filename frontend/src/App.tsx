@@ -47,6 +47,12 @@ function ProfileModal({ isOpen, onClose, currentUser, onSave }: ProfileModalProp
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const maxBytes = 2 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      alert('Profile picture size exceeds the maximum allowed limit of 2MB.');
+      return;
+    }
+
     const reader = new FileReader();
     reader.onloadend = () => {
       setProfilePicture(reader.result as string);

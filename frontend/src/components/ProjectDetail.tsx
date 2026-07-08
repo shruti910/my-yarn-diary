@@ -4,12 +4,13 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ChevronUp, ChevronDown, Trash2, Camera, NotebookPen, Save, FolderOpen, Calendar, Heart, Copy, Archive, Star, FolderUp, ClipboardList, PackageOpen, Play, Pause, CircleCheckBig, Clock, CirclePause, Route, ReceiptText, FileText, Plus, Minus } from 'lucide-react';
+import { ArrowLeft, ChevronUp, ChevronDown, Trash2, Camera, NotebookPen, Save, FolderOpen, Calendar, Heart, Copy, Archive, Star, FolderUp, ClipboardList, PackageOpen, Play, Pause, CircleCheckBig, Clock, CirclePause, Route, ReceiptText, FileText, Download, Plus, Minus } from 'lucide-react';
 import { Project, JournalLog, Category, ProjectStatus, Yarn, Hook } from '../types';
 import { useDialog } from './DialogProvider';
 import { YarnManager } from './YarnManager';
 import { HookManager } from './HookManager';
 import { PatternViewer } from './PatternViewer';
+import { exportProjectToPdf } from '../lib/pdfExport';
 
 const capitalizeWords = (str: string): string => {
   if (!str) return '';
@@ -69,6 +70,7 @@ export function ProjectDetail({
   const [submittingLog, setSubmittingLog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const { showAlert, showConfirm } = useDialog();
 
   // Edit fields
@@ -343,6 +345,36 @@ export function ProjectDetail({
     }
   };
 
+  const handleExportPdf = async () => {
+    setIsExporting(true);
+    try {
+      const activeCategory = categories.find(c => c.categoryId === targetCategoryId || c.categoryId === project.categoryId);
+      await exportProjectToPdf(
+        {
+          ...project,
+          title,
+          yarns,
+          hooks,
+          status,
+          notes,
+          startDate,
+          endDate,
+          careInstructions,
+          totalTime,
+          productPhotos
+        },
+        logs,
+        activeCategory?.name || 'General',
+        coverPhoto
+      );
+    } catch (err) {
+      console.error('Failed to export PDF:', err);
+      await showAlert('An error occurred while generating the PDF. Please try again.', 'Export Failed');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const handleProductPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
 
@@ -360,6 +392,14 @@ export function ProjectDetail({
     if (filesArray.length > remainingSlots) {
       await showAlert(`You can only upload up to 6 photos in total. Only the first ${remainingSlots} selected photos will be uploaded.`);
       filesToProcess = filesArray.slice(0, remainingSlots);
+    }
+
+    // Check size limit: 2MB per photo
+    const maxBytes = 2 * 1024 * 1024;
+    const oversizedFile = filesToProcess.find(f => f.size > maxBytes);
+    if (oversizedFile) {
+      await showAlert(`Photo "${oversizedFile.name}" exceeds the maximum allowed limit of 2MB.`, 'File Too Large');
+      return;
     }
 
     setIsUploadingPhoto(true);
@@ -470,9 +510,14 @@ export function ProjectDetail({
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      const maxBytes = 2 * 1024 * 1024;
+      if (file.size > maxBytes) {
+        await showAlert('Photo exceeds the maximum allowed limit of 2MB.', 'File Too Large');
+        return;
+      }
       setLogImageMime(file.type);
       const reader = new FileReader();
       reader.onload = () => {
@@ -717,6 +762,23 @@ export function ProjectDetail({
               </button>
 
               <button
+                type="button"
+                onClick={handleExportPdf}
+                disabled={isExporting}
+                className="p-1 px-1.5 bg-white hover:bg-[#F9F6F2] text-[#A89F94] hover:text-[#84A59D] border border-[#E8E2D9] hover:border-[#84A59D]/30 rounded-lg shrink-0 cursor-pointer transition-colors flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed"
+                title="Export PDF"
+              >
+                {isExporting ? (
+                  <svg className="animate-spin h-4 w-4 text-[#84A59D]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+              </button>
+
+              <button
                 onClick={handleArchive}
                 className={`p-1 px-1.5 bg-white border rounded-lg shrink-0 cursor-pointer transition-colors ${project.isArchive
                   ? 'text-[#84A59D] border-emerald-100 hover:bg-emerald-50/50'
@@ -810,6 +872,7 @@ export function ProjectDetail({
               </>
             )}
           </div>
+
 
           <button
             onClick={handleSaveFields}
