@@ -37,7 +37,7 @@ interface ProjectDetailProps {
   categories: Category[];
   token: string;
   onBack: () => void;
-  onUpdateProject: (updates: Partial<Project>) => Promise<any>;
+  onUpdateProject: (updates: Partial<Project> & { coverPhoto?: string | null }) => Promise<any>;
   onUpdateProjectState: (updatedProject: Project) => void;
   onToggleFavorite: (projectId: string) => void;
   onDeleteProject: (projectId: string) => void;
@@ -81,7 +81,8 @@ export function ProjectDetail({
   const [startDate, setStartDate] = useState(project.startDate || '');
   const [endDate, setEndDate] = useState(project.endDate || '');
   const [productPhotos, setProductPhotos] = useState<string[]>(project.productPhotos || []);
-  const [thumbnailIndex, setThumbnailIndex] = useState(project.thumbnailIndex || 0);
+  const initialCoverPhotoId = project.photos?.find(p => p.isCover)?.id;
+  const [coverPhoto, setCoverPhoto] = useState<string | null>(initialCoverPhotoId ? String(initialCoverPhotoId) : null);
   const [careInstructions, setCareInstructions] = useState(project.careInstructions || '');
   const [totalTime, setTotalTime] = useState(project.totalTime || '');
   const [isSaved, setIsSaved] = useState(true);
@@ -110,7 +111,8 @@ export function ProjectDetail({
     setProductPhotos(project.productPhotos || []);
     setCareInstructions(project.careInstructions || '');
     setTotalTime(project.totalTime || '');
-    setThumbnailIndex(project.thumbnailIndex || 0);
+    const coverId = project.photos?.find(p => p.isCover)?.id;
+    setCoverPhoto(coverId ? String(coverId) : null);
     setIsSaved(true);
   }, [
     project.projectId,
@@ -119,7 +121,9 @@ export function ProjectDetail({
     project.endDate,
     project.careInstructions,
     project.totalTime,
-    project.thumbnailIndex,
+    project.yarns?.map(y => `${y.brand}:${y.lineName}:${y.colorway}:${y.quantityUsed}`).join(','),
+    project.hooks?.map(h => `${h.sizeMm}:${h.sizeUs}:${h.material}`).join(','),
+    project.photos?.map(p => `${p.id}:${p.isCover}`).join(','),
     project.productPhotos?.join(',')
   ]);
 
@@ -136,13 +140,33 @@ export function ProjectDetail({
         if (response.status === 401) {
           window.dispatchEvent(new Event('unauthorized'));
         }
-        let errMsg = `Network API HTTP error ${response.status}: ${response.statusText || 'Response Error'}`;
+        let rawMsg = '';
         try {
           const errData = await response.json();
           if (errData && errData.message) {
-            errMsg = errData.message;
+            rawMsg = errData.message;
           }
         } catch (_) { }
+
+        let errMsg = '';
+        if (response.status >= 500) {
+          errMsg = 'An unexpected server error occurred. Please try again later.';
+        } else if (response.status === 400) {
+          if (rawMsg && (rawMsg.toLowerCase().includes('must be') || rawMsg.toLowerCase().includes('required') || rawMsg.toLowerCase().includes('already exists') || rawMsg.toLowerCase().includes('invalid name') || rawMsg.toLowerCase().includes('either the size'))) {
+            errMsg = rawMsg;
+          } else {
+            errMsg = 'Invalid request. Please check your inputs and try again.';
+          }
+        } else if (response.status === 403) {
+          errMsg = 'You do not have permission to perform this action.';
+        } else if (response.status === 404) {
+          errMsg = 'The requested item could not be found.';
+        } else if (response.status === 409) {
+          errMsg = 'This item already exists.';
+        } else {
+          errMsg = 'Something went wrong. Please check your connection and try again.';
+        }
+
         console.group('%c[Network API Error Interceptor]', 'color: #ef4444; font-weight: bold;');
         console.error(`[URI]: ${url}`);
         console.error(`[Status Code]: ${response.status} (${response.statusText || 'Status Unknown'})`);
@@ -191,6 +215,19 @@ export function ProjectDetail({
       return;
     }
 
+    const invalidHook = hooks.find(h => {
+      const hasMm = h.sizeMm !== undefined && h.sizeMm !== null && !isNaN(h.sizeMm);
+      const hasUs = h.sizeUs && h.sizeUs.trim() !== '';
+      if (!hasMm && !hasUs) return true;
+      if (hasMm && h.sizeMm <= 0) return true;
+      return false;
+    });
+
+    if (invalidHook) {
+      await showAlert('For each hook, please enter either the size in mm (greater than 0), the US size, or both.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await onUpdateProject({
@@ -205,7 +242,7 @@ export function ProjectDetail({
         careInstructions,
         totalTime,
         productPhotos,
-        thumbnailIndex
+        coverPhoto
       });
       setTitle(capitalized);
       setIsSaved(true);
@@ -314,13 +351,13 @@ export function ProjectDetail({
   };
 
   const removeProductPhoto = (index: number) => {
+    const photoBase64 = productPhotos[index];
     setProductPhotos(prev => {
       const updated = prev.filter((_, i) => i !== index);
       setIsSaved(false);
-      if (thumbnailIndex === index) {
-        setThumbnailIndex(0);
-      } else if (thumbnailIndex > index) {
-        setThumbnailIndex(thumbnailIndex - 1);
+      const photoObj = project.photos?.find(p => p.photoBase64 === photoBase64);
+      if (photoObj && (coverPhoto === String(photoObj.id) || coverPhoto === photoBase64)) {
+        setCoverPhoto(null);
       }
       return updated;
     });
@@ -915,44 +952,52 @@ export function ProjectDetail({
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-2">
-                {productPhotos.map((photo, i) => (
-                  <div key={i} className="relative aspect-square group rounded-xl overflow-hidden border border-[#E8E2D9] bg-[#FDFCFB]">
-                    <img
-                      src={photo}
-                      alt={`Finished product showcase ${i + 1}`}
-                      onClick={() => setLightboxImage(photo)}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform cursor-pointer"
-                    />
+                {productPhotos.map((photo, i) => {
+                  const matchedPhoto = project.photos?.find(p => p.photoBase64 === photo);
+                  const isCover = matchedPhoto
+                    ? (coverPhoto === String(matchedPhoto.id) || (coverPhoto === null && matchedPhoto.isCover))
+                    : (coverPhoto === photo);
 
-                    {productPhotos.length > 1 && (
+                  return (
+                    <div key={i} className="relative aspect-square group rounded-xl overflow-hidden border border-[#E8E2D9] bg-[#FDFCFB]">
+                      <img
+                        src={photo}
+                        alt={`Finished product showcase ${i + 1}`}
+                        onClick={() => setLightboxImage(photo)}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform cursor-pointer"
+                      />
+
+                      {productPhotos.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCoverPhoto(matchedPhoto ? String(matchedPhoto.id) : photo);
+                            setIsSaved(false);
+                          }}
+                          className={`absolute bottom-1 left-1 p-1 rounded-lg text-[9px] font-extrabold transition-all flex items-center gap-0.5 shadow-xs cursor-pointer ${
+                            isCover
+                              ? 'bg-[#84A59D] text-white'
+                              : 'bg-white/95 text-[#7C7167] hover:bg-white'
+                          }`}
+                          title="Use as cover"
+                        >
+                          <Star className="w-3 h-3" fill={isCover ? 'white' : 'transparent'} />
+                          {isCover ? 'Cover Photo' : 'Use as cover'}
+                        </button>
+                      )}
+
                       <button
                         type="button"
-                        onClick={() => {
-                          setThumbnailIndex(i);
-                          setIsSaved(false);
-                        }}
-                        className={`absolute bottom-1 left-1 p-1 rounded-lg text-[9px] font-extrabold transition-all flex items-center gap-0.5 shadow-xs cursor-pointer ${thumbnailIndex === i
-                          ? 'bg-[#84A59D] text-white'
-                          : 'bg-white/95 text-[#7C7167] hover:bg-white'
-                          }`}
-                        title="Use as cover"
+                        onClick={() => removeProductPhoto(i)}
+                        disabled={isUploadingPhoto || isSubmitting}
+                        className="absolute top-1 right-1 w-5 h-5 bg-black/60 hover:bg-red-500 rounded-full text-white text-[10px] flex items-center justify-center font-bold transition-all opacity-0 group-hover:opacity-100 cursor-pointer disabled:opacity-40"
+                        title="Remove Photo"
                       >
-                        <Star className="w-3 h-3" fill={thumbnailIndex === i ? 'white' : 'transparent'} />
-                        Use as cover
+                        ×
                       </button>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => removeProductPhoto(i)}
-                      disabled={isUploadingPhoto || isSubmitting}
-                      className="absolute top-1 right-1 w-5 h-5 bg-black/60 hover:bg-red-500 rounded-full text-white text-[10px] flex items-center justify-center font-bold transition-all opacity-0 group-hover:opacity-100 cursor-pointer disabled:opacity-40"
-                      title="Remove Photo"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             )}
 

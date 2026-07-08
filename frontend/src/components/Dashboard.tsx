@@ -29,6 +29,18 @@ const isValidName = (str: string): boolean => {
   return /^[ \p{L}\p{N}\-_()#.]+$/u.test(str) && /[\p{L}\p{N}]/u.test(str);
 };
 
+const getProjectCoverPhoto = (project: Project): string | undefined => {
+  if (project.photos && project.photos.length > 0) {
+    const cover = project.photos.find(ph => ph.isCover);
+    if (cover) return cover.photoBase64;
+    return project.photos[0].photoBase64;
+  }
+  if (project.productPhotos && project.productPhotos.length > 0) {
+    return project.productPhotos[0];
+  }
+  return undefined;
+};
+
 
 interface DashboardProps {
   projects: Project[];
@@ -427,10 +439,10 @@ export function Dashboard({
                     </div>
 
                     {/* Visual Project Thumbnail */}
-                    {p.productPhotos && p.productPhotos.length > 0 ? (
+                    {getProjectCoverPhoto(p) ? (
                       <div className="w-full h-32 rounded-2xl border border-[#E8E2D9] overflow-hidden bg-[#F9F6F2] relative">
                         <img
-                          src={p.productPhotos[p.thumbnailIndex !== undefined && p.thumbnailIndex < p.productPhotos.length ? p.thumbnailIndex : 0]}
+                          src={getProjectCoverPhoto(p)}
                           alt={p.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-350"
                         />

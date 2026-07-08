@@ -15,7 +15,7 @@ public record ProjectPatchRequest(
     String endDate,
     List<String> productPhotos,
     Boolean isArchive,
-    Integer thumbnailIndex,
+    String coverPhoto,
     String careInstructions,
     String totalTime,
     Boolean isFavorite
@@ -31,7 +31,7 @@ public record ProjectPatchRequest(
     public String getEndDate() { return endDate; }
     public List<String> getProductPhotos() { return productPhotos; }
     public Boolean getIsArchive() { return isArchive; }
-    public Integer getThumbnailIndex() { return thumbnailIndex; }
+    public String getCoverPhoto() { return coverPhoto; }
     public String getCareInstructions() { return careInstructions; }
     public String getTotalTime() { return totalTime; }
     public Boolean getIsFavorite() { return isFavorite; }

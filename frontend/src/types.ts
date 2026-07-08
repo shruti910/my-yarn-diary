@@ -70,9 +70,16 @@ export interface Project {
   totalTime?: string;
   isFavorite?: boolean;
   isArchive?: boolean;
-  thumbnailIndex?: number;
   updatedAt?: string;
   patterns?: Pattern[];
+  photos?: PhotoResponse[];
+}
+
+export interface PhotoResponse {
+  id: number;
+  photoBase64: string;
+  isCover: boolean;
+  createdAt?: string;
 }
 
 export interface JournalLog {

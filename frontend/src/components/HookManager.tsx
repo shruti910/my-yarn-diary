@@ -61,10 +61,12 @@ export function HookManager({ hooks, onChange, disabled }: HookManagerProps) {
                     type="number"
                     step="0.25"
                     min="0"
-                    required
                     value={hook.sizeMm || ''}
                     disabled={disabled}
-                    onChange={(e) => updateHook(idx, 'sizeMm', parseFloat(e.target.value))}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      updateHook(idx, 'sizeMm', val ? parseFloat(val) : null);
+                    }}
                     className="w-full bg-transparent border-b border-[#E8E2D9] text-xs py-1 focus:outline-none focus:border-[#F28482]"
                     placeholder="e.g. 5.0"
                   />

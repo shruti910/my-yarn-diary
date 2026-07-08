@@ -26,7 +26,7 @@ public class Hook {
     @JsonIgnore
     private Project project;
 
-    @Column(name = "size_mm", nullable = false)
+    @Column(name = "size_mm")
     private Double sizeMm;
 
     @Column(name = "size_us", length = 30)

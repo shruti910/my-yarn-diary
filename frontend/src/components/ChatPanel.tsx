@@ -83,12 +83,39 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
         if (response.status === 401) {
           window.dispatchEvent(new Event('unauthorized'));
         }
+        let rawMsg = '';
+        try {
+          const errData = await response.json();
+          if (errData && errData.message) {
+            rawMsg = errData.message;
+          }
+        } catch (_) { }
+
+        let errMsg = '';
+        if (response.status >= 500) {
+          errMsg = 'An unexpected server error occurred. Please try again later.';
+        } else if (response.status === 400) {
+          if (rawMsg && (rawMsg.toLowerCase().includes('must be') || rawMsg.toLowerCase().includes('required') || rawMsg.toLowerCase().includes('already exists') || rawMsg.toLowerCase().includes('invalid name') || rawMsg.toLowerCase().includes('either the size'))) {
+            errMsg = rawMsg;
+          } else {
+            errMsg = 'Invalid request. Please check your inputs and try again.';
+          }
+        } else if (response.status === 403) {
+          errMsg = 'You do not have permission to perform this action.';
+        } else if (response.status === 404) {
+          errMsg = 'The requested item could not be found.';
+        } else if (response.status === 409) {
+          errMsg = 'This item already exists.';
+        } else {
+          errMsg = 'Something went wrong. Please check your connection and try again.';
+        }
+
         console.group('%c[Network API Error Interceptor]', 'color: #ef4444; font-weight: bold;');
         console.error(`[URI]: ${url}`);
         console.error(`[Status Code]: ${response.status} (${response.statusText || 'Status Unknown'})`);
         console.error(`[Method]: ${options.method || 'GET'}`);
         console.groupEnd();
-        throw new Error(`Network API HTTP error ${response.status}: ${response.statusText || 'Response Error'}`);
+        throw new Error(errMsg);
       }
       return await response.json();
     } catch (err) {

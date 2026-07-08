@@ -19,7 +19,6 @@ public record ProjectResponse(
     String endDate,
     boolean isFavorite,
     boolean isArchive,
-    int thumbnailIndex,
     List<YarnResponse> yarns,
     List<HookResponse> hooks,
     List<PhotoResponse> photos,

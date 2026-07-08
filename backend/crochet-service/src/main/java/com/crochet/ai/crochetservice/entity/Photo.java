@@ -30,6 +30,10 @@ public class Photo {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "is_cover")
+    @Builder.Default
+    private boolean isCover = false;
+
     @PrePersist
     protected void onCreate() {
         if (this.createdAt == null) {

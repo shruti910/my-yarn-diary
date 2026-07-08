@@ -165,11 +165,22 @@ export function Sidebar({
         setIsProfileOpen(false);
         await showAlert('Profile updated successfully!', 'Success');
       } else {
-        let errorMsg = 'Failed to update profile. Please try again.';
-        try {
-          const data = await response.json();
-          if (data && data.message) errorMsg = data.message;
-        } catch (_) { }
+        let errorMsg = '';
+        if (response.status >= 500) {
+          errorMsg = 'An unexpected server error occurred. Please try again later.';
+        } else {
+          let rawMsg = 'Failed to update profile. Please try again.';
+          try {
+            const data = await response.json();
+            if (data && data.message) rawMsg = data.message;
+          } catch (_) { }
+
+          if (rawMsg && (rawMsg.toLowerCase().includes('must be') || rawMsg.toLowerCase().includes('required') || rawMsg.toLowerCase().includes('already exists') || rawMsg.toLowerCase().includes('invalid name'))) {
+            errorMsg = rawMsg;
+          } else {
+            errorMsg = 'Failed to update profile. Please check your inputs and try again.';
+          }
+        }
         await showAlert(errorMsg, 'Error');
       }
     } catch (err) {

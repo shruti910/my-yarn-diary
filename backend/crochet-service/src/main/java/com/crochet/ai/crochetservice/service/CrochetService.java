@@ -196,13 +196,18 @@ public class CrochetService {
 
     private ProjectSummaryResponse mapToSummaryResponse(Project project) {
         List<String> productPhotos = new ArrayList<>();
-        List<String> fullPhotos = project.getProductPhotos();
-        if (fullPhotos != null && !fullPhotos.isEmpty()) {
-            int idx = project.getThumbnailIndex();
-            if (idx >= 0 && idx < fullPhotos.size()) {
-                productPhotos.add(fullPhotos.get(idx));
+        if (project.getPhotoEntities() != null && !project.getPhotoEntities().isEmpty()) {
+            Photo cover = null;
+            for (Photo p : project.getPhotoEntities()) {
+                if (p.isCover()) {
+                    cover = p;
+                    break;
+                }
+            }
+            if (cover != null) {
+                productPhotos.add(cover.getPhotoBase64());
             } else {
-                productPhotos.add(fullPhotos.get(0));
+                productPhotos.add(project.getPhotoEntities().get(0).getPhotoBase64());
             }
         }
         return new ProjectSummaryResponse(
@@ -219,7 +224,6 @@ public class CrochetService {
                 project.getEndDate(),
                 project.isFavorite(),
                 project.isArchive(),
-                project.getThumbnailIndex(),
                 productPhotos,
                 project.getCreatedAt(),
                 project.getUpdatedAt()
@@ -278,7 +282,6 @@ public class CrochetService {
                 .endDate(request.getEndDate() != null ? request.getEndDate() : "")
                 .isFavorite(false)
                 .isArchive(request.getIsArchive() != null ? request.getIsArchive() : false)
-                .thumbnailIndex(request.getThumbnailIndex() != null ? request.getThumbnailIndex() : 0)
                 .build();
         
         project = projectRepository.save(project);
@@ -304,6 +307,12 @@ public class CrochetService {
         if (request.getHooks() != null) {
             List<Hook> hooks = new ArrayList<>();
             for (HookRequest hr : request.getHooks()) {
+                if ((hr.sizeMm() == null || hr.sizeMm() <= 0) && (hr.sizeUs() == null || hr.sizeUs().isBlank())) {
+                    throw new BadRequestException("Hook size (mm) or Hook size (US) is required.");
+                }
+                if (hr.sizeMm() != null && hr.sizeMm() <= 0) {
+                    throw new BadRequestException("Hook size (mm) must be a positive number.");
+                }
                 hooks.add(Hook.builder()
                         .project(project)
                         .sizeMm(hr.sizeMm())
@@ -317,6 +326,7 @@ public class CrochetService {
 
         if (request.getProductPhotos() != null) {
             project.setProductPhotos(request.getProductPhotos());
+            syncCoverPhotoPreference(project, request.getCoverPhoto());
         }
 
         return mapToProjectResponse(projectRepository.save(project));
@@ -360,6 +370,12 @@ public class CrochetService {
         if (request.getHooks() != null) {
             project.getHookEntities().clear();
             for (HookRequest hr : request.getHooks()) {
+                if ((hr.sizeMm() == null || hr.sizeMm() <= 0) && (hr.sizeUs() == null || hr.sizeUs().isBlank())) {
+                    throw new BadRequestException("Hook size (mm) or Hook size (US) is required.");
+                }
+                if (hr.sizeMm() != null && hr.sizeMm() <= 0) {
+                    throw new BadRequestException("Hook size (mm) must be a positive number.");
+                }
                 project.getHookEntities().add(Hook.builder()
                         .project(project)
                         .sizeMm(hr.sizeMm())
@@ -380,7 +396,7 @@ public class CrochetService {
         if (request.getEndDate() != null) project.setEndDate(request.getEndDate());
         if (request.getProductPhotos() != null) project.setProductPhotos(request.getProductPhotos());
         if (request.getIsArchive() != null) project.setArchive(request.getIsArchive());
-        if (request.getThumbnailIndex() != null) project.setThumbnailIndex(request.getThumbnailIndex());
+        syncCoverPhotoPreference(project, request.getCoverPhoto());
  
         if (request.getPatterns() != null) {
             List<Pattern> currentPatterns = project.getPatternEntities();
@@ -478,6 +494,12 @@ public class CrochetService {
         if (request.getHooks() != null) {
             project.getHookEntities().clear();
             for (HookRequest hr : request.getHooks()) {
+                if ((hr.sizeMm() == null || hr.sizeMm() <= 0) && (hr.sizeUs() == null || hr.sizeUs().isBlank())) {
+                    throw new BadRequestException("Hook size (mm) or Hook size (US) is required.");
+                }
+                if (hr.sizeMm() != null && hr.sizeMm() <= 0) {
+                    throw new BadRequestException("Hook size (mm) must be a positive number.");
+                }
                 project.getHookEntities().add(Hook.builder()
                         .project(project)
                         .sizeMm(hr.sizeMm())
@@ -524,8 +546,8 @@ public class CrochetService {
             project.setArchive(request.getIsArchive());
         }
 
-        if (request.getThumbnailIndex() != null) {
-            project.setThumbnailIndex(request.getThumbnailIndex());
+        if (request.getProductPhotos() != null || request.getCoverPhoto() != null) {
+            syncCoverPhotoPreference(project, request.getCoverPhoto());
         }
 
         if (request.getIsFavorite() != null) {
@@ -902,6 +924,7 @@ public class CrochetService {
         Photo photo = getValidatedPhoto(userId, photoId);
         Project project = photo.getProject();
         project.getPhotoEntities().remove(photo);
+        syncCoverPhotoPreference(project, null);
         projectRepository.save(project);
         photoRepository.delete(photo);
     }
@@ -912,6 +935,67 @@ public class CrochetService {
                 && !request.getStartDate().isBlank() && !request.getEndDate().isBlank()) {
             if (request.getStartDate().compareTo(request.getEndDate()) > 0) {
                 throw new BadRequestException("Start date cannot be after end date");
+            }
+        }
+    }
+
+    private void syncCoverPhotoPreference(Project project, String coverPhotoVal) {
+        if (project.getPhotoEntities() == null || project.getPhotoEntities().isEmpty()) {
+            return;
+        }
+
+        // If there's only one photo, it MUST be the cover
+        if (project.getPhotoEntities().size() == 1) {
+            project.getPhotoEntities().get(0).setCover(true);
+            return;
+        }
+
+        Photo matchedPhoto = null;
+
+        // Try to match coverPhotoVal
+        if (coverPhotoVal != null && !coverPhotoVal.isBlank()) {
+            // First, try matching by ID (Long)
+            try {
+                Long photoId = Long.parseLong(coverPhotoVal);
+                matchedPhoto = project.getPhotoEntities().stream()
+                        .filter(p -> p.getId() != null && p.getId().equals(photoId))
+                        .findFirst()
+                        .orElse(null);
+            } catch (NumberFormatException e) {
+                // Not a Long ID
+            }
+
+            // Second, try matching by base64 content
+            if (matchedPhoto == null) {
+                matchedPhoto = project.getPhotoEntities().stream()
+                        .filter(p -> coverPhotoVal.equals(p.getPhotoBase64()))
+                        .findFirst()
+                        .orElse(null);
+            }
+        }
+
+        // If a matched photo was found, mark it as cover and unmark all others
+        if (matchedPhoto != null) {
+            for (Photo p : project.getPhotoEntities()) {
+                p.setCover(p == matchedPhoto);
+            }
+        } else {
+            // If no match was found (or coverPhotoVal is null), ensure EXACTLY one photo is the cover
+            Photo currentCover = null;
+            for (Photo p : project.getPhotoEntities()) {
+                if (p.isCover()) {
+                    if (currentCover == null) {
+                        currentCover = p;
+                    } else {
+                        // Multiple covers marked: clean up
+                        p.setCover(false);
+                    }
+                }
+            }
+
+            if (currentCover == null) {
+                // No cover marked: default to the first photo
+                project.getPhotoEntities().get(0).setCover(true);
             }
         }
     }
@@ -935,18 +1019,19 @@ public class CrochetService {
                 .endDate(original.getEndDate())
                 .isFavorite(original.isFavorite())
                 .isArchive(false)
-                .thumbnailIndex(original.getThumbnailIndex())
                 .build();
 
-        // Copy photos
+        // Copy photos and clone isCover flag
         List<Photo> photos = new ArrayList<>();
         if (original.getPhotoEntities() != null) {
             for (Photo photo : original.getPhotoEntities()) {
-                photos.add(Photo.builder()
+                Photo duplicatedPhoto = Photo.builder()
                         .project(duplicate)
                         .photoBase64(photo.getPhotoBase64())
+                        .isCover(photo.isCover())
                         .createdAt(LocalDateTime.now())
-                        .build());
+                        .build();
+                photos.add(duplicatedPhoto);
             }
         }
         duplicate.setPhotoEntities(photos);
@@ -997,7 +1082,10 @@ public class CrochetService {
         }
         duplicate.setPatternEntities(patterns);
 
-        return mapToProjectResponse(projectRepository.save(duplicate));
+        // Save duplicate project (cascades saving photos and assigning IDs)
+        duplicate = projectRepository.save(duplicate);
+
+        return mapToProjectResponse(duplicate);
     }
 
     @Transactional
@@ -1036,6 +1124,7 @@ public class CrochetService {
         return new PhotoResponse(
             photo.getId(),
             photo.getPhotoBase64(),
+            photo.isCover(),
             photo.getCreatedAt()
         );
     }
@@ -1078,7 +1167,6 @@ public class CrochetService {
             project.getEndDate(),
             project.isFavorite(),
             project.isArchive(),
-            project.getThumbnailIndex(),
             project.getYarnEntities().stream().map(this::mapToYarnResponse).collect(Collectors.toList()),
             project.getHookEntities().stream().map(this::mapToHookResponse).collect(Collectors.toList()),
             project.getPhotoEntities().stream().map(this::mapToPhotoResponse).collect(Collectors.toList()),

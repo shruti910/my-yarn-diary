@@ -90,10 +90,6 @@ public class Project {
     @Builder.Default
     private boolean isArchive = false;
 
-    @JsonProperty("thumbnailIndex")
-    @Column(name = "thumbnail_index", nullable = false)
-    @Builder.Default
-    private int thumbnailIndex = 0;
 
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JsonIgnore
@@ -119,34 +115,29 @@ public class Project {
         if (this.photoEntities == null) {
             this.photoEntities = new ArrayList<>();
         }
-        if (photos == null) {
+        if (photos == null || photos.isEmpty()) {
             this.photoEntities.clear();
             return;
         }
 
-        List<Photo> updatedList = new ArrayList<>();
+        // 1. Remove photo entities that are no longer in the new photos list
+        this.photoEntities.removeIf(pe -> !photos.contains(pe.getPhotoBase64()));
+
+        // 2. Add new photos that are not already in the entities list
         for (String base64 : photos) {
             if (base64 == null || base64.isBlank()) continue;
 
-            // Find if it already exists
-            Optional<Photo> existing = this.photoEntities.stream()
-                    .filter(pe -> base64.equals(pe.getPhotoBase64()))
-                    .findFirst();
+            boolean exists = this.photoEntities.stream()
+                    .anyMatch(pe -> base64.equals(pe.getPhotoBase64()));
 
-            if (existing.isPresent()) {
-                updatedList.add(existing.get());
-            } else {
-                updatedList.add(Photo.builder()
+            if (!exists) {
+                this.photoEntities.add(Photo.builder()
                         .project(this)
                         .photoBase64(base64)
                         .createdAt(LocalDateTime.now())
                         .build());
             }
         }
-
-        // Clear and replace to trigger JPA orphanRemoval correctly
-        this.photoEntities.clear();
-        this.photoEntities.addAll(updatedList);
     }
 
     @Column(name = "created_at", nullable = false, updatable = false)

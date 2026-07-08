@@ -19,7 +19,6 @@ public record ProjectSummaryResponse(
     String endDate,
     boolean isFavorite,
     boolean isArchive,
-    int thumbnailIndex,
     List<String> productPhotos,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
