@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ProjectEntity {
+public class Project {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -38,7 +38,7 @@ public class ProjectEntity {
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "category_pk_id", nullable = false)
-    private CategoryEntity category;
+    private Category category;
 
     @Column(name = "category_id", nullable = false)
     private UUID categoryId;
@@ -51,13 +51,13 @@ public class ProjectEntity {
     @Fetch(FetchMode.SUBSELECT)
     @JsonProperty("yarns")
     @Builder.Default
-    private List<ProjectYarnEntity> yarnEntities = new ArrayList<>();
+    private List<Yarn> yarnEntities = new ArrayList<>();
 
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @Fetch(FetchMode.SUBSELECT)
     @JsonProperty("hooks")
     @Builder.Default
-    private List<ProjectHookEntity> hookEntities = new ArrayList<>();
+    private List<Hook> hookEntities = new ArrayList<>();
 
     @Column(name = "status", nullable = false, length = 30)
     private ProjectStatus status; // PLANNING, IN_PROGRESS, COMPLETED, ON_HOLD
@@ -98,13 +98,19 @@ public class ProjectEntity {
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JsonIgnore
     @Builder.Default
-    private List<ProjectPhotoEntity> photoEntities = new ArrayList<>();
+    private List<Photo> photoEntities = new ArrayList<>();
+
+    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @Fetch(FetchMode.SUBSELECT)
+    @JsonProperty("patterns")
+    @Builder.Default
+    private List<Pattern> patternEntities = new ArrayList<>();
 
     @Transient
     public List<String> getProductPhotos() {
         if (photoEntities == null) return new ArrayList<>();
         return photoEntities.stream()
-                .map(ProjectPhotoEntity::getPhotoBase64)
+                .map(Photo::getPhotoBase64)
                 .collect(Collectors.toList());
     }
 
@@ -118,19 +124,19 @@ public class ProjectEntity {
             return;
         }
 
-        List<ProjectPhotoEntity> updatedList = new ArrayList<>();
+        List<Photo> updatedList = new ArrayList<>();
         for (String base64 : photos) {
             if (base64 == null || base64.isBlank()) continue;
 
             // Find if it already exists
-            Optional<ProjectPhotoEntity> existing = this.photoEntities.stream()
+            Optional<Photo> existing = this.photoEntities.stream()
                     .filter(pe -> base64.equals(pe.getPhotoBase64()))
                     .findFirst();
 
             if (existing.isPresent()) {
                 updatedList.add(existing.get());
             } else {
-                updatedList.add(ProjectPhotoEntity.builder()
+                updatedList.add(Photo.builder()
                         .project(this)
                         .photoBase64(base64)
                         .createdAt(LocalDateTime.now())

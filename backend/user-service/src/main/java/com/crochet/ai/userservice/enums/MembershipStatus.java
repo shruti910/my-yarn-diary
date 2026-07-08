@@ -1,4 +1,4 @@
-package com.crochet.ai.userservice.entity;
+package com.crochet.ai.userservice.enums;
 
 public enum MembershipStatus {
     FREE,

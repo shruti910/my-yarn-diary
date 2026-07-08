@@ -16,7 +16,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ChatMessageEntity {
+public class ChatMessage {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -26,10 +26,10 @@ public class ChatMessageEntity {
     @Column(name = "message_id", nullable = false, unique = true)
     private UUID messageId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "chat_session_id", nullable = false)
     @JsonIgnore
-    private ChatSessionEntity chatSession;
+    private ChatSession chatSession;
 
     @Column(name = "chat_id", nullable = false)
     private UUID chatId;

@@ -8,7 +8,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-
 import com.crochet.ai.aiservice.dto.ChatCategory;
 
 @Entity
@@ -19,7 +18,7 @@ import com.crochet.ai.aiservice.dto.ChatCategory;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ChatSessionEntity {
+public class ChatSession {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -48,7 +47,7 @@ public class ChatSessionEntity {
     @OneToMany(mappedBy = "chatSession", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @OrderBy("createdAt ASC")
     @Builder.Default
-    private List<ChatMessageEntity> messages = new ArrayList<>();
+    private List<ChatMessage> messages = new ArrayList<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

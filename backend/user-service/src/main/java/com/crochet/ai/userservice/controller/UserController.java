@@ -21,54 +21,55 @@ public class UserController {
         this.userService = userService;
     }
 
-    @PostMapping("/sync")
+    @PostMapping
     public ResponseEntity<UserResponse> syncUser(
             @RequestHeader("X-User-Id") String userId,
             @RequestHeader(value = "X-User-Email", required = false) String email,
             @RequestHeader(value = "X-User-Name", required = false) String displayName,
-            @RequestHeader(value = "X-User-Avatar", required = false) String avatarUrl) {
+            @RequestHeader(value = "X-User-Profile-Picture", required = false) String profilePicture) {
         log.info("Syncing user from gateway headers. userId: '{}', email: '{}'", userId, email);
-        return ResponseEntity.ok(userService.syncUser(userId, email, displayName, avatarUrl));
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
+                .body(userService.syncUser(userId, email, displayName, profilePicture));
     }
 
-    @GetMapping("/profile")
-    public ResponseEntity<UserResponse> getProfile(@RequestHeader("X-User-Id") String userId) {
-        log.info("Retrieving profile for userId from header: {}", userId);
+    @GetMapping("/{id}")
+    public ResponseEntity<UserResponse> getProfile(@PathVariable("id") String userId) {
+        log.info("Retrieving profile for userId: {}", userId);
         return ResponseEntity.ok(userService.getProfile(userId));
     }
 
-    @PutMapping("/profile")
-    public ResponseEntity<UserResponse> updateProfile(@RequestHeader("X-User-Id") String userId,
+    @PutMapping("/{id}")
+    public ResponseEntity<UserResponse> updateProfile(@PathVariable("id") String userId,
             @RequestBody UserSignUpRequest request) {
-        log.info("Updating profile details for userId from header: {}", userId);
+        log.info("Updating profile details for userId: {}", userId);
         return ResponseEntity.ok(userService.updateProfile(userId, request));
     }
 
-    @PutMapping("/profile/password")
-    public ResponseEntity<Void> changePassword(@RequestHeader("X-User-Id") String userId,
+    @PatchMapping("/{id}")
+    public ResponseEntity<UserResponse> patchProfile(@PathVariable("id") String userId,
+            @RequestBody UserPatchRequest request) {
+        log.info("Patching profile details for userId: {}", userId);
+        return ResponseEntity.ok(userService.patchProfile(userId, request));
+    }
+
+    @PutMapping("/{id}/password")
+    public ResponseEntity<Void> changePassword(@PathVariable("id") String userId,
             @RequestBody PasswordUpdateRequest request) {
-        log.info("Initiating password update for userId from header: {}", userId);
+        log.info("Initiating password update for userId: {}", userId);
         userService.changePassword(userId, request);
         return ResponseEntity.ok().build();
     }
 
-    @PutMapping("/profile/membership")
-    public ResponseEntity<UserResponse> updateMembership(@RequestHeader("X-User-Id") String userId,
+    @PutMapping("/{id}/membership")
+    public ResponseEntity<UserResponse> updateMembership(@PathVariable("id") String userId,
             @RequestBody MembershipUpdateRequest request) {
-        log.info("Updating membership level to '{}' for userId from header: {}", request.getMembershipStatus(), userId);
+        log.info("Updating membership level to '{}' for userId: {}", request.getMembershipStatus(), userId);
         return ResponseEntity.ok(userService.updateMembership(userId, request));
     }
 
-    @PutMapping("/profile/deactivate")
-    public ResponseEntity<Void> deactivateUser(@RequestHeader("X-User-Id") String userId) {
-        log.warn("Deactivating user account (setting is_active to false) for userId: {}", userId);
-        userService.deleteUser(userId); // This triggers @SoftDelete setting is_active = false
-        return ResponseEntity.noContent().build();
-    }
-
-    @DeleteMapping("/profile")
-    public ResponseEntity<Void> deleteUser(@RequestHeader("X-User-Id") String userId) {
-        log.warn("Deleting user account for userId from header: {}", userId);
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteUser(@PathVariable("id") String userId) {
+        log.warn("Deleting user account for userId: {}", userId);
         userService.deleteUser(userId);
         return ResponseEntity.noContent().build();
     }

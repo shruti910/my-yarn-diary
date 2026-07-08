@@ -145,8 +145,8 @@ export function Sidebar({
       }
 
       // 2. Submit display name and profile picture to backend
-      const response = await fetch('/api/v1/users/profile', {
-        method: 'PUT',
+      const response = await fetch(`/api/v1/users/${currentUser?.userId}`, {
+        method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${activeToken}`,
           'Content-Type': 'application/json'
@@ -190,8 +190,8 @@ export function Sidebar({
 
     setIsDeactivating(true);
     try {
-      const response = await fetch('/api/v1/users/profile/deactivate', {
-        method: 'PUT',
+      const response = await fetch(`/api/v1/users/${currentUser?.userId}`, {
+        method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -380,7 +380,7 @@ export function Sidebar({
                 disabled={isSubmitting}
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
-                placeholder="Category tag name..."
+                placeholder="Category name"
                 className="bg-transparent border-none text-xs text-[#2D231B] p-1.5 focus:outline-none w-full placeholder-[#A89F94] font-semibold disabled:opacity-60"
               />
               <button

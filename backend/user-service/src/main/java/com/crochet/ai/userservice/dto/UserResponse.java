@@ -1,6 +1,6 @@
 package com.crochet.ai.userservice.dto;
 
-import com.crochet.ai.userservice.entity.MembershipStatus;
+import com.crochet.ai.userservice.enums.MembershipStatus;
 import lombok.*;
 import java.time.LocalDateTime;
 

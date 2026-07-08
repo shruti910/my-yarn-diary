@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { ChatPanel } from './components/ChatPanel';
@@ -15,13 +15,261 @@ import { AuthScreen } from './components/AuthScreen';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { CrochetLoader } from './components/CrochetLoader';
 import { Category, Project, JournalLog, ProjectStatus, ChatCategory } from './types';
-import { BookOpen, Sparkles, X, Menu } from 'lucide-react';
+import { BookOpen, Sparkles, X, Menu, CircleUserRound, Settings, Mail, Trash2, User, Image as ImageIcon, Check } from 'lucide-react';
 import { TerminologyToggle } from './components/TerminologyToggle';
 import { motion, AnimatePresence } from 'motion/react';
+import { useDialog } from './components/DialogProvider';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 
+interface ProfileModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  currentUser: any;
+  onSave: (displayName: string, profilePicture: string) => Promise<void>;
+}
+
+function ProfileModal({ isOpen, onClose, currentUser, onSave }: ProfileModalProps) {
+  const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
+  const [profilePicture, setProfilePicture] = useState(currentUser?.profilePicture || '');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (currentUser) {
+      setDisplayName(currentUser.displayName || '');
+      setProfilePicture(currentUser.profilePicture || '');
+    }
+  }, [currentUser, isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfilePicture(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!displayName.trim()) return;
+    setIsSubmitting(true);
+    try {
+      await onSave(displayName.trim(), profilePicture.trim());
+      onClose();
+    } catch (err) {
+      // Handled in caller
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs select-none">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 15 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 15 }}
+        transition={{ duration: 0.2 }}
+        className="bg-white rounded-[2rem] border border-[#E8E2D9] max-w-md w-full p-6 space-y-6 shadow-2xl relative"
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 text-[#7C7167] hover:text-[#F28482] hover:bg-stone-100 rounded-full transition-colors cursor-pointer"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="flex items-center gap-3 border-b border-[#E8E2D9] pb-4">
+          <div className="p-2.5 rounded-xl bg-[#F28482]/10 text-[#F28482]">
+            <CircleUserRound className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="font-serif font-extrabold text-[#2D231B] text-lg">Edit Profile</h3>
+            <p className="text-xs text-[#7C7167] font-medium">Update your display name and upload profile picture</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Avatar Preview & File Input Container */}
+          <div className="flex items-center gap-4 bg-[#F9F6F2] p-4 rounded-2xl border border-[#E8E2D9]/60">
+            <div
+              className="relative group cursor-pointer shrink-0"
+              onClick={() => document.getElementById('avatar-upload')?.click()}
+            >
+              {profilePicture ? (
+                <img
+                  src={profilePicture}
+                  alt="Avatar Preview"
+                  className="w-16 h-16 rounded-xl object-cover border border-[#E8E2D9] shadow-sm bg-white group-hover:opacity-75 transition-opacity"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-xl flex items-center justify-center text-lg font-bold text-white bg-gradient-to-br from-[#F28482] to-[#F5CAC3] border border-[#E8E2D9] shadow-sm group-hover:opacity-75 transition-opacity">
+                  {displayName ? displayName.slice(0, 2).toUpperCase() : 'C'}
+                </div>
+              )}
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white rounded-xl opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="text-[9px] font-bold uppercase">Upload</span>
+              </div>
+            </div>
+
+            <div className="flex-1 space-y-1.5">
+              <span className="text-[10px] font-bold text-[#7C7167] uppercase tracking-wider block">Profile Image</span>
+              <input
+                type="file"
+                id="avatar-upload"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => document.getElementById('avatar-upload')?.click()}
+                  className="px-3 py-1.5 bg-white border border-[#E8E2D9] text-[#7C7167] hover:text-[#F28482] rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  Choose Image File
+                </button>
+                {profilePicture && (
+                  <button
+                    type="button"
+                    onClick={() => setProfilePicture('')}
+                    className="px-2.5 py-1.5 bg-transparent text-red-500 hover:text-red-600 text-xs font-bold cursor-pointer"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Display Name Input */}
+          <div className="space-y-1.5">
+            <label htmlFor="displayNameInput" className="text-[11px] font-bold text-[#7C7167] uppercase tracking-wider block">Display Name</label>
+            <input
+              id="displayNameInput"
+              type="text"
+              required
+              disabled={isSubmitting}
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="Enter your name"
+              className="w-full bg-white border border-[#E8E2D9] rounded-xl text-xs p-3 focus:outline-none focus:border-[#F28482] text-[#2D231B] font-semibold"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2.5 pt-2">
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={onClose}
+              className="px-4 py-2.5 bg-[#FDFCFB] hover:bg-[#F9F6F2] text-[#7C7167] border border-[#E8E2D9] rounded-xl text-xs font-bold transition-all cursor-pointer hover:border-[#84A59D] disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting || !displayName.trim()}
+              className="px-5 py-2.5 bg-[#F28482] hover:bg-[#F28482]/90 text-white font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer shadow-[#F28482]/20 flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              {isSubmitting ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
+interface SettingsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  currentUser: any;
+  onDeactivate: () => Promise<void>;
+}
+
+function SettingsModal({ isOpen, onClose, currentUser, onDeactivate }: SettingsModalProps) {
+  if (!isOpen) return null;
+
+  const mailtoUrl = `mailto:myyarndiary@gmail.com?subject=Delete%20Account%20Request&body=Please%20delete%20my%20account%20associated%20with%20email%20${encodeURIComponent(currentUser?.email || '')}.`;
+
+  return (
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs select-none">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 15 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 15 }}
+        transition={{ duration: 0.2 }}
+        className="bg-white rounded-[2rem] border border-[#E8E2D9] max-w-md w-full p-6 space-y-6 shadow-2xl relative"
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 text-[#7C7167] hover:text-[#F28482] hover:bg-stone-100 rounded-full transition-colors cursor-pointer"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="flex items-center gap-3 border-b border-[#E8E2D9] pb-4">
+          <div className="p-2.5 rounded-xl bg-[#84A59D]/10 text-[#84A59D]">
+            <Settings className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="font-serif font-extrabold text-[#2D231B] text-lg">Account Settings</h3>
+            <p className="text-xs text-[#7C7167] font-medium">Manage your account preferences</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {/* Deactivate Option Card */}
+          <div className="p-4 bg-amber-50/40 border border-amber-200/60 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1 max-w-[240px]">
+              <h4 className="text-xs font-bold text-amber-800">Deactivate Account</h4>
+              <p className="text-[11px] text-stone-600 leading-relaxed">
+                Temporarily disable your profile. You can reactivate anytime by logging back in.
+              </p>
+            </div>
+            <button
+              onClick={onDeactivate}
+              className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shadow-amber-600/10 shrink-0 self-start sm:self-center"
+            >
+              Deactivate
+            </button>
+          </div>
+
+          {/* Delete Option Card */}
+          <div className="p-4 bg-red-50/40 border border-red-200/60 rounded-2xl flex flex-col gap-3">
+            <div className="space-y-1">
+              <h4 className="text-xs font-bold text-red-800">Delete Account</h4>
+              <p className="text-[11px] text-stone-600 leading-relaxed font-semibold">
+                Permanently delete all stored projects, patterns, and journals. This action is irreversible.
+              </p>
+            </div>
+
+            <a
+              href={mailtoUrl}
+              className="w-full py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shadow-red-600/10 flex items-center justify-center gap-1.5 text-center"
+            >
+              <Mail className="w-3.5 h-3.5" />
+              Contact Support to Delete Account
+            </a>
+            <p className="text-[10px] text-center text-stone-500 font-semibold italic">
+              Opens your default mail app to email support at myyarndiary@gmail.com
+            </p>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 export default function App() {
+  const { showToast, showAlert, showConfirm } = useDialog();
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [token, setToken] = useState<string | null>(localStorage.getItem('crochet_token'));
   const [user, setUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'aitools'>('dashboard');
@@ -64,29 +312,7 @@ export default function App() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [showCelebrationTitle, setShowCelebrationTitle] = useState<string | null>(null);
 
-  // Toast notifications state
-  const [toast, setToast] = useState<{
-    id: number;
-    message: string;
-    type: 'success' | 'error' | 'warning';
-  } | null>(null);
-
-  const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'error') => {
-    setToast({
-      id: Date.now(),
-      message,
-      type
-    });
-  };
-
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => {
-        setToast(null);
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
+  const rowCountTimeoutRef = useRef<any>(null);
 
   // Proactive background wakeup ping on mount to boot Cloud Run containers instantly
   // useEffect(() => {
@@ -95,14 +321,14 @@ export default function App() {
 
   const syncUserWithBackend = async (idToken: string, fallbackProfile: any) => {
     try {
-      const response = await fetch('/api/v1/users/sync', {
+      const response = await fetch('/api/v1/users', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${idToken}`,
           'Content-Type': 'application/json',
           'X-User-Name': fallbackProfile?.displayName || '',
           'X-User-Email': fallbackProfile?.email || '',
-          'X-User-Avatar': fallbackProfile?.profilePicture || ''
+          'X-User-Profile-Picture': fallbackProfile?.profilePicture || ''
         }
       });
       if (response.ok) {
@@ -191,17 +417,13 @@ export default function App() {
   const updateCrochetTerminology = async (pref: 'US' | 'UK') => {
     if (!token || !user) return;
     try {
-      const response = await fetch('/api/v1/users/profile', {
-        method: 'PUT',
+      const response = await fetch(`/api/v1/users/${user.userId}`, {
+        method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'X-User-Terminology': pref
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          displayName: user.displayName,
-          email: user.email,
-          profilePicture: user.profilePicture || '',
           crochetTerminology: pref
         })
       });
@@ -395,7 +617,8 @@ export default function App() {
       status: ProjectStatus.InProgress,
       rowCount: 0,
       notes: notes || '',
-      productPhotos: []
+      productPhotos: [],
+      patterns: []
     };
 
     try {
@@ -420,29 +643,58 @@ export default function App() {
   const handleUpdateProject = async (updates: Partial<Project>) => {
     if (!selectedProject) return;
     const { projectId } = selectedProject;
-    try {
-      const fullProj = projects.find(p => p.projectId === projectId) || selectedProject;
-      const oldStatus = fullProj.status;
-      const payload = {
-        categoryId: updates.categoryId !== undefined ? updates.categoryId : fullProj.categoryId,
-        title: updates.title !== undefined ? updates.title : fullProj.title,
-        yarns: updates.yarns !== undefined ? updates.yarns : fullProj.yarns,
-        hooks: updates.hooks !== undefined ? updates.hooks : fullProj.hooks,
-        careInstructions: updates.careInstructions !== undefined ? updates.careInstructions : fullProj.careInstructions,
-        totalTime: updates.totalTime !== undefined ? updates.totalTime : fullProj.totalTime,
-        status: updates.status !== undefined ? updates.status : fullProj.status,
-        rowCount: updates.rowCount !== undefined ? updates.rowCount : fullProj.rowCount,
-        notes: updates.notes !== undefined ? updates.notes : fullProj.notes,
-        startDate: updates.startDate !== undefined ? updates.startDate : (fullProj.startDate || ''),
-        endDate: updates.endDate !== undefined ? updates.endDate : (fullProj.endDate || ''),
-        productPhotos: updates.productPhotos !== undefined ? updates.productPhotos : (fullProj.productPhotos || []),
-        isArchive: updates.isArchive !== undefined ? updates.isArchive : (fullProj.isArchive !== undefined ? fullProj.isArchive : false),
-        thumbnailIndex: updates.thumbnailIndex !== undefined ? updates.thumbnailIndex : (fullProj.thumbnailIndex !== undefined ? fullProj.thumbnailIndex : 0)
-      };
 
+    // Optimistically update the UI immediately
+    const mergedLocally = {
+      ...selectedProject,
+      ...updates
+    } as Project;
+    setProjects(prev => prev.map(p => p.projectId === projectId ? mergedLocally : p));
+    setSelectedProject(mergedLocally);
+
+    // Check if we are ONLY updating the row count (and possibly status)
+    const isOnlyRowCount = Object.keys(updates).every(k => k === 'rowCount' || k === 'status');
+
+    if (isOnlyRowCount) {
+      // Clear any pending debounce saves
+      if (rowCountTimeoutRef.current) {
+        clearTimeout(rowCountTimeoutRef.current);
+      }
+
+      // Debounce the save to the database by 1 second to avoid massive network calls on rapid clicks
+      rowCountTimeoutRef.current = setTimeout(async () => {
+        try {
+          const res = await fetchWithToken(`/api/v1/projects/${projectId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(updates)
+          });
+
+          if (res) {
+            // Keep state synced with the official server response
+            const merged = {
+              ...res,
+              categoryId: res.categoryId || res.folderId
+            } as Project;
+            setProjects(prev => prev.map(p => p.projectId === projectId ? merged : p));
+            setSelectedProject(merged);
+          }
+        } catch (err: any) {
+          console.error('Failed to sync row count with backend:', err);
+        }
+      }, 1000);
+
+      return;
+    }
+
+    // Otherwise, perform an immediate save for all other fields (e.g. text patterns, care instructions, notes)
+    if (rowCountTimeoutRef.current) {
+      clearTimeout(rowCountTimeoutRef.current);
+    }
+
+    try {
       const res = await fetchWithToken(`/api/v1/projects/${projectId}`, {
-        method: 'PUT',
-        body: JSON.stringify(payload)
+        method: 'PATCH',
+        body: JSON.stringify(updates)
       });
       if (res) {
         const merged = {
@@ -453,7 +705,8 @@ export default function App() {
         setSelectedProject(merged);
         showToast('Project updated successfully!', 'success');
 
-        if (merged.status === ProjectStatus.Completed && oldStatus !== ProjectStatus.Completed) {
+        const oldStatus = selectedProject.status;
+        if (updates.status === ProjectStatus.Completed && oldStatus !== ProjectStatus.Completed) {
           setShowCelebrationTitle(merged.title);
         }
       }
@@ -464,9 +717,16 @@ export default function App() {
     }
   };
 
+  const handleUpdateProjectState = (updatedProject: Project) => {
+    setProjects(prev => prev.map(p => p.projectId === updatedProject.projectId ? updatedProject : p));
+    if (selectedProject?.projectId === updatedProject.projectId) {
+      setSelectedProject(updatedProject);
+    }
+  };
+
   const handleDuplicateProject = async (projectId: string) => {
     try {
-      const res = await fetchWithToken(`/api/v1/projects/${projectId}/duplicate`, {
+      const res = await fetchWithToken(`/api/v1/projects/${projectId}/duplicates`, {
         method: 'POST'
       });
       if (res) {
@@ -486,8 +746,11 @@ export default function App() {
 
   const handleArchiveProject = async (projectId: string) => {
     try {
-      const res = await fetchWithToken(`/api/v1/projects/${projectId}/archive`, {
-        method: 'POST'
+      const currentProject = projects.find(p => p.projectId === projectId);
+      const nextArchiveState = currentProject ? !currentProject.isArchive : true;
+      const res = await fetchWithToken(`/api/v1/projects/${projectId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isArchive: nextArchiveState })
       });
       if (res) {
         const merged = {
@@ -521,8 +784,11 @@ export default function App() {
 
   const handleToggleFavorite = async (projectId: string) => {
     try {
-      const res = await fetchWithToken(`/api/v1/projects/${projectId}/favorite`, {
-        method: 'POST'
+      const currentProject = projects.find(p => p.projectId === projectId);
+      const nextFavoriteState = currentProject ? !currentProject.isFavorite : true;
+      const res = await fetchWithToken(`/api/v1/projects/${projectId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isFavorite: nextFavoriteState })
       });
       if (res) {
         setProjects(prev => prev.map(p => p.projectId === projectId ? {
@@ -535,6 +801,44 @@ export default function App() {
     } catch (err: any) {
       console.error('Failed to toggle project favorite status:', err);
       showToast(err.message || 'Failed to toggle favorite status.', 'error');
+    }
+  };
+
+  const handleUpdateProfile = async (displayName: string, profilePicture: string) => {
+    try {
+      const res = await fetchWithToken(`/api/v1/users/${user.userId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ displayName, profilePicture })
+      });
+      if (res) {
+        setUser(res);
+        localStorage.setItem('crochet_user', JSON.stringify(res));
+        showToast('Profile updated successfully!', 'success');
+        setIsProfileOpen(false);
+      }
+    } catch (err: any) {
+      console.error('Failed to update profile:', err);
+      showToast(err.message || 'Failed to update profile.', 'error');
+    }
+  };
+
+  const handleDeactivateAccount = async () => {
+    const confirmed = await showConfirm(
+      'Are you sure you want to deactivate your account? This will hide your profile and log you out. You can re-activate by logging in again.',
+      'Deactivate Account'
+    );
+    if (!confirmed) return;
+
+    try {
+      await fetchWithToken(`/api/v1/users/${user.userId}`, {
+        method: 'DELETE'
+      });
+      showToast('Account deactivated successfully.', 'success');
+      setIsSettingsOpen(false);
+      handleLogout();
+    } catch (err: any) {
+      console.error('Failed to deactivate account:', err);
+      showToast(err.message || 'Failed to deactivate account.', 'error');
     }
   };
 
@@ -573,10 +877,7 @@ export default function App() {
         onToggleCollapse={toggleSidebar}
         onUpdateUser={setUser}
         token={token}
-        onUpdateToken={(newToken) => {
-          setToken(newToken);
-          localStorage.setItem('crochet_token', newToken);
-        }}
+        onUpdateToken={setToken}
       />
 
       {/* 2. Main working content frame */}
@@ -662,6 +963,7 @@ export default function App() {
                       token={token}
                       onBack={() => setSelectedProject(null)}
                       onUpdateProject={handleUpdateProject}
+                      onUpdateProjectState={handleUpdateProjectState}
                       onToggleFavorite={handleToggleFavorite}
                       onDeleteProject={handleDeleteProject}
                       onDuplicateProject={handleDuplicateProject}
@@ -707,33 +1009,7 @@ export default function App() {
         </main>
       </div>
 
-      {/* Global Toast component wrapper */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className={`fixed bottom-6 right-6 z-[9999] max-w-sm p-4 rounded-2xl border backdrop-blur-md shadow-lg flex items-start gap-3 ${toast.type === 'success'
-              ? 'bg-emerald-50/90 border-emerald-200 text-emerald-800'
-              : toast.type === 'warning'
-                ? 'bg-amber-50/90 border-amber-200 text-amber-800'
-                : 'bg-rose-50/90 border-rose-200 text-rose-800'
-              }`}
-          >
-            <div className="flex-1 text-xs font-semibold leading-relaxed">
-              {toast.message}
-            </div>
-            <button
-              onClick={() => setToast(null)}
-              className="text-stone-400 hover:text-stone-700 font-bold text-sm shrink-0 cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
 
       {token && activeTab !== 'aitools' && !isFloatingBuddyDismissed && (
         <FloatingAiBuddy
@@ -747,6 +1023,28 @@ export default function App() {
           <Celebration
             projectTitle={showCelebrationTitle}
             onClose={() => setShowCelebrationTitle(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isProfileOpen && (
+          <ProfileModal
+            isOpen={isProfileOpen}
+            onClose={() => setIsProfileOpen(false)}
+            currentUser={user}
+            onSave={handleUpdateProfile}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isSettingsOpen && (
+          <SettingsModal
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+            currentUser={user}
+            onDeactivate={handleDeactivateAccount}
           />
         )}
       </AnimatePresence>

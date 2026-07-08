@@ -15,7 +15,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class JournalLogEntity {
+public class JournalLog {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,9 +25,9 @@ public class JournalLogEntity {
     @Column(name = "log_id", nullable = false, unique = true)
     private UUID logId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "project_pk_id", nullable = false)
-    private ProjectEntity project;
+    private Project project;
 
     @Column(name = "project_id", nullable = false)
     private UUID projectId;

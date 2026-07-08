@@ -1,8 +1,8 @@
 package com.crochet.ai.userservice.service;
 
 import com.crochet.ai.userservice.dto.*;
-import com.crochet.ai.userservice.entity.UserEntity;
-import com.crochet.ai.userservice.entity.MembershipStatus;
+import com.crochet.ai.userservice.entity.User;
+import com.crochet.ai.userservice.enums.MembershipStatus;
 import com.crochet.ai.userservice.exception.*;
 import com.crochet.ai.userservice.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,18 +42,26 @@ public class UserService {
             userRepository.reactivateUserByEmail(email);
         }
 
-        Optional<UserEntity> existingUserOpt = userRepository.findByUserId(userId);
+        // Reactivate user if they are deactivated
+        if (userRepository.existsByUserIdIncludeDeactivated(userId)) {
+            userRepository.reactivateUser(userId);
+        } else if (email != null && !email.isBlank() && userRepository.existsByEmailIncludeDeactivated(email)) {
+            userRepository.reactivateUserByEmail(email);
+        }
+
+        Optional<User> existingUserOpt = userRepository.findByUserId(userId);
         if (existingUserOpt.isPresent()) {
-            UserEntity user = existingUserOpt.get();
+            User user = existingUserOpt.get();
             boolean modified = false;
             if (displayName != null && !displayName.isBlank() && !displayName.equals(user.getDisplayName())) {
                 user.setDisplayName(displayName);
                 modified = true;
             }
-            if (profilePicture != null && !profilePicture.isBlank() && !profilePicture.equals(user.getProfilePicture())) {
+            if (profilePicture != null && !profilePicture.isBlank()
+                    && !profilePicture.equals(user.getProfilePicture())) {
                 user.setProfilePicture(profilePicture);
                 modified = true;
-            }
+                    }
             if (email != null && !email.isBlank() && !email.equals(user.getEmail())) {
                 user.setEmail(email);
                 modified = true;
@@ -66,9 +74,9 @@ public class UserService {
 
         // If not found by userId, check if email matches to link accounts
         if (email != null && !email.isBlank()) {
-            Optional<UserEntity> existingEmailOpt = userRepository.findByEmail(email);
+            Optional<User> existingEmailOpt = userRepository.findByEmail(email);
             if (existingEmailOpt.isPresent()) {
-                UserEntity user = existingEmailOpt.get();
+                User user = existingEmailOpt.get();
                 user.setUserId(userId);
                 if (displayName != null && !displayName.isBlank()) {
                     user.setDisplayName(displayName);
@@ -82,7 +90,7 @@ public class UserService {
         }
 
         // Otherwise create new user
-        UserEntity user = UserEntity.builder()
+        User user = User.builder()
                 .userId(userId)
                 .displayName(displayName != null && !displayName.isBlank() ? displayName : "Crafter")
                 .email(email != null && !email.isBlank() ? email : "")
@@ -93,13 +101,13 @@ public class UserService {
                 .crochetTerminology("US")
                 .build();
 
-        UserEntity savedUser = userRepository.save(user);
+        User savedUser = userRepository.save(user);
         return mapToResponse(savedUser);
     }
 
     public UserResponse getProfile(String userId) {
         UUID uuid = UUID.fromString(userId);
-        UserEntity user = userRepository.findByUserId(uuid)
+        User user = userRepository.findByUserId(uuid)
                 .orElseThrow(() -> new ResourceNotFoundException("User profile not found with ID: " + userId));
         return mapToResponse(user);
     }
@@ -107,7 +115,7 @@ public class UserService {
     @Transactional
     public UserResponse updateProfile(String userId, UserSignUpRequest updateRequest) {
         UUID uuid = UUID.fromString(userId);
-        UserEntity user = userRepository.findByUserId(uuid)
+        User user = userRepository.findByUserId(uuid)
                 .orElseThrow(() -> new ResourceNotFoundException("User profile not found with ID: " + userId));
 
         user.setDisplayName(updateRequest.getDisplayName());
@@ -119,7 +127,30 @@ public class UserService {
             user.setCrochetTerminology(updateRequest.getCrochetTerminology());
         }
 
-        UserEntity updatedUser = userRepository.save(user);
+        User updatedUser = userRepository.save(user);
+        return mapToResponse(updatedUser);
+    }
+
+    @Transactional
+    public UserResponse patchProfile(String userId, UserPatchRequest patchRequest) {
+        UUID uuid = UUID.fromString(userId);
+        User user = userRepository.findByUserId(uuid)
+                .orElseThrow(() -> new ResourceNotFoundException("User profile not found with ID: " + userId));
+
+        if (patchRequest.getDisplayName() != null) {
+            user.setDisplayName(patchRequest.getDisplayName());
+        }
+        if (patchRequest.getEmail() != null) {
+            user.setEmail(patchRequest.getEmail());
+        }
+        if (patchRequest.getProfilePicture() != null) {
+            user.setProfilePicture(patchRequest.getProfilePicture());
+        }
+        if (patchRequest.getCrochetTerminology() != null) {
+            user.setCrochetTerminology(patchRequest.getCrochetTerminology());
+        }
+
+        User updatedUser = userRepository.save(user);
         return mapToResponse(updatedUser);
     }
 
@@ -149,7 +180,7 @@ public class UserService {
     @Transactional
     public void changePassword(String userId, PasswordUpdateRequest request) {
         UUID uuid = UUID.fromString(userId);
-        UserEntity user = userRepository.findByUserId(uuid)
+        User user = userRepository.findByUserId(uuid)
                 .orElseThrow(() -> new ResourceNotFoundException("User profile not found with ID: " + userId));
 
         String currentHash = "sha256_" + request.getCurrentPassword().hashCode();
@@ -164,25 +195,25 @@ public class UserService {
     @Transactional
     public UserResponse updateMembership(String userId, MembershipUpdateRequest request) {
         UUID uuid = UUID.fromString(userId);
-        UserEntity user = userRepository.findByUserId(uuid)
+        User user = userRepository.findByUserId(uuid)
                 .orElseThrow(() -> new ResourceNotFoundException("User profile not found with ID: " + userId));
 
         user.setMembershipStatus(request.getMembershipStatus());
         user.setMembershipActive(request.isActive());
 
-        UserEntity updatedUser = userRepository.save(user);
+        User updatedUser = userRepository.save(user);
         return mapToResponse(updatedUser);
     }
 
     @Transactional
     public void deleteUser(String userId) {
         UUID uuid = UUID.fromString(userId);
-        UserEntity user = userRepository.findByUserId(uuid)
+        User user = userRepository.findByUserId(uuid)
                 .orElseThrow(() -> new ResourceNotFoundException("User profile not found with ID: " + userId));
         userRepository.delete(user);
     }
 
-    private UserResponse mapToResponse(UserEntity user) {
+    private UserResponse mapToResponse(User user) {
         return UserResponse.builder()
                 .userId(user.getUserId().toString())
                 .displayName(user.getDisplayName())

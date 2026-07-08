@@ -15,7 +15,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class CategoryEntity {
+public class Category {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -28,7 +28,7 @@ public class CategoryEntity {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    @NotBlank(message = "Folder name is required")
+    @NotBlank(message = "Category name is required")
     @Column(name = "name", nullable = false, length = 100)
     private String name;
 

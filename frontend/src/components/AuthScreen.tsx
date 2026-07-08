@@ -303,8 +303,8 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
                   onChange={handleDisplayNameChange}
                   placeholder="e.g. GrandmaStitches"
                   className={`w-full pl-10 pr-4 py-3 bg-[#FDFCFB] border rounded-xl text-sm focus:outline-none transition-all text-[#2D231B] placeholder-[#A89F94] font-semibold ${displayNameError
-                      ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-                      : 'border-[#E8E2D9] focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482]'
+                    ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+                    : 'border-[#E8E2D9] focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482]'
                     }`}
                 />
               </div>
@@ -329,8 +329,8 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
                 onChange={handleEmailChange}
                 placeholder="crafter@example.com"
                 className={`w-full pl-10 pr-4 py-3 bg-[#FDFCFB] border rounded-xl text-sm focus:outline-none transition-all text-[#2D231B] placeholder-[#A89F94] font-semibold ${emailError
-                    ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-                    : 'border-[#E8E2D9] focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482]'
+                  ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+                  : 'border-[#E8E2D9] focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482]'
                   }`}
               />
             </div>
@@ -354,8 +354,8 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
                 onChange={handlePasswordChange}
                 placeholder="••••••••"
                 className={`w-full pl-10 pr-10 py-3 bg-[#FDFCFB] border rounded-xl text-sm focus:outline-none transition-all text-[#2D231B] placeholder-[#A89F94] font-semibold ${passwordError
-                    ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-                    : 'border-[#E8E2D9] focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482]'
+                  ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+                  : 'border-[#E8E2D9] focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482]'
                   }`}
               />
               <button
@@ -411,7 +411,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
             </svg>
           )}
-          <span>Signin with Google</span>
+          <span>Sign in with Google</span>
         </button>
 
 

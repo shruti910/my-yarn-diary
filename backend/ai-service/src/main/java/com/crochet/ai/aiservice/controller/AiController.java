@@ -40,7 +40,8 @@ public class AiController {
     public ResponseEntity<ChatSessionDto> createSession(@RequestHeader("X-User-Id") String userId,
             @RequestBody ChatCreateRequest request) {
         log.info("Creating a new AI chat workspace: '{}' for user: {}", request.getTitle(), userId);
-        return ResponseEntity.ok(aiService.createSession(userId, request));
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
+                .body(aiService.createSession(userId, request));
     }
 
     @PostMapping("/chats/{chatId}/messages")
@@ -51,7 +52,8 @@ public class AiController {
             @RequestBody MessageRequest request) {
         log.info("Sending message to AI chat session: {} by user: {} (prompt excerpt: '{}')",
                 chatId, userId, request.getText().substring(0, Math.min(request.getText().length(), 40)));
-        return ResponseEntity.ok(aiService.sendMessage(userId, chatId, request, userTerminology));
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
+                .body(aiService.sendMessage(userId, chatId, request, userTerminology));
     }
 
     @DeleteMapping("/chats/{chatId}")

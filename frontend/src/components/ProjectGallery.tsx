@@ -27,7 +27,7 @@ export function ProjectGallery({ projects, token }: ProjectGalleryProps) {
   useEffect(() => {
     const fetchGallery = async () => {
       try {
-        const response = await fetch('/api/v1/gallery', {
+        const response = await fetch('/api/v1/galleries', {
           headers: {
             'Authorization': `Bearer ${token}`
           }

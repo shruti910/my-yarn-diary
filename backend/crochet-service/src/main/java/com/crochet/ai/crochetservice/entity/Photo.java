@@ -13,16 +13,16 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ProjectPhotoEntity {
+public class Photo {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "project_pk_id", nullable = false)
-    private ProjectEntity project;
+    private Project project;
 
     @Column(name = "photo_base64", columnDefinition = "TEXT")
     private String photoBase64;

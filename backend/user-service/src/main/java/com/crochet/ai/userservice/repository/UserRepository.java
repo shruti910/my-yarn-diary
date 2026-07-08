@@ -1,6 +1,6 @@
 package com.crochet.ai.userservice.repository;
 
-import com.crochet.ai.userservice.entity.UserEntity;
+import com.crochet.ai.userservice.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -10,10 +10,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface UserRepository extends JpaRepository<UserEntity, Long> {
-    Optional<UserEntity> findByUserId(UUID userId);
+public interface UserRepository extends JpaRepository<User, Long> {
+    Optional<User> findByUserId(UUID userId);
     boolean existsByUserId(UUID userId);
-    Optional<UserEntity> findByEmail(String email);
+    Optional<User> findByEmail(String email);
     boolean existsByEmail(String email);
 
     @Query(value = "SELECT EXISTS(SELECT 1 FROM users WHERE user_id = :userId)", nativeQuery = true)

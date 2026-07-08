@@ -1,8 +1,8 @@
 package com.crochet.ai.aiservice.service;
 
 import com.crochet.ai.aiservice.dto.*;
-import com.crochet.ai.aiservice.entity.ChatMessageEntity;
-import com.crochet.ai.aiservice.entity.ChatSessionEntity;
+import com.crochet.ai.aiservice.entity.ChatMessage;
+import com.crochet.ai.aiservice.entity.ChatSession;
 import com.crochet.ai.aiservice.exception.*;
 import com.crochet.ai.aiservice.repository.ChatMessageRepository;
 import com.crochet.ai.aiservice.repository.ChatSessionRepository;
@@ -22,8 +22,8 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Service
+@Slf4j
 public class AiService {
 
     private final ChatSessionRepository chatSessionRepository;
@@ -55,7 +55,7 @@ public class AiService {
     public ChatSessionDto getSessionDetails(String userId, String chatId) {
         UUID chatUuid = UUID.fromString(chatId);
         UUID userUuid = UUID.fromString(userId);
-        ChatSessionEntity session = chatSessionRepository.findByChatId(chatUuid)
+        ChatSession session = chatSessionRepository.findByChatId(chatUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Consultation thread not found: " + chatId));
         if (!session.getUserId().equals(userUuid)) {
             throw new ForbiddenException("Forbidden access attempt");
@@ -66,7 +66,7 @@ public class AiService {
     @Transactional
     public ChatSessionDto createSession(String userId, ChatCreateRequest request) {
         validateTitle(request.getTitle());
-        ChatSessionEntity session = ChatSessionEntity.builder()
+        ChatSession session = ChatSession.builder()
                 .chatId(UUID.randomUUID())
                 .userId(UUID.fromString(userId))
                 .title(request.getTitle())
@@ -74,7 +74,7 @@ public class AiService {
                 .messages(new ArrayList<>())
                 .build();
 
-        ChatSessionEntity saved = chatSessionRepository.save(session);
+        ChatSession saved = chatSessionRepository.save(session);
         return mapToSessionDto(saved);
     }
 
@@ -82,14 +82,14 @@ public class AiService {
     public ChatMessageDto sendMessage(String userId, String chatId, MessageRequest request, String userTerminology) {
         UUID chatUuid = UUID.fromString(chatId);
         UUID userUuid = UUID.fromString(userId);
-        ChatSessionEntity session = chatSessionRepository.findByChatId(chatUuid)
+        ChatSession session = chatSessionRepository.findByChatId(chatUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Consultation thread not found: " + chatId));
         if (!session.getUserId().equals(userUuid)) {
             throw new ForbiddenException("Forbidden operation");
         }
 
         // 1. Save and append User message
-        ChatMessageEntity userMsg = ChatMessageEntity.builder()
+        ChatMessage userMsg = ChatMessage.builder()
                 .messageId(UUID.randomUUID())
                 .chatSession(session)
                 .chatId(session.getChatId())
@@ -105,7 +105,7 @@ public class AiService {
         String assistantReply = callGeminiApiKey(session, request.getText(), userTerminology);
 
         // 3. Save and append Model reply
-        ChatMessageEntity modelMsg = ChatMessageEntity.builder()
+        ChatMessage modelMsg = ChatMessage.builder()
                 .messageId(UUID.randomUUID())
                 .chatSession(session)
                 .chatId(session.getChatId())
@@ -130,7 +130,7 @@ public class AiService {
     public void deleteSession(String userId, String chatId) {
         UUID chatUuid = UUID.fromString(chatId);
         UUID userUuid = UUID.fromString(userId);
-        ChatSessionEntity session = chatSessionRepository.findByChatId(chatUuid)
+        ChatSession session = chatSessionRepository.findByChatId(chatUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Consultation thread not found: " + chatId));
         if (!session.getUserId().equals(userUuid)) {
             throw new ForbiddenException("Forbidden session removal context");
@@ -142,7 +142,7 @@ public class AiService {
     public ChatSessionDto updateSession(String userId, String chatId, ChatUpdateRequest request) {
         UUID chatUuid = UUID.fromString(chatId);
         UUID userUuid = UUID.fromString(userId);
-        ChatSessionEntity session = chatSessionRepository.findByChatId(chatUuid)
+        ChatSession session = chatSessionRepository.findByChatId(chatUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Consultation thread not found: " + chatId));
         if (!session.getUserId().equals(userUuid)) {
             throw new ForbiddenException("Forbidden session update context");
@@ -154,7 +154,7 @@ public class AiService {
         if (request.pinned() != null) {
             session.setPinned(request.pinned());
         }
-        ChatSessionEntity saved = chatSessionRepository.save(session);
+        ChatSession saved = chatSessionRepository.save(session);
         return mapToSessionDto(saved);
     }
 
@@ -164,15 +164,16 @@ public class AiService {
         }
         String trimmed = title.trim();
         boolean hasLetterOrDigit = java.util.regex.Pattern.compile("[\\p{L}\\p{N}]").matcher(trimmed).find();
-        boolean onlyAllowedChars = java.util.regex.Pattern.compile("^[ \\p{L}\\p{N}\\-_()#.]+$").matcher(trimmed).matches();
+        boolean onlyAllowedChars = java.util.regex.Pattern.compile("^[ \\p{L}\\p{N}\\-_()#.]+$").matcher(trimmed)
+                .matches();
         if (!hasLetterOrDigit || !onlyAllowedChars) {
-            throw new BadRequestException("Session title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, and brackets");
+            throw new BadRequestException(
+                    "Session title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, and brackets");
         }
     }
 
-
     // Connects to Gemini's Official Rest endpoints
-    private String callGeminiApiKey(ChatSessionEntity session, String latestPrompt, String userTerminology) {
+    private String callGeminiApiKey(ChatSession session, String latestPrompt, String userTerminology) {
         if (geminiApiKey == null || geminiApiKey.isBlank()) {
             return "Apologies! Our AI service is currently experiencing high traffic or is temporarily unavailable.";
         }
@@ -185,7 +186,7 @@ public class AiService {
 
             // Translate full chat memory history to standard Gemini payloads
             List<Map<String, Object>> contentsList = new ArrayList<>();
-            for (ChatMessageEntity msg : session.getMessages()) {
+            for (ChatMessage msg : session.getMessages()) {
                 Map<String, Object> contentMap = new HashMap<>();
                 // Convert JPA entity role to standard "user" / "model"
                 contentMap.put("role", msg.getRole().equals("model") ? "model" : "user");
@@ -219,7 +220,6 @@ public class AiService {
                     }
                 }
                 contentMap.put("parts", partsList);
-
                 contentsList.add(contentMap);
             }
 
@@ -234,8 +234,11 @@ public class AiService {
             if (userTerminology != null && !userTerminology.isBlank()) {
                 instructions += "\n\n# User Preference\n" +
                         "The user prefers " + userTerminology + " crochet terminology standard. " +
-                        "Ensure that any crochet patterns, stitches, instructions, or tutorials you provide or explain are written using " + userTerminology + " terminology (e.g., if US, use 'sc' and 'hdc'; if UK, use 'dc' and 'htr' and 'tr'). " +
-                        "If the user uploads an image using a different terminology, you must still output your final pattern/instructions in the user's preferred " + userTerminology + " standard, or explicitly mention that you are translating it for them.";
+                        "Ensure that any crochet patterns, stitches, instructions, or tutorials you provide or explain are written using "
+                        + userTerminology
+                        + " terminology (e.g., if US, use 'sc' and 'hdc'; if UK, use 'dc' and 'htr' and 'tr'). " +
+                        "If the user uploads an image using a different terminology, you must still output your final pattern/instructions in the user's preferred "
+                        + userTerminology + " standard, or explicitly mention that you are translating it for them.";
             }
             promptPart.put("text", instructions);
 
@@ -268,7 +271,7 @@ public class AiService {
         return "Apologies! Our AI service is currently experiencing high traffic or is temporarily unavailable. Please try again later.";
     }
 
-    private ChatSessionDto mapToSessionDto(ChatSessionEntity session) {
+    private ChatSessionDto mapToSessionDto(ChatSession session) {
         List<ChatMessageDto> msgs = session.getMessages().stream()
                 .map(m -> ChatMessageDto.builder()
                         .id(m.getMessageId().toString())
@@ -289,7 +292,6 @@ public class AiService {
                 .pinned(session.isPinned())
                 .build();
     }
-
 
     private String getSystemInstructions(ChatCategory category) {
         if (category == ChatCategory.PATTERN_DECODER) {

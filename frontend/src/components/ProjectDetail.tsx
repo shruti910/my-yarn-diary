@@ -4,11 +4,12 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ChevronUp, ChevronDown, Trash2, Camera, NotebookPen, Save, FolderOpen, Calendar, Heart, Copy, Archive, Star, FolderUp, ClipboardList, PackageOpen, Play, Pause, CircleCheckBig, Clock, CirclePause, Route, ReceiptText } from 'lucide-react';
+import { ArrowLeft, ChevronUp, ChevronDown, Trash2, Camera, NotebookPen, Save, FolderOpen, Calendar, Heart, Copy, Archive, Star, FolderUp, ClipboardList, PackageOpen, Play, Pause, CircleCheckBig, Clock, CirclePause, Route, ReceiptText, FileText, Plus, Minus } from 'lucide-react';
 import { Project, JournalLog, Category, ProjectStatus, Yarn, Hook } from '../types';
 import { useDialog } from './DialogProvider';
 import { YarnManager } from './YarnManager';
 import { HookManager } from './HookManager';
+import { PatternViewer } from './PatternViewer';
 
 const capitalizeWords = (str: string): string => {
   if (!str) return '';
@@ -37,6 +38,7 @@ interface ProjectDetailProps {
   token: string;
   onBack: () => void;
   onUpdateProject: (updates: Partial<Project>) => Promise<any>;
+  onUpdateProjectState: (updatedProject: Project) => void;
   onToggleFavorite: (projectId: string) => void;
   onDeleteProject: (projectId: string) => void;
   onDuplicateProject: (projectId: string) => void;
@@ -51,6 +53,7 @@ export function ProjectDetail({
   token,
   onBack,
   onUpdateProject,
+  onUpdateProjectState,
   onToggleFavorite,
   onDeleteProject,
   onDuplicateProject,
@@ -91,6 +94,7 @@ export function ProjectDetail({
   const [cameraTarget, setCameraTarget] = useState<'product' | 'log' | null>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const [activeTab, setActiveTab] = useState<'journal' | 'pattern'>('journal');
 
   const isDateRangeInvalid = !!(startDate && endDate && startDate > endDate);
 
@@ -427,7 +431,7 @@ export function ProjectDetail({
     const confirmed = await showConfirm('Are you sure you want to discard this journal entry?');
     if (!confirmed) return;
     try {
-      await fetchWithToken(`/api/v1/projects/logs/${logId}`, { method: 'DELETE' });
+      await fetchWithToken(`/api/v1/logs/${logId}`, { method: 'DELETE' });
       setLogs(prev => prev.filter(l => l.logId !== logId));
     } catch (err) {
       console.error('Failed to delete log entry:', err);
@@ -710,27 +714,33 @@ export function ProjectDetail({
           <div className="bg-white rounded-3xl p-6 border border-[#E8E2D9] warm-shadow-lg text-center space-y-4">
             <span className="text-[10px] uppercase font-extrabold tracking-widest text-[#F28482] block font-mono">Row Tracker</span>
 
-            <div className="relative inline-flex items-center justify-center">
-              {/* Massive active row clicker circle */}
-              <button
-                onClick={() => incrementRow(1)}
-                disabled={isSubmitting}
-                className="w-44 h-44 rounded-full bg-radial from-white to-[#F28482]/10 hover:to-[#F28482]/20 border-8 border-white warm-shadow-lg active:scale-95 transition-all flex flex-col items-center justify-center text-[#F28482] group cursor-pointer disabled:opacity-70 disabled:pointer-events-none"
-                title="Tap to add row"
-              >
-                <ChevronUp className="w-8 h-8 group-hover:translate-y-[-2px] transition-transform" />
-                <span className="text-4xl font-extrabold font-serif leading-none text-[#2D231B]">{project.rowCount}</span>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[#7C7167] mt-1 opacity-80">Row</span>
-              </button>
-
-              {/* Reset / Negative hooks */}
+            <div className="flex items-center justify-center gap-5 py-2">
+              {/* Symmetrical Decrease Row Button */}
               <button
                 onClick={() => incrementRow(-1)}
                 disabled={project.rowCount === 0 || isSubmitting}
-                className="absolute -bottom-1 -right-1 p-3 bg-white border border-[#E8E2D9] text-[#7C7167] hover:text-red-500 rounded-2xl shadow-md hover:bg-red-50 disabled:opacity-40 transition-colors cursor-pointer"
+                className="w-12 h-12 rounded-full bg-[#F28482] hover:bg-[#F28482]/90 active:scale-95 text-white transition-all flex items-center justify-center shadow-md cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
                 title="Decrease row count"
               >
-                <ChevronDown className="w-4 h-4" />
+                <Minus className="w-5 h-5" />
+              </button>
+
+              {/* Central Display Circle */}
+              <div
+                className="w-36 h-36 rounded-full bg-radial from-white to-[#F28482]/15 border-8 border-white warm-shadow-lg flex flex-col items-center justify-center text-[#2D231B]"
+              >
+                <span className="text-4xl font-extrabold font-serif leading-none">{project.rowCount}</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[#7C7167] mt-1.5 opacity-80">Row</span>
+              </div>
+
+              {/* Symmetrical Increase Row Button */}
+              <button
+                onClick={() => incrementRow(1)}
+                disabled={isSubmitting}
+                className="w-12 h-12 rounded-full bg-[#F28482] hover:bg-[#F28482]/90 active:scale-95 text-white transition-all flex items-center justify-center shadow-md cursor-pointer disabled:opacity-70 disabled:pointer-events-none"
+                title="Increase row count"
+              >
+                <Plus className="w-5 h-5" />
               </button>
             </div>
 
@@ -993,143 +1003,188 @@ export function ProjectDetail({
         {/* Right column: Dynamic Journal Logs and Snaps photo archives */}
         <div className="lg:col-span-8 space-y-6">
 
-          {/* PROGRESS WRITING LOGGER BOX */}
-          <div className="bg-white rounded-3xl p-6 border border-[#E8E2D9] warm-shadow-lg">
-            <h3 className="font-serif font-extrabold text-[#2D231B] text-sm flex items-center gap-2">
-              <NotebookPen className="w-4 h-4 text-[#F28482]" /> Log Today's Progress..
-            </h3>
-
-            <form onSubmit={handleAddLog} className="space-y-4 mt-4">
-              <div className="relative">
-                <textarea
-                  value={textEntry}
-                  placeholder="Adjusted round 12 to make the pattern smaller, used standard single loop Terminology..."
-                  onChange={(e) => setTextEntry(e.target.value)}
-                  required
-                  rows={3}
-                  className={`w-full p-4 bg-[#FDFCFB] border rounded-2xl text-xs focus:outline-none placeholder-[#A89F94] font-semibold text-[#2D231B] resize-none ${textEntry.length > 1000
-                    ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
-                    : 'border-[#E8E2D9] focus:ring-1 focus:ring-[#F28482] focus:border-[#F28482]'
-                    }`}
-                />
-                <div className="flex justify-between items-center px-1 mt-1 text-[10px] font-semibold">
-                  {textEntry.length > 1000 ? (
-                    <span className="text-red-500">Warning: Log entry exceeds character limit of 1000.</span>
-                  ) : (
-                    <span className="text-[#7C7167]">Max 1000 characters</span>
-                  )}
-                  <span className={textEntry.length > 1000 ? 'text-red-500 font-bold' : 'text-[#7C7167]'}>
-                    {textEntry.length} / 1000
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                {/* Photo attachment selector */}
-                <div className="flex items-center gap-2.5">
-                  <input
-                    type="file"
-                    id="log-photo-file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                  <div className="flex gap-2">
-                    <label
-                      htmlFor="log-photo-file"
-                      className="px-3.5 py-2 bg-white border border-[#E8E2D9] hover:border-[#F28482] text-[#7C7167] rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 transition-colors"
-                    >
-                      <Camera className="w-3.5 h-3.5 text-[#F28482]" />
-                      Upload Image
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => startCamera('log')}
-                      className="px-3.5 py-2 bg-white border border-[#E8E2D9] hover:border-[#F28482] text-[#7C7167] rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 transition-colors"
-                    >
-                      <Camera className="w-3.5 h-3.5 text-[#F28482]" />
-                      Take Snap
-                    </button>
-                  </div>
-
-                  {logImage && (
-                    <div className="relative animate-scale-up">
-                      <img src={logImage} className="w-10 h-10 rounded-lg object-cover border border-[#E8E2D9]" alt="Attached Snapshot" />
-                      <button
-                        type="button"
-                        onClick={() => { setLogImage(null); setLogImageBase64(null); }}
-                        className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 rounded-full text-white text-[9px] flex items-center justify-center font-bold"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={submittingLog || !textEntry.trim() || textEntry.length > 1000}
-                  className="px-5 py-2 bg-[#F28482] hover:bg-[#F28482]/85 text-white font-bold rounded-xl text-xs tracking-wide cursor-pointer disabled:opacity-40 shadow-md transform hover:-translate-y-0.5"
-                >
-                  Add Entry
-                </button>
-              </div>
-            </form>
+          {/* Tab Switcher Headers */}
+          <div className="flex border-b border-[#E8E2D9] gap-2 pb-1 bg-white p-3 rounded-2xl warm-shadow">
+            <button
+              onClick={() => setActiveTab('journal')}
+              className={`flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                activeTab === 'journal'
+                  ? 'bg-[#F28482] text-white shadow-xs'
+                  : 'bg-white text-[#7C7167] hover:bg-[#F9F6F2] border border-transparent'
+              }`}
+            >
+              <NotebookPen className="w-3.5 h-3.5" />
+              Progress Journal
+            </button>
+            
+            <button
+              onClick={() => setActiveTab('pattern')}
+              className={`flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                activeTab === 'pattern'
+                  ? 'bg-[#F28482] text-white shadow-xs'
+                  : 'bg-white text-[#7C7167] hover:bg-[#F9F6F2] border border-transparent'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              Crochet Pattern
+              {project.patterns && project.patterns.length > 0 && (
+                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-extrabold ${
+                  activeTab === 'pattern' ? 'bg-white text-[#F28482]' : 'bg-[#F28482]/10 text-[#F28482]'
+                }`}>
+                  {project.patterns.length}
+                </span>
+              )}
+            </button>
           </div>
 
-          {/* SNAPSHOT PHOTO JOURNAL HISTORY TIMELINE */}
-          <div className="space-y-4">
-            <span className="text-[10px] uppercase font-bold tracking-widest text-[#A89F94] block px-1">Journal entries</span>
+          {activeTab === 'journal' ? (
+            <>
+              {/* PROGRESS WRITING LOGGER BOX */}
+              <div className="bg-white rounded-3xl p-6 border border-[#E8E2D9] warm-shadow-lg">
+                <h3 className="font-serif font-extrabold text-[#2D231B] text-sm flex items-center gap-2">
+                  <NotebookPen className="w-4 h-4 text-[#F28482]" /> Log Today's Progress..
+                </h3>
 
-            {logs.length === 0 ? (
-              <div className="p-8 text-center bg-white rounded-3xl border border-[#E8E2D9] warm-shadow">
-                <p className="text-xs text-[#A89F94] font-semibold">No progress logs filed yet. Document row milestones and attach snaps to build a gorgeous pattern project history.</p>
-              </div>
-            ) : (
-              <div className="space-y-4 animate-fade-in">
-                {logs.map((log) => (
-                  <div
-                    key={log.logId}
-                    className="bg-white rounded-3xl p-5 border border-[#E8E2D9] warm-shadow hover:border-[#84A59D]/30 transition-all flex flex-col md:flex-row gap-5 items-start justify-between"
-                  >
-                    <div className="space-y-2 flex-1">
-                      <div className="flex flex-wrap items-center gap-2.5">
-                        <span className="text-[9px] font-mono font-bold text-[#A89F94] bg-[#F9F6F2] border border-[#E8E2D9] px-2 py-0.5 rounded-md flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-[#84A59D]" />
-                          {new Date(log.createdAt).toLocaleDateString()} at {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        {log.rowCountSnapshot !== undefined && (
-                          <span className="text-[9px] font-extrabold text-[#F28482] bg-[#F28482]/10 border border-[#F28482]/20 px-2 py-0.5 rounded-md">Row {log.rowCountSnapshot} Milestone</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-[#2D231B] whitespace-pre-wrap leading-relaxed font-semibold">{log.textEntry}</p>
+                <form onSubmit={handleAddLog} className="space-y-4 mt-4">
+                  <div className="relative">
+                    <textarea
+                      value={textEntry}
+                      placeholder="Adjusted round 12 to make the pattern smaller, used standard single loop Terminology..."
+                      onChange={(e) => setTextEntry(e.target.value)}
+                      required
+                      rows={3}
+                      className={`w-full p-4 bg-[#FDFCFB] border rounded-2xl text-xs focus:outline-none placeholder-[#A89F94] font-semibold text-[#2D231B] resize-none ${textEntry.length > 1000
+                        ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                        : 'border-[#E8E2D9] focus:ring-1 focus:ring-[#F28482] focus:border-[#F28482]'
+                        }`}
+                    />
+                    <div className="flex justify-between items-center px-1 mt-1 text-[10px] font-semibold">
+                      {textEntry.length > 1000 ? (
+                        <span className="text-red-500">Warning: Log entry exceeds character limit of 1000.</span>
+                      ) : (
+                        <span className="text-[#7C7167]">Max 1000 characters</span>
+                      )}
+                      <span className={textEntry.length > 1000 ? 'text-red-500 font-bold' : 'text-[#7C7167]'}>
+                        {textEntry.length} / 1000
+                      </span>
                     </div>
+                  </div>
 
-                    <div className="flex items-center gap-4 shrink-0 justify-between w-full md:w-auto self-end md:self-stretch">
-                      {log.imageBase64 && (
-                        <div className="relative group">
-                          <img
-                            src={log.imageBase64}
-                            alt="Log snapshot snapshot"
-                            onClick={() => setLightboxImage(log.imageBase64)}
-                            className="w-20 h-20 rounded-xl object-cover border border-[#E8E2D9] shadow-xs cursor-pointer hover:scale-105 transition-transform"
-                          />
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    {/* Photo attachment selector */}
+                    <div className="flex items-center gap-2.5">
+                      <input
+                        type="file"
+                        id="log-photo-file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                      />
+                      <div className="flex gap-2">
+                        <label
+                          htmlFor="log-photo-file"
+                          className="px-3.5 py-2 bg-white border border-[#E8E2D9] hover:border-[#F28482] text-[#7C7167] rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 transition-colors"
+                        >
+                          <Camera className="w-3.5 h-3.5 text-[#F28482]" />
+                          Upload Image
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => startCamera('log')}
+                          className="px-3.5 py-2 bg-white border border-[#E8E2D9] hover:border-[#F28482] text-[#7C7167] rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 transition-colors"
+                        >
+                          <Camera className="w-3.5 h-3.5 text-[#F28482]" />
+                          Take Snap
+                        </button>
+                      </div>
+
+                      {logImage && (
+                        <div className="relative animate-scale-up">
+                          <img src={logImage} className="w-10 h-10 rounded-lg object-cover border border-[#E8E2D9]" alt="Attached Snapshot" />
+                          <button
+                            type="button"
+                            onClick={() => { setLogImage(null); setLogImageBase64(null); }}
+                            className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 rounded-full text-white text-[9px] flex items-center justify-center font-bold"
+                          >
+                            ×
+                          </button>
                         </div>
                       )}
-
-                      <button
-                        onClick={() => handleDeleteLog(log.logId)}
-                        className="p-2 text-[#A89F94] hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
-                        title="Delete log"
-                      >
-                        <Trash2 className="w-4 h-4 cursor-pointer" />
-                      </button>
                     </div>
+
+                    <button
+                      type="submit"
+                      disabled={submittingLog || !textEntry.trim() || textEntry.length > 1000}
+                      className="px-5 py-2 bg-[#F28482] hover:bg-[#F28482]/85 text-white font-bold rounded-xl text-xs tracking-wide cursor-pointer disabled:opacity-40 shadow-md transform hover:-translate-y-0.5"
+                    >
+                      Add Entry
+                    </button>
                   </div>
-                ))}
+                </form>
               </div>
-            )}
-          </div>
+
+              {/* SNAPSHOT PHOTO JOURNAL HISTORY TIMELINE */}
+              <div className="space-y-4">
+                <span className="text-[10px] uppercase font-bold tracking-widest text-[#A89F94] block px-1">Journal entries</span>
+
+                {logs.length === 0 ? (
+                  <div className="p-8 text-center bg-white rounded-3xl border border-[#E8E2D9] warm-shadow">
+                    <p className="text-xs text-[#A89F94] font-semibold">No progress logs filed yet. Document row milestones and attach snaps to build a gorgeous pattern project history.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 animate-fade-in">
+                    {logs.map((log) => (
+                      <div
+                        key={log.logId}
+                        className="bg-white rounded-3xl p-5 border border-[#E8E2D9] warm-shadow hover:border-[#84A59D]/30 transition-all flex flex-col md:flex-row gap-5 items-start justify-between"
+                      >
+                        <div className="space-y-2 flex-1">
+                          <div className="flex flex-wrap items-center gap-2.5">
+                            <span className="text-[9px] font-mono font-bold text-[#A89F94] bg-[#F9F6F2] border border-[#E8E2D9] px-2 py-0.5 rounded-md flex items-center gap-1">
+                              <Calendar className="w-3 h-3 text-[#84A59D]" />
+                              {new Date(log.createdAt).toLocaleDateString()} at {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            {log.rowCountSnapshot !== undefined && (
+                              <span className="text-[9px] font-extrabold text-[#F28482] bg-[#F28482]/10 border border-[#F28482]/20 px-2 py-0.5 rounded-md">Row {log.rowCountSnapshot} Milestone</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-[#2D231B] whitespace-pre-wrap leading-relaxed font-semibold">{log.textEntry}</p>
+                        </div>
+
+                        <div className="flex items-center gap-4 shrink-0 justify-between w-full md:w-auto self-end md:self-stretch">
+                          {log.imageBase64 && (
+                            <div className="relative group">
+                              <img
+                                src={log.imageBase64}
+                                alt="Log snapshot snapshot"
+                                onClick={() => setLightboxImage(log.imageBase64)}
+                                className="w-20 h-20 rounded-xl object-cover border border-[#E8E2D9] shadow-xs cursor-pointer hover:scale-105 transition-transform"
+                              />
+                            </div>
+                          )}
+
+                          <button
+                            onClick={() => handleDeleteLog(log.logId)}
+                            className="p-2 text-[#A89F94] hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                            title="Delete log"
+                          >
+                            <Trash2 className="w-4 h-4 cursor-pointer" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <PatternViewer 
+              project={project} 
+              token={token}
+              onUpdateProject={onUpdateProject} 
+              onUpdateProjectState={onUpdateProjectState} 
+            />
+          )}
 
         </div>
 

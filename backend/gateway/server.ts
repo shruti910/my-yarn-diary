@@ -58,7 +58,7 @@ const authenticate = async (req: Request, res: Response, next: NextFunction) => 
     req.headers['x-user-id'] = getUuidFromFirebaseUid(userId);
     req.headers['x-user-email'] = decodedToken.email || (req.headers['x-user-email'] as string) || '';
     req.headers['x-user-name'] = decodedToken.name || (req.headers['x-user-name'] as string) || '';
-    req.headers['x-user-avatar'] = decodedToken.picture || (req.headers['x-user-avatar'] as string) || '';
+    req.headers['x-user-profile-picture'] = decodedToken.picture || (req.headers['x-user-profile-picture'] as string) || '';
 
     // Clean out the heavy Authorization header to unburden the internal proxy size
     delete req.headers['authorization'];
@@ -131,7 +131,7 @@ app.use('/api/v1/auth', authenticate, proxyTo(USER_SERVICE_URL));
 app.use('/api/v1/projects', authenticate, proxyTo(CROCHET_SERVICE_URL));
 app.use('/api/v1/patterns', authenticate, proxyTo(CROCHET_SERVICE_URL));
 app.use('/api/v1/categories', authenticate, proxyTo(CROCHET_SERVICE_URL));
-app.use('/api/v1/gallery', authenticate, proxyTo(CROCHET_SERVICE_URL));
+app.use('/api/v1/galleries', authenticate, proxyTo(CROCHET_SERVICE_URL));
 
 // 3. Generative Multimodal AI Analytics Routing
 app.use('/api/v1/ai', authenticate, proxyTo(AI_SERVICE_URL));

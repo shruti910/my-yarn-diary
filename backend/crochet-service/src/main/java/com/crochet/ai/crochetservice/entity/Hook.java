@@ -14,17 +14,17 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ProjectHookEntity {
+public class Hook {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "project_pk_id", nullable = false)
     @JsonIgnore
-    private ProjectEntity project;
+    private Project project;
 
     @Column(name = "size_mm", nullable = false)
     private Double sizeMm;
@@ -41,5 +41,4 @@ public class ProjectHookEntity {
     @Column(name = "created_at", updatable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
-
 }

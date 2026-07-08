@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Send, Image, Plus, Trash2, ArrowRight, MessagesSquare, Compass, AlertCircle, Camera, X, Edit2, Check, Pin, PinOff } from 'lucide-react';
+import { Send, Image, Plus, Trash2, ArrowRight, MessagesSquare, Compass, AlertCircle, Camera, X, Edit2, Check, Pin, PinOff, Copy } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { ChatSession, ChatMessage, ChatCategory } from '../types';
@@ -36,6 +36,15 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
   const [loading, setLoading] = useState(false);
   const { showConfirm, showAlert } = useDialog();
   const [error, setError] = useState<string | null>(null);
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+
+  const handleCopyMessage = (msgId: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedMsgId(msgId);
+    setTimeout(() => {
+      setCopiedMsgId(null);
+    }, 2000);
+  };
 
   // In-chat image attachments (multiple, up to 3)
   interface ImageAttachment {
@@ -966,10 +975,26 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
                         </>
                       )}
                     </div>
-                    {/* Timestamp helper */}
-                    <span className={`text-[9px] font-mono font-bold text-[#A89F94] block px-1 ${isUser ? 'text-right' : 'text-left'}`}>
-                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+                    {/* Timestamp & Copy Actions */}
+                    <div className={`flex items-center gap-2.5 mt-1.5 px-1.5 ${isUser ? 'justify-end' : 'justify-start'}`}>
+                      <span className="text-[9px] font-mono font-bold text-[#A89F94]">
+                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyMessage(msg.id, msg.text)}
+                        className="text-[9px] font-bold text-[#A89F94] hover:text-[#F28482] flex items-center gap-1 cursor-pointer transition-colors"
+                        title="Copy message to clipboard"
+                      >
+                        {copiedMsgId === msg.id ? (
+                          <span className="text-emerald-600 font-extrabold flex items-center gap-0.5">
+                            <Check className="w-2.5 h-2.5 shrink-0" /> Copied!
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-0.5"><Copy className="w-2.5 h-2.5" /> Copy</span>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               );

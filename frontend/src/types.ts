@@ -44,6 +44,14 @@ export interface Hook {
   brand?: string;
 }
 
+export interface Pattern {
+  patternId: string;
+  patternType: 'pdf' | 'image' | 'text';
+  patternContent: string;
+  fileName?: string;
+  createdAt?: string;
+}
+
 export interface Project {
   projectId: string;
   userId: string;
@@ -64,6 +72,7 @@ export interface Project {
   isArchive?: boolean;
   thumbnailIndex?: number;
   updatedAt?: string;
+  patterns?: Pattern[];
 }
 
 export interface JournalLog {
