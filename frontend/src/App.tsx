@@ -723,7 +723,7 @@ export default function App() {
         } as Project;
         setProjects(prev => prev.map(p => p.projectId === projectId ? merged : p));
         setSelectedProject(merged);
-        showToast('Project updated successfully!', 'success');
+        showToast('Saving..', 'success');
 
         const oldStatus = selectedProject.status;
         if (updates.status === ProjectStatus.Completed && oldStatus !== ProjectStatus.Completed) {

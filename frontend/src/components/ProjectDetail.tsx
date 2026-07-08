@@ -95,6 +95,7 @@ export function ProjectDetail({
   const [cameraTarget, setCameraTarget] = useState<'product' | 'log' | null>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const autoSaveTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activeTab, setActiveTab] = useState<'journal' | 'pattern'>('journal');
 
   const isDateRangeInvalid = !!(startDate && endDate && startDate > endDate);
@@ -204,6 +205,95 @@ export function ProjectDetail({
   const handleFieldChange = () => {
     setIsSaved(false);
   };
+
+  useEffect(() => {
+    if (isSaved) {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+        autoSaveTimeoutRef.current = null;
+      }
+      return;
+    }
+
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    autoSaveTimeoutRef.current = setTimeout(async () => {
+      const trimmed = title.trim();
+      if (!trimmed) return;
+
+      const capitalized = capitalizeWords(trimmed);
+      if (!isValidName(capitalized)) return;
+
+      const invalidHook = hooks.find(h => {
+        const hasMm = h.sizeMm !== undefined && h.sizeMm !== null && !isNaN(h.sizeMm);
+        const hasUs = h.sizeUs && h.sizeUs.trim() !== '';
+        if (!hasMm && !hasUs) return true;
+        if (hasMm && h.sizeMm <= 0) return true;
+        return false;
+      });
+      if (invalidHook) return;
+
+      setIsSubmitting(true);
+      try {
+        await onUpdateProject({
+          title: capitalized,
+          yarns,
+          hooks,
+          status,
+          notes,
+          categoryId: targetCategoryId,
+          startDate,
+          endDate,
+          careInstructions,
+          totalTime,
+          productPhotos,
+          coverPhoto
+        });
+        setTitle(capitalized);
+        setIsSaved(true);
+      } catch (err) {
+        console.error('Auto-save failed:', err);
+      } finally {
+        setIsSubmitting(false);
+      }
+    }, 1500);
+
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [
+    isSaved,
+    title,
+    yarns,
+    hooks,
+    status,
+    notes,
+    targetCategoryId,
+    startDate,
+    endDate,
+    careInstructions,
+    totalTime,
+    productPhotos,
+    coverPhoto,
+    onUpdateProject
+  ]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isSaved) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isSaved]);
 
   const handleSaveFields = async () => {
     const trimmed = title.trim();
