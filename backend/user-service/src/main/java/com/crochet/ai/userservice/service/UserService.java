@@ -214,16 +214,16 @@ public class UserService {
     }
 
     private UserResponse mapToResponse(User user) {
-        return UserResponse.builder()
-                .userId(user.getUserId().toString())
-                .displayName(user.getDisplayName())
-                .email(user.getEmail())
-                .profilePicture(user.getProfilePicture())
-                .membershipStatus(user.getMembershipStatus())
-                .membershipActive(user.isMembershipActive())
-                .crochetTerminology(user.getCrochetTerminology())
-                .createdAt(user.getCreatedAt())
-                .updatedAt(user.getUpdatedAt())
-                .build();
+        return new UserResponse(
+                user.getUserId().toString(),
+                user.getDisplayName(),
+                user.getEmail(),
+                user.getProfilePicture(),
+                user.getMembershipStatus(),
+                user.isMembershipActive(),
+                user.getCrochetTerminology(),
+                user.getCreatedAt(),
+                user.getUpdatedAt()
+        );
     }
 }

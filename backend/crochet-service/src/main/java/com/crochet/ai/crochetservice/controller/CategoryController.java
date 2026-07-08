@@ -1,7 +1,6 @@
 package com.crochet.ai.crochetservice.controller;
 
-import com.crochet.ai.crochetservice.dto.CategoryRequest;
-import com.crochet.ai.crochetservice.entity.Category;
+import com.crochet.ai.crochetservice.dto.*;
 import com.crochet.ai.crochetservice.service.CrochetService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,13 +24,13 @@ public class CategoryController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Category>> getCategories(@RequestHeader("X-User-Id") String userId) {
+    public ResponseEntity<List<CategoryResponse>> getCategories(@RequestHeader("X-User-Id") String userId) {
         log.info("Fetching all categories for user: {}", userId);
         return ResponseEntity.ok(crochetService.getCategories(userId));
     }
 
     @PostMapping
-    public ResponseEntity<Category> createCategory(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<CategoryResponse> createCategory(@RequestHeader("X-User-Id") String userId,
             @RequestBody CategoryRequest request) {
         log.info("Creating new category: '{}' for user: {}", request.getName(), userId);
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -39,7 +38,7 @@ public class CategoryController {
     }
 
     @PutMapping("/{categoryId}")
-    public ResponseEntity<Category> updateCategory(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<CategoryResponse> updateCategory(@RequestHeader("X-User-Id") String userId,
             @PathVariable String categoryId,
             @RequestBody CategoryRequest request) {
         log.info("Updating categoryId: {} for user: {} to new name: '{}'", categoryId, userId, request.getName());

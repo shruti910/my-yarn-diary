@@ -1,7 +1,6 @@
 package com.crochet.ai.crochetservice.controller;
 
-import com.crochet.ai.crochetservice.dto.HookRequest;
-import com.crochet.ai.crochetservice.entity.Hook;
+import com.crochet.ai.crochetservice.dto.*;
 import com.crochet.ai.crochetservice.service.CrochetService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,14 +24,14 @@ public class HookController {
     }
 
     @GetMapping("/projects/{projectId}/hooks")
-    public ResponseEntity<List<Hook>> getHooks(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<List<HookResponse>> getHooks(@RequestHeader("X-User-Id") String userId,
             @PathVariable String projectId) {
         log.info("Fetching all hooks for projectId: {} and user: {}", projectId, userId);
         return ResponseEntity.ok(crochetService.getHooks(userId, projectId));
     }
 
     @PostMapping("/projects/{projectId}/hooks")
-    public ResponseEntity<Hook> addHook(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<HookResponse> addHook(@RequestHeader("X-User-Id") String userId,
             @PathVariable String projectId,
             @RequestBody HookRequest request) {
         log.info("Adding new hook to projectId: {} for user: {}", projectId, userId);
@@ -41,14 +40,14 @@ public class HookController {
     }
 
     @GetMapping("/hooks/{hookId}")
-    public ResponseEntity<Hook> getHookDetails(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<HookResponse> getHookDetails(@RequestHeader("X-User-Id") String userId,
             @PathVariable Long hookId) {
         log.info("Fetching hook ID: {} for user: {}", hookId, userId);
         return ResponseEntity.ok(crochetService.getHookDetails(userId, hookId));
     }
 
     @PutMapping("/hooks/{hookId}")
-    public ResponseEntity<Hook> updateHook(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<HookResponse> updateHook(@RequestHeader("X-User-Id") String userId,
             @PathVariable Long hookId,
             @RequestBody HookRequest request) {
         log.info("Updating hook ID: {} for user: {}", hookId, userId);
@@ -56,7 +55,7 @@ public class HookController {
     }
 
     @PatchMapping("/hooks/{hookId}")
-    public ResponseEntity<Hook> patchHook(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<HookResponse> patchHook(@RequestHeader("X-User-Id") String userId,
             @PathVariable Long hookId,
             @RequestBody HookRequest request) {
         log.info("Patching hook ID: {} for user: {}", hookId, userId);

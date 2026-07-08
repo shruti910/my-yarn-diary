@@ -848,6 +848,24 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
+  const handleSelectProject = async (projectSummary: Project) => {
+    setSelectedProject(projectSummary);
+    try {
+      const detailedProject = await fetchWithToken(`/api/v1/projects/${projectSummary.projectId}`);
+      if (detailedProject) {
+        const mapped = {
+          ...detailedProject,
+          categoryId: detailedProject.categoryId || detailedProject.folderId
+        } as Project;
+        setSelectedProject(mapped);
+        setProjects(prev => prev.map(p => p.projectId === mapped.projectId ? mapped : p));
+      }
+    } catch (err: any) {
+      console.error('Failed fetching project details:', err);
+      showToast('Failed to load project details.', 'error');
+    }
+  };
+
   const liveSelectedProject = selectedProject
     ? projects.find(p => p.projectId === selectedProject.projectId) || selectedProject
     : null;
@@ -980,7 +998,7 @@ export default function App() {
                       categoryId={activeCategoryId}
                       categories={categories}
                       token={token}
-                      onSelectProject={setSelectedProject}
+                      onSelectProject={handleSelectProject}
                       onCreateProject={handleCreateProject}
                       onDeleteProject={handleDeleteProject}
                       onToggleFavorite={handleToggleFavorite}

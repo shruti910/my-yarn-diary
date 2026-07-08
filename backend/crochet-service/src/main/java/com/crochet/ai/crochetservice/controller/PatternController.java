@@ -1,7 +1,6 @@
 package com.crochet.ai.crochetservice.controller;
 
-import com.crochet.ai.crochetservice.dto.ProjectPatternRequest;
-import com.crochet.ai.crochetservice.entity.Project;
+import com.crochet.ai.crochetservice.dto.*;
 import com.crochet.ai.crochetservice.service.CrochetService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +22,7 @@ public class PatternController {
     }
 
     @PostMapping("/projects/{projectId}/patterns")
-    public ResponseEntity<Project> addProjectPattern(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<ProjectResponse> addProjectPattern(@RequestHeader("X-User-Id") String userId,
             @PathVariable String projectId,
             @RequestBody ProjectPatternRequest request) {
         log.info("Adding pattern of type: {} to projectId: {}", request.patternType(), projectId);
@@ -32,7 +31,7 @@ public class PatternController {
     }
 
     @PutMapping("/patterns/{patternId}")
-    public ResponseEntity<Project> updateProjectPattern(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<ProjectResponse> updateProjectPattern(@RequestHeader("X-User-Id") String userId,
             @PathVariable String patternId,
             @RequestBody ProjectPatternRequest request) {
         log.info("Updating patternId: {} for user: {}", patternId, userId);
@@ -40,7 +39,7 @@ public class PatternController {
     }
 
     @DeleteMapping("/patterns/{patternId}")
-    public ResponseEntity<Project> deleteProjectPattern(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<ProjectResponse> deleteProjectPattern(@RequestHeader("X-User-Id") String userId,
             @PathVariable String patternId) {
         log.info("Deleting patternId: {} for user: {}", patternId, userId);
         return ResponseEntity.ok(crochetService.deleteProjectPattern(userId, patternId));

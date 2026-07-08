@@ -25,7 +25,7 @@ public class ProjectController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Project>> getProjects(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<List<ProjectSummaryResponse>> getProjects(@RequestHeader("X-User-Id") String userId,
             @RequestParam(required = false, name = "categoryId") String categoryId,
             @RequestParam(required = false, name = "favorite") Boolean favorite) {
         if (Boolean.TRUE.equals(favorite)) {
@@ -37,14 +37,14 @@ public class ProjectController {
     }
 
     @GetMapping("/{projectId}")
-    public ResponseEntity<Project> getProjectDetails(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<ProjectResponse> getProjectDetails(@RequestHeader("X-User-Id") String userId,
             @PathVariable String projectId) {
         log.info("Fetching project details for projectId: {} and user: {}", projectId, userId);
-        return ResponseEntity.ok(crochetService.getProjectDetails(userId, projectId));
+        return ResponseEntity.ok(crochetService.getProjectDetailsResponse(userId, projectId));
     }
 
     @PostMapping
-    public ResponseEntity<Project> createProject(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<ProjectResponse> createProject(@RequestHeader("X-User-Id") String userId,
             @RequestBody ProjectRequest request) {
         log.info("Creating project: '{}' for user: {} with status: {}", request.getTitle(), userId, request.getStatus());
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -52,7 +52,7 @@ public class ProjectController {
     }
 
     @PutMapping("/{projectId}")
-    public ResponseEntity<Project> updateProject(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<ProjectResponse> updateProject(@RequestHeader("X-User-Id") String userId,
             @PathVariable String projectId,
             @RequestBody ProjectRequest request) {
         log.info("Updating projectId: {} for user: {} (new status: {})", projectId, userId, request.getStatus());
@@ -60,7 +60,7 @@ public class ProjectController {
     }
 
     @PatchMapping("/{projectId}")
-    public ResponseEntity<Project> patchProject(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<ProjectResponse> patchProject(@RequestHeader("X-User-Id") String userId,
             @PathVariable String projectId,
             @RequestBody ProjectPatchRequest request) {
         log.info("Patching projectId: {} for user: {}", projectId, userId);
@@ -76,7 +76,7 @@ public class ProjectController {
     }
 
     @PostMapping("/{projectId}/duplicates")
-    public ResponseEntity<Project> duplicateProject(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<ProjectResponse> duplicateProject(@RequestHeader("X-User-Id") String userId,
             @PathVariable String projectId) {
         log.info("Duplicating project: {} for user: {}", projectId, userId);
         return ResponseEntity.status(HttpStatus.CREATED)

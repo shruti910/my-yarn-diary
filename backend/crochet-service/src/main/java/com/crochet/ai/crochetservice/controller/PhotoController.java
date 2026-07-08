@@ -1,7 +1,6 @@
 package com.crochet.ai.crochetservice.controller;
 
-import com.crochet.ai.crochetservice.dto.GalleryItemResponse;
-import com.crochet.ai.crochetservice.entity.Photo;
+import com.crochet.ai.crochetservice.dto.*;
 import com.crochet.ai.crochetservice.service.CrochetService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,14 +23,14 @@ public class PhotoController {
     }
 
     @GetMapping("/api/v1/projects/{projectId}/photos")
-    public ResponseEntity<List<Photo>> getPhotos(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<List<PhotoResponse>> getPhotos(@RequestHeader("X-User-Id") String userId,
             @PathVariable String projectId) {
         log.info("Fetching all photos for projectId: {} and user: {}", projectId, userId);
         return ResponseEntity.ok(crochetService.getPhotos(userId, projectId));
     }
 
     @PostMapping("/api/v1/projects/{projectId}/photos")
-    public ResponseEntity<Photo> addPhoto(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<PhotoResponse> addPhoto(@RequestHeader("X-User-Id") String userId,
             @PathVariable String projectId,
             @RequestBody String photoBase64) {
         log.info("Adding new photo to projectId: {} for user: {}", projectId, userId);
@@ -40,7 +39,7 @@ public class PhotoController {
     }
 
     @GetMapping("/api/v1/photos/{photoId}")
-    public ResponseEntity<Photo> getPhotoDetails(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<PhotoResponse> getPhotoDetails(@RequestHeader("X-User-Id") String userId,
             @PathVariable Long photoId) {
         log.info("Fetching photo ID: {} for user: {}", photoId, userId);
         return ResponseEntity.ok(crochetService.getPhotoDetails(userId, photoId));
