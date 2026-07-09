@@ -1,9 +1,9 @@
-name: My Yarn Diary - Dev CI/CD Pipeline
+name: My Yarn Diary - Prod CI/CD Pipeline
 
 on:
   push:
     branches:
-      - dev
+      - main
 
 jobs:
   # JOB 1: Detect path changes across the monorepo structure
