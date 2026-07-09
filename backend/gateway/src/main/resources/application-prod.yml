@@ -1,0 +1,24 @@
+server:
+  port: ${PORT:3000}
+
+USER_SERVICE_URL: ${USER_SERVICE_URL:http://user-service:8081}
+CROCHET_SERVICE_URL: ${CROCHET_SERVICE_URL:http://crochet-service:8082}
+AI_SERVICE_URL: ${AI_SERVICE_URL:http://ai-service:8083}
+
+logging:
+  include-application-name: true
+  structured:
+    format:
+      console: logstash
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,prometheus"
+  endpoint:
+    health:
+      show-details: always
