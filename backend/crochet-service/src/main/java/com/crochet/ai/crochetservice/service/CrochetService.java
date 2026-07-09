@@ -173,7 +173,11 @@ public class CrochetService {
                 UUID categoryUuid = UUID.fromString(categoryId);
                 Optional<Category> categoryOpt = categoryRepository.findByCategoryId(categoryUuid);
                 if (categoryOpt.isPresent()) {
-                    String normName = categoryOpt.get().getName().trim().toLowerCase();
+                    Category category = categoryOpt.get();
+                    if (!category.getUserId().equals(userUuid)) {
+                        throw new ForbiddenException("Forbidden access attempt");
+                    }
+                    String normName = category.getName().trim().toLowerCase();
                     if (normName.equals("favourites ❤️") || normName.equals("favourites")) {
                         projects = projectRepository.findByUserIdAndIsFavoriteTrue(userUuid);
                         return projects.stream().map(this::mapToSummaryResponse).collect(Collectors.toList());
@@ -253,6 +257,10 @@ public class CrochetService {
         
         Category category = categoryRepository.findByCategoryId(categoryUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Category directory not found: " + request.getCategoryId()));
+        
+        if (!category.getUserId().equals(userUuid)) {
+            throw new ForbiddenException("Forbidden access attempt");
+        }
         
         String checkName = category.getName().trim().toLowerCase();
         if (checkName.equals("favourites ❤️") || checkName.equals("favourites")) {
@@ -341,6 +349,9 @@ public class CrochetService {
         if (!project.getCategoryId().equals(categoryUuid)) {
             Category category = categoryRepository.findByCategoryId(categoryUuid)
                     .orElseThrow(() -> new ResourceNotFoundException("Category not found: " + request.getCategoryId()));
+            if (!category.getUserId().equals(UUID.fromString(userId))) {
+                throw new ForbiddenException("Forbidden access attempt");
+            }
             String checkName = category.getName().trim().toLowerCase();
             if (checkName.equals("favourites ❤️") || checkName.equals("favourites")) {
                 throw new BadRequestException("Projects cannot be moved directly into the Favourites category.");
@@ -461,6 +472,9 @@ public class CrochetService {
             if (!project.getCategoryId().equals(categoryUuid)) {
                 Category category = categoryRepository.findByCategoryId(categoryUuid)
                         .orElseThrow(() -> new ResourceNotFoundException("Category not found: " + request.getCategoryId()));
+                if (!category.getUserId().equals(UUID.fromString(userId))) {
+                    throw new ForbiddenException("Forbidden access attempt");
+                }
                 String checkName = category.getName().trim().toLowerCase();
                 if (checkName.equals("favourites ❤️") || checkName.equals("favourites")) {
                     throw new BadRequestException("Projects cannot be moved directly into the Favourites category.");

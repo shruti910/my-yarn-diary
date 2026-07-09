@@ -1,0 +1,11 @@
+server:
+  port: 3000
+
+USER_SERVICE_URL: http://localhost:8081
+CROCHET_SERVICE_URL: http://localhost:8082
+AI_SERVICE_URL: http://localhost:8083
+
+logging:
+  level:
+    root: INFO
+    com.crochet.ai.gateway: DEBUG

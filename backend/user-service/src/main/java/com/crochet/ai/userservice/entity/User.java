@@ -37,10 +37,6 @@ public class User {
     @Column(name = "email", nullable = false, unique = true, length = 150)
     private String email;
 
-    @NotBlank(message = "Password hash is required")
-    @Column(name = "password_hash", nullable = false, length = 100)
-    private String passwordHash;
-
     @Column(name = "profile_picture", columnDefinition = "TEXT")
     private String profilePicture;
 

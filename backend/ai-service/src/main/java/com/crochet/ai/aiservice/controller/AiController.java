@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import com.crochet.ai.aiservice.dto.*;
 import com.crochet.ai.aiservice.service.AiService;
+import com.crochet.ai.aiservice.exception.BadRequestException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,7 +26,7 @@ public class AiController {
 
     @GetMapping("/chats")
     public ResponseEntity<List<ChatSessionDto>> getSessions(@RequestHeader("X-User-Id") String userId) {
-        log.info("Fetching all active AI chat sessions for user: {}", userId);
+        log.info("Fetching all active AI chats for user: {}", userId);
         return ResponseEntity.ok(aiService.getSessions(userId));
     }
 
@@ -52,6 +53,9 @@ public class AiController {
             @RequestBody MessageRequest request) {
         log.info("Sending message to AI chat session: {} by user: {} (prompt excerpt: '{}')",
                 chatId, userId, request.getText().substring(0, Math.min(request.getText().length(), 40)));
+        if (userTerminology != null && !"US".equalsIgnoreCase(userTerminology) && !"UK".equalsIgnoreCase(userTerminology)) {
+            throw new BadRequestException("Invalid terminology preference. Must be US or UK.");
+        }
         return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
                 .body(aiService.sendMessage(userId, chatId, request, userTerminology));
     }

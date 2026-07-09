@@ -1,17 +1,21 @@
-# Stage 1: Build TypeScript
-FROM node:20-alpine AS builder
+# Stage 1: Build stage
+FROM maven:3.9-eclipse-temurin-21-alpine AS builder
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+COPY src ./src
+RUN mvn clean package -DskipTests
 
-# Stage 2: Production Execution
-FROM node:20-alpine
+# Stage 2: Runtime stage
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/server.ts ./ 
+
+# Automatically download the Grafana tracking agent binary into the container layer
+ADD https://github.com/grafana/grafana-opentelemetry-java/releases/latest/download/grafana-opentelemetry-java.jar grafana-agent.jar
+
+# Copy the compiled JAR file from the build stage
+COPY --from=builder /app/target/*.jar app.jar
 EXPOSE 3000
-CMD ["npm", "start"]
+
+# Execute the application with the agent attached
+ENTRYPOINT ["java", "-javaagent:grafana-agent.jar", "-jar", "app.jar"]

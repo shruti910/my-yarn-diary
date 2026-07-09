@@ -5,8 +5,8 @@ services:
   user-db:
     image: postgres:15-alpine
     container_name: user-db
-    ports:
-      - "${USER_DB_PORT}:5432"
+    expose:
+      - "5432"
     environment:
       - POSTGRES_DB=${USER_DB_NAME}
       - POSTGRES_USER=${USER_DB_USER}
@@ -24,8 +24,8 @@ services:
   crochet-db:
     image: postgres:15-alpine
     container_name: crochet-db
-    ports:
-      - "${CROCHET_DB_PORT}:5432"
+    expose:
+      - "5432"
     environment:
       - POSTGRES_DB=${CROCHET_DB_NAME}
       - POSTGRES_USER=${CROCHET_DB_USER}
@@ -43,8 +43,8 @@ services:
   ai-db:
     image: postgres:15-alpine
     container_name: ai-db
-    ports:
-      - "${AI_DB_PORT}:5432"
+    expose:
+      - "5432"
     environment:
       - POSTGRES_DB=${AI_DB_NAME}
       - POSTGRES_USER=${AI_DB_USER}
@@ -70,17 +70,20 @@ services:
     ports:
       - "${GATEWAY_PORT}:3000" # Exposes your main API entryway to the frontend
     environment:
-      - APP_PROFILE=${APP_PROFILE}
-      - USER_SERVICE_URL=http://user-service:${USER_SERVICE_PORT}
-      - CROCHET_SERVICE_URL=http://crochet-service:${CROCHET_SERVICE_PORT}
-      - AI_SERVICE_URL=http://ai-service:${AI_SERVICE_PORT}
+      - SPRING_PROFILES_ACTIVE=${APP_PROFILE}
+      - USER_SERVICE_URL=http://user-service:8081
+      - CROCHET_SERVICE_URL=http://crochet-service:8082
+      - AI_SERVICE_URL=http://ai-service:8083
       - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - INTERNAL_JWT_SECRET=${INTERNAL_JWT_SECRET}
+      - OTEL_SERVICE_NAME=gateway
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
+      - OTEL_EXPORTER_OTLP_HEADERS=${OTEL_EXPORTER_OTLP_HEADERS}
+      - OTEL_EXPORTER_OTLP_PROTOCOL=${OTEL_EXPORTER_OTLP_PROTOCOL}
     depends_on:
       - user-service
       - crochet-service
       - ai-service
-    volumes:
-      - ./crochet_db.json:/app/crochet_db.json # Mounts backup fallback data
     networks:
       - crochet-network
 
@@ -92,13 +95,14 @@ services:
       context: ./backend/user-service
       dockerfile: Dockerfile
     container_name: user-service
-    ports:
-      - "${USER_SERVICE_PORT}:8081"
+    expose:
+      - "8081"
     environment:
-      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_PROFILES_ACTIVE=${APP_PROFILE}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://user-db:5432/${USER_DB_NAME}
       - SPRING_DATASOURCE_USERNAME=${USER_DB_USER}
       - SPRING_DATASOURCE_PASSWORD=${USER_DB_PASSWORD}
+      - INTERNAL_JWT_SECRET=${INTERNAL_JWT_SECRET}
       - OTEL_SERVICE_NAME=user-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
       - OTEL_EXPORTER_OTLP_HEADERS=${OTEL_EXPORTER_OTLP_HEADERS}
@@ -114,13 +118,14 @@ services:
       context: ./backend/crochet-service
       dockerfile: Dockerfile
     container_name: crochet-service
-    ports:
-      - "${CROCHET_SERVICE_PORT}:8082"
+    expose:
+      - "8082"
     environment:
-      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_PROFILES_ACTIVE=${APP_PROFILE}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://crochet-db:5432/${CROCHET_DB_NAME}
       - SPRING_DATASOURCE_USERNAME=${CROCHET_DB_USER}
       - SPRING_DATASOURCE_PASSWORD=${CROCHET_DB_PASSWORD}
+      - INTERNAL_JWT_SECRET=${INTERNAL_JWT_SECRET}
       - OTEL_SERVICE_NAME=crochet-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
       - OTEL_EXPORTER_OTLP_HEADERS=${OTEL_EXPORTER_OTLP_HEADERS}
@@ -136,14 +141,15 @@ services:
       context: ./backend/ai-service
       dockerfile: Dockerfile
     container_name: ai-service
-    ports:
-      - "${AI_SERVICE_PORT}:8083"
+    expose:
+      - "8083"
     environment:
-      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_PROFILES_ACTIVE=${APP_PROFILE}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://ai-db:5432/${AI_DB_NAME}
       - SPRING_DATASOURCE_USERNAME=${AI_DB_USER}
       - SPRING_DATASOURCE_PASSWORD=${AI_DB_PASSWORD}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - INTERNAL_JWT_SECRET=${INTERNAL_JWT_SECRET}
       - OTEL_SERVICE_NAME=ai-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
       - OTEL_EXPORTER_OTLP_HEADERS=${OTEL_EXPORTER_OTLP_HEADERS}

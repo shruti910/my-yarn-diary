@@ -94,7 +94,6 @@ public class UserService {
                 .userId(userId)
                 .displayName(displayName != null && !displayName.isBlank() ? displayName : "Crafter")
                 .email(email != null && !email.isBlank() ? email : "")
-                .passwordHash("firebase_managed")
                 .profilePicture(profilePicture != null && !profilePicture.isBlank() ? profilePicture : "")
                 .membershipStatus(MembershipStatus.FREE)
                 .membershipActive(false)
@@ -175,21 +174,6 @@ public class UserService {
         } catch (IllegalArgumentException e) {
             throw new BadRequestException("Invalid profile picture format. Must be a valid Base64 image data string.");
         }
-    }
-
-    @Transactional
-    public void changePassword(String userId, PasswordUpdateRequest request) {
-        UUID uuid = UUID.fromString(userId);
-        User user = userRepository.findByUserId(uuid)
-                .orElseThrow(() -> new ResourceNotFoundException("User profile not found with ID: " + userId));
-
-        String currentHash = "sha256_" + request.getCurrentPassword().hashCode();
-        if (!user.getPasswordHash().equals(currentHash)) {
-            throw new BadRequestException("Current password matches incorrectly");
-        }
-
-        user.setPasswordHash("sha256_" + request.getNewPassword().hashCode());
-        userRepository.save(user);
     }
 
     @Transactional

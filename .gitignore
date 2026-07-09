@@ -15,7 +15,6 @@
 # =========================================================================
 # Node / Frontend / Gateway dependencies
 node_modules/
-/backend/gateway/node_modules/
 /frontend/node_modules/
 npm-debug.log*
 yarn-debug.log*
@@ -24,6 +23,7 @@ yarn-error.log*
 
 # Java / Maven dependencies and build targets
 target/
+/backend/gateway/target/
 /backend/user-service/target/
 /backend/crochet-service/target/
 /backend/ai-service/target/
@@ -36,9 +36,6 @@ target/
 # =========================================================================
 # Frontend build bundle
 /frontend/dist/
-
-# Gateway compiled TypeScript bundle
-/backend/gateway/dist/
 
 # Local database volumes (Docker persistence folders)
 .docker/
@@ -66,3 +63,5 @@ ai_db_data/
 .DS_Store?
 ehthumbs.db
 Thumbs.db
+
+docker-compose.override.yml
