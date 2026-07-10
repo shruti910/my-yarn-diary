@@ -72,8 +72,8 @@ public class FirebaseAuthenticationFilter extends AbstractGatewayFilterFactory<F
                 // Map Firebase UID to standardized UUID
                 String standardizedUserId = UuidGenerator.getUuidFromFirebaseUid(firebaseUid);
 
-                // Generate signed downstream handoff token
-                String internalJwt = tokenProvider.createToken(standardizedUserId, email, name, picture);
+                // Generate signed downstream handoff token containing original firebaseUid
+                String internalJwt = tokenProvider.createToken(standardizedUserId, email, name, picture, firebaseUid);
 
                 // Inject headers to request
                 ServerHttpRequest mutatedRequest = request.mutate()
@@ -81,6 +81,7 @@ public class FirebaseAuthenticationFilter extends AbstractGatewayFilterFactory<F
                         .header("X-User-Email", email != null ? email : "")
                         .header("X-User-Name", name != null ? name : "")
                         .header("X-User-Profile-Picture", picture != null ? picture : "")
+                        .header("X-Firebase-Uid", firebaseUid)
                         .header("X-Forwarded-Identity", internalJwt)
                         .build();
 

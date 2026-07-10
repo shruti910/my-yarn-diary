@@ -22,6 +22,7 @@ public class HeaderSanitizationFilter implements GlobalFilter, Ordered {
             "x-user-name",
             "x-user-profile-picture",
             "x-user-avatar",
+            "x-firebase-uid",
             "x-forwarded-identity"
     );
 

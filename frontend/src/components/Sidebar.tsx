@@ -4,11 +4,11 @@
  */
 
 import React, { useState } from 'react';
-import { Folder, Plus, Trash2, Edit2, Check, X, LogOut, Scissors, ChevronLeft, Archive, Heart, Settings, CircleUserRound, Camera } from 'lucide-react';
+import { Folder, Plus, Trash2, Edit2, Check, X, LogOut, Scissors, ChevronLeft, Archive, Heart, Settings, CircleUserRound, Camera, Lock } from 'lucide-react';
 import { Category } from '../types';
 import { useDialog } from './DialogProvider';
 import { motion, AnimatePresence } from 'motion/react';
-import { updateProfile } from 'firebase/auth';
+import { updateProfile, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import packageJson from '../../package.json';
 
@@ -94,6 +94,85 @@ export function Sidebar({
   const [tempProfilePicture, setTempProfilePicture] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
+
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+
+  const handleUpdatePassword = async () => {
+    const curPass = currentPassword.trim();
+    const newPass = newPassword.trim();
+    const confPass = confirmNewPassword.trim();
+
+    if (!curPass || !newPass || !confPass) {
+      showAlert('All password fields are required.', 'Missing Fields');
+      return;
+    }
+
+    if (newPass.length < 6) {
+      showAlert('New password must be at least 6 characters long.', 'Password Too Short');
+      return;
+    }
+
+    if (newPass !== confPass) {
+      showAlert('New passwords do not match.', 'Password Mismatch');
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+    try {
+      if (!auth.currentUser || !auth.currentUser.email) {
+        throw new Error('No authenticated user session found.');
+      }
+
+      const credential = EmailAuthProvider.credential(auth.currentUser.email, curPass);
+      await reauthenticateWithCredential(auth.currentUser, credential);
+
+      const idToken = await auth.currentUser.getIdToken();
+
+      const response = await fetch(`/api/v1/users/${currentUser?.userId}/password`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          newPassword: newPass
+        })
+      });
+
+      if (!response.ok) {
+        let errMsg = 'Failed to update password on the server.';
+        try {
+          const data = await response.json();
+          if (data && data.message) errMsg = data.message;
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
+
+      setIsChangePasswordOpen(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      
+      await showAlert('Password updated successfully! For security, you will now be logged out.', 'Success');
+      onLogout();
+
+    } catch (err: any) {
+      console.error('Password update failed:', err);
+      let friendlyMsg = err.message || 'Verification failed. Please check your current password.';
+      if (err.code === 'auth/wrong-password' || err.message?.includes('wrong-password')) {
+        friendlyMsg = 'The current password you entered is incorrect.';
+      } else if (err.code === 'auth/user-token-expired') {
+        friendlyMsg = 'Your session expired. Please reload and try again.';
+      }
+      showAlert(friendlyMsg, 'Update Failed');
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  };
 
   const openProfileModal = () => {
     setTempDisplayName(currentUser?.displayName || '');
@@ -711,6 +790,24 @@ export function Sidebar({
 
               {/* Body */}
               <div className="space-y-6">
+                {/* Change Password Section */}
+                <div className="space-y-2 bg-[#F9F6F2]/30 p-4 border border-[#E8E2D9]/40 rounded-2xl">
+                  <h4 className="text-xs font-bold text-[#84A59D] uppercase tracking-widest">Change Password</h4>
+                  <p className="text-[11px] text-[#7C7167] font-semibold leading-relaxed">
+                    Update your password regularly to keep your account secure.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSettingsOpen(false);
+                      setIsChangePasswordOpen(true);
+                    }}
+                    className="mt-2 px-4 py-2 border border-[#84A59D]/40 bg-[#84A59D]/10 hover:bg-[#84A59D]/20 text-[#84A59D] font-bold rounded-xl text-xs transition-all cursor-pointer"
+                  >
+                    Change Password
+                  </button>
+                </div>
+
                 {/* Deactivate Account Section */}
                 <div className="space-y-2 bg-[#F9F6F2]/30 p-4 border border-[#E8E2D9]/40 rounded-2xl">
                   <h4 className="text-xs font-bold text-red-500 uppercase tracking-widest">Deactivate Account</h4>
@@ -762,6 +859,98 @@ export function Sidebar({
                   className="px-5 py-2.5 bg-[#7C7167] hover:bg-[#7C7167]/90 text-white font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer"
                 >
                   Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Change Password Modal */}
+      <AnimatePresence>
+        {isChangePasswordOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/45 backdrop-blur-xs select-none">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="bg-white rounded-[2rem] border border-[#E8E2D9] max-w-md w-full p-6 space-y-5 shadow-2xl relative text-left"
+            >
+              {/* Header */}
+              <div className="flex justify-between items-center pb-2 border-b border-[#F9F6F2]">
+                <h3 className="font-serif font-extrabold text-[#2D231B] text-lg flex items-center gap-2">
+                  <Lock className="w-5 h-5 text-[#84A59D]" />
+                  Change Password
+                </h3>
+                <button
+                  onClick={() => setIsChangePasswordOpen(false)}
+                  className="p-1.5 rounded-lg hover:bg-stone-100 text-[#7C7167] transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Form Body */}
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-[#7C7167] uppercase tracking-widest">Current Password</label>
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Enter current password"
+                    className="w-full px-4 py-2.5 bg-white border border-[#E8E2D9] rounded-xl text-xs font-semibold text-[#2D231B] focus:border-[#F28482] outline-none transition-colors"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-[#7C7167] uppercase tracking-widest">New Password</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password (min 6 characters)"
+                    className="w-full px-4 py-2.5 bg-white border border-[#E8E2D9] rounded-xl text-xs font-semibold text-[#2D231B] focus:border-[#F28482] outline-none transition-colors"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-[#7C7167] uppercase tracking-widest">Confirm New Password</label>
+                  <input
+                    type="password"
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    placeholder="Re-enter new password"
+                    className="w-full px-4 py-2.5 bg-white border border-[#E8E2D9] rounded-xl text-xs font-semibold text-[#2D231B] focus:border-[#F28482] outline-none transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Actions Footer */}
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#F9F6F2]">
+                <button
+                  type="button"
+                  onClick={() => setIsChangePasswordOpen(false)}
+                  className="px-4 py-2 bg-[#FDFCFB] hover:bg-[#F9F6F2] text-[#7C7167] border border-[#E8E2D9] rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUpdatePassword}
+                  disabled={isUpdatingPassword || !currentPassword.trim() || !newPassword.trim() || !confirmNewPassword.trim()}
+                  className="px-5 py-2.5 bg-[#84A59D] hover:bg-[#84A59D]/90 text-white font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                >
+                  {isUpdatingPassword ? (
+                    <>
+                      <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Updating...
+                    </>
+                  ) : 'Update Password'}
                 </button>
               </div>
             </motion.div>

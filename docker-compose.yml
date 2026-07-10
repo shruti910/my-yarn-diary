@@ -97,12 +97,16 @@ services:
     container_name: user-service
     expose:
       - "8081"
+    volumes:
+      - ./secrets/firebase-credentials-prod.json:/app/firebase-credentials.json:ro
     environment:
       - SPRING_PROFILES_ACTIVE=${APP_PROFILE}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://user-db:5432/${USER_DB_NAME}
       - SPRING_DATASOURCE_USERNAME=${USER_DB_USER}
       - SPRING_DATASOURCE_PASSWORD=${USER_DB_PASSWORD}
       - INTERNAL_JWT_SECRET=${INTERNAL_JWT_SECRET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-credentials.json
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
       - OTEL_SERVICE_NAME=user-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
       - OTEL_EXPORTER_OTLP_HEADERS=${OTEL_EXPORTER_OTLP_HEADERS}

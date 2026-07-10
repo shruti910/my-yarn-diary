@@ -67,8 +67,9 @@ public class GatewayTrustFilter implements Filter {
             String email = claims.get("email", String.class);
             String name = claims.get("name", String.class);
             String picture = claims.get("picture", String.class);
+            String firebaseUid = claims.get("firebaseUid", String.class);
 
-            chain.doFilter(new HttpServletRequestWrapper(httpRequest, userId, email, name, picture), response);
+            chain.doFilter(new HttpServletRequestWrapper(httpRequest, userId, email, name, picture, firebaseUid), response);
 
         } catch (Exception ex) {
             log.error("Access Forbidden: Failed to verify X-Forwarded-Identity header signature: {}", ex.getMessage());
@@ -81,13 +82,15 @@ public class GatewayTrustFilter implements Filter {
         private final String email;
         private final String name;
         private final String picture;
+        private final String firebaseUid;
 
-        public HttpServletRequestWrapper(HttpServletRequest request, String userId, String email, String name, String picture) {
+        public HttpServletRequestWrapper(HttpServletRequest request, String userId, String email, String name, String picture, String firebaseUid) {
             super(request);
             this.userId = userId;
             this.email = email;
             this.name = name;
             this.picture = picture;
+            this.firebaseUid = firebaseUid;
         }
 
         @Override
@@ -103,6 +106,9 @@ public class GatewayTrustFilter implements Filter {
             }
             if ("x-user-profile-picture".equalsIgnoreCase(nameHeader)) {
                 return picture;
+            }
+            if ("x-firebase-uid".equalsIgnoreCase(nameHeader)) {
+                return firebaseUid;
             }
             return super.getHeader(nameHeader);
         }

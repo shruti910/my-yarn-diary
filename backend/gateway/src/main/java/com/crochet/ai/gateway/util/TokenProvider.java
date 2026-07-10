@@ -23,16 +23,21 @@ public class TokenProvider {
     }
 
     public String createToken(String userId, String email) {
-        return createToken(userId, email, null, null);
+        return createToken(userId, email, null, null, null);
     }
 
     public String createToken(String userId, String email, String name, String picture) {
+        return createToken(userId, email, name, picture, null);
+    }
+
+    public String createToken(String userId, String email, String name, String picture, String firebaseUid) {
         long now = System.currentTimeMillis();
         return Jwts.builder()
                 .subject(userId)
                 .claim("email", email != null ? email : "")
                 .claim("name", name != null ? name : "")
                 .claim("picture", picture != null ? picture : "")
+                .claim("firebaseUid", firebaseUid != null ? firebaseUid : "")
                 .issuedAt(new Date(now))
                 .expiration(new Date(now + 60000)) // 60 seconds expiration
                 .signWith(secretKey)

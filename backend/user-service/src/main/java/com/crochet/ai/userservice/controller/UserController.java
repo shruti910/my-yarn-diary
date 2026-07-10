@@ -82,6 +82,16 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
+    @PutMapping({"/profile/change-password", "/{id}/password"})
+    public ResponseEntity<Void> changePassword(
+            @RequestHeader("X-User-Id") String authenticatedUserId,
+            @RequestHeader("X-Firebase-Uid") String firebaseUid,
+            @RequestBody @jakarta.validation.Valid ChangePasswordRequest request) {
+        log.info("Request to change password for user ID: {} (firebase UID: {})", authenticatedUserId, firebaseUid);
+        userService.changePassword(authenticatedUserId, firebaseUid, request.getNewPassword());
+        return ResponseEntity.ok().build();
+    }
+
     private void validateUserOwnership(String authenticatedUserId, String targetUserId) {
         if (authenticatedUserId == null || !authenticatedUserId.equalsIgnoreCase(targetUserId)) {
             throw new ForbiddenException("Access denied: You are not authorized to view or modify this profile.");

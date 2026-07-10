@@ -11,7 +11,8 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  updateProfile
+  updateProfile,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 
 interface AuthScreenProps {
@@ -90,6 +91,33 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   const [displayNameError, setDisplayNameError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setEmailError('');
+    setLoading(true);
+
+    const emailErr = validateField('email', email);
+    if (emailErr) {
+      setEmailError(emailErr);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setResetSent(true);
+    } catch (err: any) {
+      console.warn("Auth reset request completed code:", err.code);
+      // Account enumeration protection: display success uniformly
+      setResetSent(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const validateField = (name: string, value: string) => {
     if (name === 'displayName') {
@@ -264,155 +292,269 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           </p>
         </div>
 
-        {/* Tab Controls */}
-        <div className="flex bg-[#F9F6F2] p-1 rounded-xl mb-6 border border-[#E8E2D9]">
-          <button
-            type="button"
-            className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all cursor-pointer ${isLogin ? 'bg-[#F28482] text-white shadow-sm' : 'text-[#7C7167] hover:text-[#F28482]'}`}
-            onClick={() => { setIsLogin(true); setError(''); setDisplayNameError(''); setEmailError(''); setPasswordError(''); }}
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all cursor-pointer ${!isLogin ? 'bg-[#F28482] text-white shadow-sm' : 'text-[#7C7167] hover:text-[#F28482]'}`}
-            onClick={() => { setIsLogin(false); setError(''); setDisplayNameError(''); setEmailError(''); setPasswordError(''); }}
-          >
-            Create Account
-          </button>
-        </div>
-
-        {error && (
-          <div className="mb-4 p-3 bg-red-55 border border-red-100 text-red-700 rounded-xl text-xs font-semibold flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          {!isLogin && (
-            <div className="space-y-1">
-              <label className="text-xs font-extrabold text-[#7C7167] uppercase tracking-wider block">Your Name / Handle</label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#A89F94]">
-                  <UserIcon className="w-4 h-4" />
-                </span>
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={handleDisplayNameChange}
-                  placeholder="e.g. GrandmaStitches"
-                  className={`w-full pl-10 pr-4 py-3 bg-[#FDFCFB] border rounded-xl text-sm focus:outline-none transition-all text-[#2D231B] placeholder-[#A89F94] font-semibold ${displayNameError
-                    ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-                    : 'border-[#E8E2D9] focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482]'
-                    }`}
-                />
+        {isForgotPassword ? (
+          resetSent ? (
+            <div className="space-y-6 text-center">
+              <div className="mx-auto w-12 h-12 rounded-full bg-[#84A59D]/15 flex items-center justify-center text-2xl text-[#84A59D]">
+                <Sparkles className="w-6 h-6 animate-pulse" />
               </div>
-              {displayNameError && (
-                <p className="text-xs text-red-500 font-semibold mt-1 flex items-center gap-1">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  <span>{displayNameError}</span>
+              <div className="space-y-2">
+                <h3 className="font-serif text-xl font-extrabold text-[#2D231B]">Reset Link Dispatched</h3>
+                <p className="font-sans text-xs text-[#7C7167] font-semibold leading-relaxed">
+                  If an account is associated with this email address, a secure password reset link has been dispatched to your inbox.
                 </p>
-              )}
-            </div>
-          )}
-
-          <div className="space-y-1">
-            <label className="text-xs font-extrabold text-[#7C7167] uppercase tracking-wider block">Email Address</label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#A89F94]">
-                <Mail className="w-4 h-4" />
-              </span>
-              <input
-                type="email"
-                value={email}
-                onChange={handleEmailChange}
-                placeholder="crafter@example.com"
-                className={`w-full pl-10 pr-4 py-3 bg-[#FDFCFB] border rounded-xl text-sm focus:outline-none transition-all text-[#2D231B] placeholder-[#A89F94] font-semibold ${emailError
-                  ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-                  : 'border-[#E8E2D9] focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482]'
-                  }`}
-              />
-            </div>
-            {emailError && (
-              <p className="text-xs text-red-500 font-semibold mt-1 flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                <span>{emailError}</span>
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-extrabold text-[#7C7167] uppercase tracking-wider block">Password</label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#A89F94]">
-                <Lock className="w-4 h-4" />
-              </span>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={handlePasswordChange}
-                placeholder="••••••••"
-                className={`w-full pl-10 pr-10 py-3 bg-[#FDFCFB] border rounded-xl text-sm focus:outline-none transition-all text-[#2D231B] placeholder-[#A89F94] font-semibold ${passwordError
-                  ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-                  : 'border-[#E8E2D9] focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482]'
-                  }`}
-              />
+              </div>
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#A89F94] hover:text-[#F28482] cursor-pointer focus:outline-none"
+                onClick={() => {
+                  setIsForgotPassword(false);
+                  setResetSent(false);
+                  setEmail('');
+                  setError('');
+                }}
+                className="w-full py-3 bg-[#F28482] hover:bg-[#F28482]/85 text-white font-bold rounded-xl text-xs transition-all cursor-pointer shadow-md"
               >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                Back to Sign In
               </button>
             </div>
-            {passwordError && (
-              <p className="text-xs text-red-500 font-semibold mt-1 flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                <span>{passwordError}</span>
-              </p>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-[#F28482] hover:bg-[#F28482]/85 text-white font-bold rounded-xl transition-all shadow-md transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 text-sm flex items-center justify-center gap-2 mt-2 cursor-pointer"
-          >
-            {loading ? (
-              <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-            ) : isLogin ? (
-              'Sign In'
-            ) : (
-              'Register'
-            )}
-          </button>
-        </form>
-
-        <div className="relative flex py-4 items-center">
-          <div className="flex-grow border-t border-[#E8E2D9]"></div>
-          <span className="flex-shrink mx-4 text-xs text-[#A89F94] font-bold uppercase tracking-widest bg-white">OR</span>
-          <div className="flex-grow border-t border-[#E8E2D9]"></div>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleGoogleSSO}
-          disabled={loading}
-          className="w-full py-3 bg-white border border-[#E8E2D9] text-[#7C7167] font-bold rounded-xl text-sm flex items-center justify-center gap-2.5 hover:bg-[#F9F6F2] transition-all cursor-pointer hover:border-[#84A59D]"
-        >
-          {loading ? (
-            <span className="inline-block w-4 h-4 border-2 border-stone-500 border-t-transparent rounded-full animate-spin"></span>
           ) : (
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
-            </svg>
-          )}
-          <span>Sign in with Google</span>
-        </button>
+            <div className="space-y-5">
+              <div className="text-center space-y-2 mb-2">
+                <h2 className="font-serif text-2xl font-extrabold text-[#2D231B]">Reset Password</h2>
+                <p className="font-sans text-xs text-[#7C7167] font-semibold">
+                  Enter your email address and we'll send you a link to reset your password.
+                </p>
+              </div>
+              
+              {error && (
+                <div className="p-3 bg-red-55 border border-red-100 text-red-700 rounded-xl text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleForgotPasswordSubmit} className="space-y-4" noValidate>
+                <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-[#7C7167] uppercase tracking-wider block">Email Address</label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#A89F94]">
+                      <Mail className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={handleEmailChange}
+                      placeholder="crafter@example.com"
+                      className={`w-full pl-10 pr-4 py-3 bg-[#FDFCFB] border rounded-xl text-sm focus:outline-none transition-all text-[#2D231B] placeholder-[#A89F94] font-semibold ${emailError
+                        ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+                        : 'border-[#E8E2D9] focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482]'
+                        }`}
+                    />
+                  </div>
+                  {emailError && (
+                    <p className="text-xs text-red-500 font-semibold mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{emailError}</span>
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3 bg-[#F28482] hover:bg-[#F28482]/85 text-white font-bold rounded-xl text-sm transition-all shadow-md transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer text-xs"
+                >
+                  {loading ? (
+                    <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  ) : (
+                    'Send Reset Link'
+                  )}
+                </button>
+              </form>
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsForgotPassword(false);
+                    setError('');
+                    setEmailError('');
+                  }}
+                  className="text-xs font-bold text-[#7C7167] hover:text-[#F28482] hover:underline cursor-pointer focus:outline-none bg-transparent border-0"
+                >
+                  Back to Sign In
+                </button>
+              </div>
+            </div>
+          )
+        ) : (
+          <>
+            {/* Tab Controls */}
+            <div className="flex bg-[#F9F6F2] p-1 rounded-xl mb-6 border border-[#E8E2D9]">
+              <button
+                type="button"
+                className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all cursor-pointer ${isLogin ? 'bg-[#F28482] text-white shadow-sm' : 'text-[#7C7167] hover:text-[#F28482]'}`}
+                onClick={() => { setIsLogin(true); setError(''); setDisplayNameError(''); setEmailError(''); setPasswordError(''); }}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all cursor-pointer ${!isLogin ? 'bg-[#F28482] text-white shadow-sm' : 'text-[#7C7167] hover:text-[#F28482]'}`}
+                onClick={() => { setIsLogin(false); setError(''); setDisplayNameError(''); setEmailError(''); setPasswordError(''); }}
+              >
+                Create Account
+              </button>
+            </div>
+
+            {error && (
+              <div className="mb-4 p-3 bg-red-55 border border-red-100 text-red-700 rounded-xl text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+              {!isLogin && (
+                <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-[#7C7167] uppercase tracking-wider block">Your Name / Handle</label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#A89F94]">
+                      <UserIcon className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="text"
+                      value={displayName}
+                      onChange={handleDisplayNameChange}
+                      placeholder="e.g. GrandmaStitches"
+                      className={`w-full pl-10 pr-4 py-3 bg-[#FDFCFB] border rounded-xl text-sm focus:outline-none transition-all text-[#2D231B] placeholder-[#A89F94] font-semibold ${displayNameError
+                        ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+                        : 'border-[#E8E2D9] focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482]'
+                        }`}
+                    />
+                  </div>
+                  {displayNameError && (
+                    <p className="text-xs text-red-500 font-semibold mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{displayNameError}</span>
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="text-xs font-extrabold text-[#7C7167] uppercase tracking-wider block">Email Address</label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#A89F94]">
+                    <Mail className="w-4 h-4" />
+                  </span>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={handleEmailChange}
+                    placeholder="crafter@example.com"
+                    className={`w-full pl-10 pr-4 py-3 bg-[#FDFCFB] border rounded-xl text-sm focus:outline-none transition-all text-[#2D231B] placeholder-[#A89F94] font-semibold ${emailError
+                      ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+                      : 'border-[#E8E2D9] focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482]'
+                      }`}
+                  />
+                </div>
+                {emailError && (
+                  <p className="text-xs text-red-500 font-semibold mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{emailError}</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-extrabold text-[#7C7167] uppercase tracking-wider block">Password</label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#A89F94]">
+                    <Lock className="w-4 h-4" />
+                  </span>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={handlePasswordChange}
+                    placeholder="••••••••"
+                    className={`w-full pl-10 pr-10 py-3 bg-[#FDFCFB] border rounded-xl text-sm focus:outline-none transition-all text-[#2D231B] placeholder-[#A89F94] font-semibold ${passwordError
+                      ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+                      : 'border-[#E8E2D9] focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482]'
+                      }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#A89F94] hover:text-[#F28482] cursor-pointer focus:outline-none"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {passwordError && (
+                  <p className="text-xs text-red-500 font-semibold mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{passwordError}</span>
+                  </p>
+                )}
+              </div>
+
+              {isLogin && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsForgotPassword(true);
+                      setError('');
+                      setEmailError('');
+                      setPasswordError('');
+                    }}
+                    className="text-xs font-bold text-[#F28482] hover:underline cursor-pointer focus:outline-none bg-transparent border-0"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 bg-[#F28482] hover:bg-[#F28482]/85 text-white font-bold rounded-xl transition-all shadow-md transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 text-sm flex items-center justify-center gap-2 mt-2 cursor-pointer"
+              >
+                {loading ? (
+                  <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                ) : isLogin ? (
+                  'Sign In'
+                ) : (
+                  'Register'
+                )}
+              </button>
+            </form>
+
+            <div className="relative flex py-4 items-center">
+              <div className="flex-grow border-t border-[#E8E2D9]"></div>
+              <span className="flex-shrink mx-4 text-xs text-[#A89F94] font-bold uppercase tracking-widest bg-white">OR</span>
+              <div className="flex-grow border-t border-[#E8E2D9]"></div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGoogleSSO}
+              disabled={loading}
+              className="w-full py-3 bg-white border border-[#E8E2D9] text-[#7C7167] font-bold rounded-xl text-sm flex items-center justify-center gap-2.5 hover:bg-[#F9F6F2] transition-all cursor-pointer hover:border-[#84A59D]"
+            >
+              {loading ? (
+                <span className="inline-block w-4 h-4 border-2 border-stone-500 border-t-transparent rounded-full animate-spin"></span>
+              ) : (
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
+                </svg>
+              )}
+              <span>Sign in with Google</span>
+            </button>
+          </>
+        )}
 
 
       </motion.div>
