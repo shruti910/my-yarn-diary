@@ -519,6 +519,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
     setInput('');
     setLoading(true);
     setError(null);
+    const isNewSession = !targetChatId;
 
     if (!targetChatId) {
       // Auto-create a new chat thread
@@ -531,7 +532,11 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
 
       const textForTitle = userText.trim();
       if (textForTitle) {
-        defaultTitle = textForTitle.length > 30 ? textForTitle.substring(0, 30) + '...' : textForTitle;
+        const rawTitle = textForTitle.length > 30 ? textForTitle.substring(0, 30) + '...' : textForTitle;
+        const cleaned = rawTitle.replace(/[^\p{L}\p{N}\s\-_()#.]/gu, '').trim();
+        if (cleaned) {
+          defaultTitle = cleaned;
+        }
       }
 
       try {
@@ -548,7 +553,6 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
           setSessions(prev => [res as ChatSession, ...prev]);
           targetChatId = res.chatId;
           setActiveChatId(res.chatId);
-          loadSessions(0);
         } else {
           setError('Failed to initialize new conversation thread.');
           setLoading(false);
@@ -634,6 +638,9 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
       setError(err.message || 'Connection lost to AI engine.');
     } finally {
       setLoading(false);
+      if (isNewSession) {
+        loadSessions(0);
+      }
     }
   };
 
