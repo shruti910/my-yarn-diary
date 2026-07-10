@@ -8,6 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -163,15 +165,25 @@ public class CrochetService {
     }
 
     // --- TRACKED PROJECTS ---
-    public List<ProjectSummaryResponse> getProjects(String userId, String categoryId) {
+    public Page<ProjectSummaryResponse> getProjects(
+            String userId, 
+            String categoryId, 
+            Boolean favorite, 
+            Boolean archive, 
+            String statusStr, 
+            String search, 
+            Pageable pageable) {
         UUID userUuid = UUID.fromString(userId);
-        List<Project> projects;
+        boolean isArchive = Boolean.TRUE.equals(archive);
         
-        // If category is "Favourites ❤️", return favorited projects
-        if (categoryId != null && !categoryId.equalsIgnoreCase("all")) {
+        UUID categoryUuid = null;
+        Boolean isFavorite = favorite;
+
+        // If category is "Favourites ❤️" or "Favourites", handle it
+        if (categoryId != null && !categoryId.equalsIgnoreCase("all") && !categoryId.equalsIgnoreCase("archived")) {
             try {
-                UUID categoryUuid = UUID.fromString(categoryId);
-                Optional<Category> categoryOpt = categoryRepository.findByCategoryId(categoryUuid);
+                UUID parsedCategoryUuid = UUID.fromString(categoryId);
+                Optional<Category> categoryOpt = categoryRepository.findByCategoryId(parsedCategoryUuid);
                 if (categoryOpt.isPresent()) {
                     Category category = categoryOpt.get();
                     if (!category.getUserId().equals(userUuid)) {
@@ -179,23 +191,36 @@ public class CrochetService {
                     }
                     String normName = category.getName().trim().toLowerCase();
                     if (normName.equals("favourites ❤️") || normName.equals("favourites")) {
-                        projects = projectRepository.findByUserIdAndIsFavoriteTrue(userUuid);
-                        return projects.stream().map(this::mapToSummaryResponse).collect(Collectors.toList());
+                        isFavorite = true;
+                    } else {
+                        categoryUuid = parsedCategoryUuid;
                     }
                 }
             } catch (IllegalArgumentException e) {
-                // If categoryId is not a valid UUID, proceed to normal logic
+                // Ignore, treat as no category filter
             }
         }
-        
-        if (categoryId == null || categoryId.equalsIgnoreCase("all")) {
-            projects = projectRepository.findByUserId(userUuid);
-        } else {
-            UUID categoryUuid = UUID.fromString(categoryId);
-            projects = projectRepository.findByUserIdAndCategoryId(userUuid, categoryUuid);
+
+        ProjectStatus status = null;
+        if (statusStr != null && !statusStr.isBlank() && !statusStr.equalsIgnoreCase("all")) {
+            status = ProjectStatus.fromValue(statusStr);
         }
-        
-        return projects.stream().map(this::mapToSummaryResponse).collect(Collectors.toList());
+
+        String searchPattern = null;
+        if (search != null && !search.isBlank()) {
+            searchPattern = search.trim();
+        }
+
+        Page<Project> projectsPage = projectRepository.findProjectsForUser(
+                userUuid, 
+                categoryUuid, 
+                isFavorite, 
+                isArchive, 
+                status, 
+                searchPattern, 
+                pageable);
+
+        return projectsPage.map(this::mapToSummaryResponse);
     }
 
     private ProjectSummaryResponse mapToSummaryResponse(Project project) {
@@ -594,9 +619,11 @@ public class CrochetService {
     }
 
     // --- PROGRESS JOURNAL LOGS ---
-    public List<JournalLogResponse> getJournalLogs(String userId, String projectId) {
+    public Page<JournalLogResponse> getJournalLogs(String userId, String projectId, Pageable pageable) {
         Project project = getProjectDetails(userId, projectId);
-        return journalLogRepository.findByProjectId(project.getProjectId()).stream().map(this::mapToJournalLogResponse).collect(Collectors.toList());
+        UUID userUuid = UUID.fromString(userId);
+        return journalLogRepository.findByUserIdAndProjectId(userUuid, project.getProjectId(), pageable)
+                .map(this::mapToJournalLogResponse);
     }
 
     @Transactional

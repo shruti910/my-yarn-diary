@@ -314,6 +314,15 @@ export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [journalLogs, setJournalLogs] = useState<JournalLog[]>([]);
 
+  // Server-side projects pagination states
+  const [projectsPage, setProjectsPage] = useState(0);
+  const [projectsPageSize, setProjectsPageSize] = useState(10);
+  const [projectsTotalPages, setProjectsTotalPages] = useState(0);
+  const [projectsTotalElements, setProjectsTotalElements] = useState(0);
+  const [projectsSort, setProjectsSort] = useState('createdAt,desc');
+  const [projectsSearch, setProjectsSearch] = useState('');
+  const [projectsStatus, setProjectsStatus] = useState('all');
+
   const [activeCategoryId, setActiveCategoryId] = useState<string>('all');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [showCelebrationTitle, setShowCelebrationTitle] = useState<string | null>(null);
@@ -498,16 +507,8 @@ export default function App() {
         }
       }
 
-      // 2. Fetch Projects
-      const projectsData = await fetchWithToken('/api/v1/projects');
-      if (projectsData) {
-        let list = projectsData.map((p: any) => ({
-          ...p,
-          categoryId: p.categoryId || p.folderId,
-        } as Project));
-        list = list.sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
-        setProjects(list);
-      }
+      // 2. Fetch Projects (paginated)
+      await fetchProjects(activeCategoryId || 'all', 0, projectsPageSize, projectsSort, projectsSearch, projectsStatus);
     } catch (err: any) {
       console.error('Failed loading initial data sequence:', err);
       showToast(err.message || 'Failed loading data from server.', 'error');
@@ -516,11 +517,42 @@ export default function App() {
     }
   };
 
+  const fetchProjects = async (catId = activeCategoryId, page = projectsPage, size = projectsPageSize, sort = projectsSort, search = projectsSearch, status = projectsStatus) => {
+    if (!token || !user) return;
+    try {
+      const actualCat = catId === 'all' ? '' : catId;
+      const actualStatus = status === 'all' ? '' : status;
+      const url = `/api/v1/projects?categoryId=${actualCat}&page=${page}&size=${size}&sort=${sort}&search=${search}&status=${actualStatus}`;
+      const res = await fetchWithToken(url);
+      if (res && res.content) {
+        setProjects(res.content.map((p: any) => ({
+          ...p,
+          categoryId: p.categoryId || p.folderId,
+        } as Project)));
+        setProjectsTotalPages(res.totalPages);
+        setProjectsTotalElements(res.totalElements);
+        setProjectsPage(res.number);
+        setProjectsPageSize(res.size);
+      }
+    } catch (err: any) {
+      console.error('Failed fetching projects page:', err);
+      showToast(err.message || 'Failed loading projects.', 'error');
+    }
+  };
+
   // Sync data dynamically from backend with REST fetching
   useEffect(() => {
     if (!token || !user) return;
     loadAllData();
   }, [token, user]);
+
+  // Refetch projects when filters or pagination states change
+  useEffect(() => {
+    if (!token || !user) return;
+    if (categories.length > 0) {
+      fetchProjects(activeCategoryId, projectsPage, projectsPageSize, projectsSort, projectsSearch, projectsStatus);
+    }
+  }, [activeCategoryId, projectsPage, projectsPageSize, projectsSort, projectsSearch, projectsStatus]);
 
   // Auth outcomes
   const handleAuthSuccess = async (newToken: string, authenticatedUser: any) => {
@@ -653,11 +685,14 @@ export default function App() {
         body: JSON.stringify(payload)
       });
       if (res) {
-        setProjects(prev => [{
+        const merged = {
           ...res,
           categoryId: res.categoryId || res.folderId
-        } as Project, ...prev]);
+        } as Project;
+        setProjects(prev => [merged, ...prev]);
+        setSelectedProject(merged); // Automatically view the new project
         showToast('Project created successfully!', 'success');
+        fetchProjects(activeCategoryId, 0, projectsPageSize);
       }
     } catch (err: any) {
       console.error('Failed creating project:', err);
@@ -763,6 +798,7 @@ export default function App() {
         setProjects(prev => [merged, ...prev]);
         showToast('Project duplicated successfully!', 'success');
         setSelectedProject(null); // Return to list view
+        fetchProjects(activeCategoryId, 0, projectsPageSize);
       }
     } catch (err: any) {
       console.error('Failed duplicating project:', err);
@@ -786,6 +822,7 @@ export default function App() {
         setProjects(prev => prev.map(p => p.projectId === projectId ? merged : p));
         setSelectedProject(null); // Return to list view
         showToast(merged.isArchive ? 'Project archived successfully!' : 'Project unarchived successfully!', 'success');
+        fetchProjects(activeCategoryId, projectsPage, projectsPageSize);
       }
     } catch (err: any) {
       console.error('Failed toggling archive project status:', err);
@@ -801,6 +838,7 @@ export default function App() {
         setSelectedProject(null);
       }
       showToast('Project deleted successfully!', 'success');
+      fetchProjects(activeCategoryId, 0, projectsPageSize);
     } catch (err: any) {
       console.error('Failed deleting project:', err);
       showToast(err.message || 'Failed to delete project.', 'error');
@@ -822,7 +860,7 @@ export default function App() {
           isFavorite: res.isFavorite
         } : p));
         showToast(res.isFavorite ? 'Added to Favourites ❤️' : 'Removed from Favourites', 'success');
-        loadAllData();
+        fetchProjects(activeCategoryId, projectsPage, projectsPageSize);
       }
     } catch (err: any) {
       console.error('Failed to toggle project favorite status:', err);
@@ -1032,6 +1070,18 @@ export default function App() {
                       onSelectCategory={handleSelectCategory}
                       user={user}
                       onUpdateCrochetTerminology={updateCrochetTerminology}
+                      page={projectsPage}
+                      pageSize={projectsPageSize}
+                      totalPages={projectsTotalPages}
+                      totalElements={projectsTotalElements}
+                      sort={projectsSort}
+                      searchQuery={projectsSearch}
+                      stageFilter={projectsStatus}
+                      onPageChange={setProjectsPage}
+                      onPageSizeChange={setProjectsPageSize}
+                      onSortChange={setProjectsSort}
+                      onSearchChange={setProjectsSearch}
+                      onStageFilterChange={setProjectsStatus}
                     />
                   </ErrorBoundary>
                 )

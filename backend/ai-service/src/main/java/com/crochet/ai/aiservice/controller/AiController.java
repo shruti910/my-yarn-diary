@@ -9,6 +9,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+
 import java.util.List;
 
 @Slf4j
@@ -25,9 +30,15 @@ public class AiController {
     }
 
     @GetMapping("/chats")
-    public ResponseEntity<List<ChatSessionDto>> getSessions(@RequestHeader("X-User-Id") String userId) {
-        log.info("Fetching all active AI chats for user: {}", userId);
-        return ResponseEntity.ok(aiService.getSessions(userId));
+    public ResponseEntity<PagedResponse<ChatSessionDto>> getSessions(
+            @RequestHeader("X-User-Id") String userId,
+            @RequestParam(required = false, name = "category") String category,
+            @PageableDefault(page = 0, size = 10, sort = {"pinned", "createdAt"}, direction = Sort.Direction.DESC) Pageable pageable) {
+        
+        log.info("Fetching paginated active AI chats for user: {}, category: {}, pageable: {}", 
+                 userId, category, pageable);
+        Page<ChatSessionDto> result = aiService.getSessions(userId, category, pageable);
+        return ResponseEntity.ok(PagedResponse.fromPage(result));
     }
 
     @GetMapping("/chats/{chatId}")

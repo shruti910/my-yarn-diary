@@ -63,6 +63,10 @@ export function ProjectDetail({
   onUpdateCrochetTerminology
 }: ProjectDetailProps) {
   const [logs, setLogs] = useState<JournalLog[]>([]);
+  const [logsPage, setLogsPage] = useState(0);
+  const [logsPageSize, setLogsPageSize] = useState(5);
+  const [logsTotalPages, setLogsTotalPages] = useState(0);
+  const [logsTotalElements, setLogsTotalElements] = useState(0);
   const [textEntry, setTextEntry] = useState('');
   const [logImage, setLogImage] = useState<string | null>(null);
   const [logImageMime, setLogImageMime] = useState('');
@@ -187,12 +191,15 @@ export function ProjectDetail({
     }
   };
 
-  const loadLogs = async () => {
+  const loadLogs = async (targetPage = logsPage, targetSize = logsPageSize) => {
     try {
-      const data = await fetchWithToken(`/api/v1/projects/${project.projectId}/logs`);
-      if (data) {
-        const sorted = (data as JournalLog[]).sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
-        setLogs(sorted);
+      const data = await fetchWithToken(`/api/v1/projects/${project.projectId}/logs?page=${targetPage}&size=${targetSize}&sort=createdAt,desc`);
+      if (data && data.content) {
+        setLogs(data.content);
+        setLogsTotalPages(data.totalPages);
+        setLogsTotalElements(data.totalElements);
+        setLogsPage(data.number);
+        setLogsPageSize(data.size);
       }
     } catch (err) {
       console.error('Failed to load journal progression logs:', err);
@@ -201,8 +208,8 @@ export function ProjectDetail({
 
   useEffect(() => {
     if (!token) return;
-    loadLogs();
-  }, [project.projectId, token]);
+    loadLogs(logsPage, logsPageSize);
+  }, [project.projectId, token, logsPage, logsPageSize]);
 
   const handleFieldChange = () => {
     setIsSaved(false);
@@ -591,6 +598,7 @@ export function ProjectDetail({
         setTextEntry('');
         setLogImage(null);
         setLogImageBase64(null);
+        loadLogs(0);
       }
     } catch (err) {
       console.error('Failed to append progress log:', err);
@@ -605,6 +613,7 @@ export function ProjectDetail({
     try {
       await fetchWithToken(`/api/v1/logs/${logId}`, { method: 'DELETE' });
       setLogs(prev => prev.filter(l => l.logId !== logId));
+      loadLogs(0);
     } catch (err) {
       console.error('Failed to delete log entry:', err);
     }
@@ -1330,7 +1339,8 @@ export function ProjectDetail({
                     <p className="text-xs text-[#A89F94] font-semibold">No progress logs filed yet. Document row milestones and attach snaps to build a gorgeous pattern project history.</p>
                   </div>
                 ) : (
-                  <div className="space-y-4 animate-fade-in">
+                  <>
+                    <div className="space-y-4 animate-fade-in">
                     {logs.map((log) => (
                       <div
                         key={log.logId}
@@ -1372,8 +1382,54 @@ export function ProjectDetail({
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
+                  
+                  {/* Logs Pagination Controls */}
+                  {logsTotalPages > 1 && (
+                    <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#FDFCFB] border border-[#E8E2D9] rounded-2xl p-4">
+                      <span className="text-xs text-[#7C7167] font-semibold">
+                        Showing <span className="font-extrabold text-[#2D231B]">{logsPage * logsPageSize + 1}</span> to{' '}
+                        <span className="font-extrabold text-[#2D231B]">
+                          {Math.min((logsPage + 1) * logsPageSize, logsTotalElements)}
+                        </span>{' '}
+                        of <span className="font-extrabold text-[#2D231B]">{logsTotalElements}</span> entries
+                      </span>
+                      
+                      <div className="flex items-center gap-1">
+                        <button
+                          disabled={logsPage === 0}
+                          onClick={() => setLogsPage(logsPage - 1)}
+                          className="p-1.5 px-2.5 border border-[#E8E2D9] rounded-lg text-[#7C7167] hover:text-[#2D231B] hover:bg-[#F9F6F2] disabled:opacity-40 disabled:hover:bg-transparent transition-all text-xs font-bold cursor-pointer"
+                        >
+                          Prev
+                        </button>
+                        
+                        {Array.from({ length: logsTotalPages }, (_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setLogsPage(i)}
+                            className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              logsPage === i
+                                ? 'bg-[#F28482] text-white'
+                                : 'border border-[#E8E2D9] text-[#7C7167] hover:text-[#2D231B] hover:bg-[#F9F6F2]'
+                            }`}
+                          >
+                            {i + 1}
+                          </button>
+                        ))}
+                        
+                        <button
+                          disabled={logsPage === logsTotalPages - 1}
+                          onClick={() => setLogsPage(logsPage + 1)}
+                          className="p-1.5 px-2.5 border border-[#E8E2D9] rounded-lg text-[#7C7167] hover:text-[#2D231B] hover:bg-[#F9F6F2] disabled:opacity-40 disabled:hover:bg-transparent transition-all text-xs font-bold cursor-pointer"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
             </>
           ) : (
             <PatternViewer 

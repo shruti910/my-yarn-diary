@@ -31,6 +31,10 @@ interface ChatPanelProps {
 
 export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }: ChatPanelProps) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [sessionsPage, setSessionsPage] = useState(0);
+  const [sessionsPageSize, setSessionsPageSize] = useState(10);
+  const [sessionsTotalPages, setSessionsTotalPages] = useState(0);
+  const [sessionsTotalElements, setSessionsTotalElements] = useState(0);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -124,13 +128,14 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
     }
   };
 
-  const loadSessions = async () => {
+  const loadSessions = async (targetPage = sessionsPage, targetSize = sessionsPageSize) => {
     try {
-      const data = await fetchWithToken('/api/v1/chats');
-      if (data) {
-        // Handle sorting
-        const list = (data as ChatSession[]).sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
-        setSessions(list);
+      const url = `/api/v1/chats?category=${category}&page=${targetPage}&size=${targetSize}`;
+      const data = await fetchWithToken(url);
+      if (data && data.content) {
+        setSessions(data.content);
+        setSessionsTotalPages(data.totalPages);
+        setSessionsTotalElements(data.totalElements);
       }
     } catch (err) {
       console.error('Failed loading chat sessions:', err);
@@ -138,21 +143,15 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
   };
 
   useEffect(() => {
-    if (!token) return;
-    loadSessions();
-  }, [token, category]);
+    setSessionsPage(0);
+  }, [category]);
 
-  const filteredSessions = useMemo(() => {
-    const filtered = sessions.filter(s => (s.category || 'crochet-buddy') === category);
-    return [...filtered].sort((a, b) => {
-      const aPinned = a.pinned ? 1 : 0;
-      const bPinned = b.pinned ? 1 : 0;
-      if (aPinned !== bPinned) {
-        return bPinned - aPinned;
-      }
-      return new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime();
-    });
-  }, [sessions, category]);
+  useEffect(() => {
+    if (!token) return;
+    loadSessions(sessionsPage, sessionsPageSize);
+  }, [token, category, sessionsPage, sessionsPageSize]);
+
+  const filteredSessions = sessions;
 
   useEffect(() => {
     setActiveChatId(null);
@@ -289,6 +288,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
       if (res) {
         setSessions(prev => [res as ChatSession, ...prev]);
         setActiveChatId(res.chatId);
+        loadSessions(0);
       }
       setIsCreateModalOpen(false);
     } catch (err) {
@@ -306,9 +306,10 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
       const nextSessions = sessions.filter(s => s.chatId !== chatId);
       setSessions(nextSessions);
       if (activeChatId === chatId) {
-        const nextFilteredSessions = nextSessions.filter(s => (s.category || 'crochet-buddy') === category);
+        const nextFilteredSessions = nextSessions;
         setActiveChatId(nextFilteredSessions.length > 0 ? nextFilteredSessions[0].chatId : null);
       }
+      loadSessions(0);
     } catch (err) {
       console.error('Failed to delete chat:', err);
     }
@@ -547,6 +548,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
           setSessions(prev => [res as ChatSession, ...prev]);
           targetChatId = res.chatId;
           setActiveChatId(res.chatId);
+          loadSessions(0);
         } else {
           setError('Failed to initialize new conversation thread.');
           setLoading(false);
@@ -750,7 +752,8 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
               </button>
             </div>
           ) : (
-            filteredSessions.map((sess) => {
+            <>
+              {filteredSessions.map((sess) => {
               const isActive = sess.chatId === activeChatId;
               const isEditing = sess.chatId === editingChatId;
               return (
@@ -836,7 +839,34 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
                   </div>
                 </div>
               );
-            })
+            })}
+              
+              {/* AI Chats Pagination Controls */}
+              {sessionsTotalPages > 1 && (
+                <div className="mt-4 pt-4 border-t border-[#E8E2D9] flex items-center justify-between gap-2">
+                  <span className="text-[10px] text-[#7C7167] font-semibold">
+                    Page {sessionsPage + 1} of {sessionsTotalPages}
+                  </span>
+                  
+                  <div className="flex items-center gap-1">
+                    <button
+                      disabled={sessionsPage === 0}
+                      onClick={() => setSessionsPage(sessionsPage - 1)}
+                      className="p-1 px-2 border border-[#E8E2D9] rounded-lg text-[#7C7167] hover:text-[#2D231B] hover:bg-[#F9F6F2] disabled:opacity-40 disabled:hover:bg-transparent transition-all text-[10px] font-bold cursor-pointer"
+                    >
+                      Prev
+                    </button>
+                    <button
+                      disabled={sessionsPage === sessionsTotalPages - 1}
+                      onClick={() => setSessionsPage(sessionsPage + 1)}
+                      className="p-1 px-2 border border-[#E8E2D9] rounded-lg text-[#7C7167] hover:text-[#2D231B] hover:bg-[#F9F6F2] disabled:opacity-40 disabled:hover:bg-transparent transition-all text-[10px] font-bold cursor-pointer"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

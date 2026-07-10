@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import lombok.extern.slf4j.Slf4j;
@@ -44,12 +46,14 @@ public class AiService {
         this.restTemplate = new RestTemplate();
     }
 
-    public List<ChatSessionDto> getSessions(String userId) {
+    public Page<ChatSessionDto> getSessions(String userId, String categoryStr, Pageable pageable) {
         UUID userUuid = UUID.fromString(userId);
-        return chatSessionRepository.findByUserIdOrderByCreatedAtDesc(userUuid)
-                .stream()
-                .map(this::mapToSessionDto)
-                .collect(Collectors.toList());
+        ChatCategory category = null;
+        if (categoryStr != null && !categoryStr.isBlank() && !categoryStr.equalsIgnoreCase("all")) {
+            category = ChatCategory.fromString(categoryStr);
+        }
+        Page<ChatSession> sessionsPage = chatSessionRepository.findSessionsForUser(userUuid, category, pageable);
+        return sessionsPage.map(this::mapToSessionDto);
     }
 
     public ChatSessionDto getSessionDetails(String userId, String chatId) {

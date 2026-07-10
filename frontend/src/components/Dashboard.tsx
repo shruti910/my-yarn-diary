@@ -56,6 +56,20 @@ interface DashboardProps {
   onSelectCategory?: (categoryId: string) => void;
   user?: any;
   onUpdateCrochetTerminology?: (pref: 'US' | 'UK') => Promise<void>;
+
+  // Pagination & sorting props
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  totalElements: number;
+  sort: string;
+  searchQuery: string;
+  stageFilter: string;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+  onSortChange: (sort: string) => void;
+  onSearchChange: (search: string) => void;
+  onStageFilterChange: (status: string) => void;
 }
 
 export function Dashboard({
@@ -71,9 +85,23 @@ export function Dashboard({
   isSidebarCollapsed = false,
   onSelectCategory,
   user,
-  onUpdateCrochetTerminology
+  onUpdateCrochetTerminology,
+
+  // Pagination & sorting destructuring
+  page,
+  pageSize,
+  totalPages,
+  totalElements,
+  sort,
+  searchQuery,
+  stageFilter,
+  onPageChange,
+  onPageSizeChange,
+  onSortChange,
+  onSearchChange,
+  onStageFilterChange
 }: DashboardProps) {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
   const [showAddModal, setShowAddModal] = useState(false);
   const [dashboardSubTab, setDashboardSubTab] = useState<'projects' | 'gallery'>('projects');
   const { showAlert, showConfirm } = useDialog();
@@ -83,14 +111,37 @@ export function Dashboard({
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Stage and sorting state
-  const [stageFilter, setStageFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<string>('createdAt-desc');
+  // Map sort string to local sortBy selector value
+  const sortBy = useMemo(() => {
+    if (sort === 'createdAt,desc') return 'createdAt-desc';
+    if (sort === 'createdAt,asc') return 'createdAt-asc';
+    if (sort === 'updatedAt,desc') return 'updatedAt-desc';
+    if (sort === 'updatedAt,asc') return 'updatedAt-asc';
+    if (sort === 'title,asc') return 'name-asc';
+    if (sort === 'title,desc') return 'name-desc';
+    return 'createdAt-desc';
+  }, [sort]);
 
-  // Reset stage filter when active category changes
+  const handleSortChangeLocal = (value: string) => {
+    let mapped = 'createdAt,desc';
+    if (value === 'createdAt-desc') mapped = 'createdAt,desc';
+    else if (value === 'createdAt-asc') mapped = 'createdAt,asc';
+    else if (value === 'updatedAt-desc') mapped = 'updatedAt,desc';
+    else if (value === 'updatedAt-asc') mapped = 'updatedAt,asc';
+    else if (value === 'name-asc') mapped = 'title,asc';
+    else if (value === 'name-desc') mapped = 'title,desc';
+    onSortChange(mapped);
+    onPageChange(0);
+  };
+
+  // Debounced search query sync
   useEffect(() => {
-    setStageFilter('all');
-  }, [categoryId]);
+    const timer = setTimeout(() => {
+      onSearchChange(localSearchQuery);
+      onPageChange(0);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [localSearchQuery]);
 
   const activeCategory = categories.find(c => c.categoryId === categoryId);
   const isFavouritesCategory = activeCategory && (
@@ -98,56 +149,8 @@ export function Dashboard({
     activeCategory.name.trim().toLowerCase() === 'favourites'
   );
 
-  const currentCategoryProjects = categoryId === 'archived'
-    ? projects.filter(p => p.isArchive)
-    : categoryId === 'all'
-      ? projects.filter(p => !p.isArchive)
-      : isFavouritesCategory
-        ? projects.filter(p => !p.isArchive && p.isFavorite)
-        : projects.filter(p => !p.isArchive && p.categoryId === categoryId);
-
-  // Filter project cards by stage filter, search text, and then sort them
-  const filteredProjects = useMemo(() => {
-    let result = currentCategoryProjects;
-
-    // Filter by stage
-    if (stageFilter !== 'all') {
-      result = result.filter(p => p.status === stageFilter);
-    }
-
-    // Filter by search text
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(p =>
-        p.title.toLowerCase().includes(q) ||
-        (p.notes || '').toLowerCase().includes(q)
-      );
-    }
-
-    // Sort projects
-    return [...result].sort((a, b) => {
-      if (sortBy === 'name-asc') {
-        return a.title.localeCompare(b.title);
-      } else if (sortBy === 'name-desc') {
-        return b.title.localeCompare(a.title);
-      } else if (sortBy === 'createdAt-asc') {
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      } else if (sortBy === 'createdAt-desc') {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      } else if (sortBy === 'updatedAt-asc') {
-        const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : new Date(a.createdAt).getTime();
-        const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : new Date(b.createdAt).getTime();
-        return timeA - timeB;
-      } else if (sortBy === 'updatedAt-desc') {
-        const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : new Date(a.createdAt).getTime();
-        const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : new Date(b.createdAt).getTime();
-        return timeB - timeA;
-      } else {
-        // default: newest first (createdAt-desc)
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      }
-    });
-  }, [currentCategoryProjects, stageFilter, searchQuery, sortBy]);
+  // The backend already handles all filters, searches and sorts.
+  const filteredProjects = projects;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,13 +179,13 @@ export function Dashboard({
   };
 
   // Stats calculation
-  const totalProjects = currentCategoryProjects.length;
-  const totalWips = currentCategoryProjects.filter(p => p.status === ProjectStatus.InProgress).length;
-  const completedCount = currentCategoryProjects.filter(p => p.status === ProjectStatus.Completed).length;
-  const planningCount = currentCategoryProjects.filter(p => p.status === ProjectStatus.Planning).length;
-  const onHoldCount = currentCategoryProjects.filter(p => p.status === ProjectStatus.OnHold).length;
-  const totalStitches = currentCategoryProjects.reduce((acc, current) => acc + current.rowCount, 0);
-  const completionRate = totalProjects > 0 ? Math.round((completedCount / totalProjects) * 100) : 0;
+  const totalProjects = totalElements;
+  const totalWips = projects.filter(p => p.status === ProjectStatus.InProgress).length;
+  const completedCount = projects.filter(p => p.status === ProjectStatus.Completed).length;
+  const planningCount = projects.filter(p => p.status === ProjectStatus.Planning).length;
+  const onHoldCount = projects.filter(p => p.status === ProjectStatus.OnHold).length;
+  const totalStitches = projects.reduce((acc, current) => acc + current.rowCount, 0);
+  const completionRate = totalElements > 0 ? Math.round((completedCount / totalElements) * 100) : 0;
 
   const getStatusBadge = (status: ProjectStatus) => {
     switch (status) {
@@ -314,7 +317,10 @@ export function Dashboard({
                   <select
                     id="stage-filter-select"
                     value={stageFilter}
-                    onChange={(e) => setStageFilter(e.target.value)}
+                    onChange={(e) => {
+                      onStageFilterChange(e.target.value);
+                      onPageChange(0);
+                    }}
                     className="appearance-none bg-[#FDFCFB] pl-8 pr-8 py-2.5 border border-[#E8E2D9] rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[#F28482] focus:border-[#F28482] transition-all text-[#2D231B] font-bold cursor-pointer"
                   >
                     <option value="all">All Stages</option>
@@ -336,7 +342,7 @@ export function Dashboard({
                   <select
                     id="sort-by-select"
                     value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
+                    onChange={(e) => handleSortChangeLocal(e.target.value)}
                     className="appearance-none bg-[#FDFCFB] pl-8 pr-8 py-2.5 border border-[#E8E2D9] rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[#F28482] focus:border-[#F28482] transition-all text-[#2D231B] font-bold cursor-pointer"
                   >
                     <option value="createdAt-desc">Date Created: Newest</option>
@@ -364,8 +370,8 @@ export function Dashboard({
                 </span>
                 <input
                   type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={localSearchQuery}
+                  onChange={(e) => setLocalSearchQuery(e.target.value)}
                   placeholder="Search projects..."
                   className="w-full bg-[#FDFCFB] pl-9 pr-4 py-2.5 border border-[#E8E2D9] rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[#F28482] focus:border-[#F28482] transition-all text-[#2D231B] font-semibold max-w-[200px] placeholder-[#A89F94]"
                 />
@@ -396,10 +402,10 @@ export function Dashboard({
                 )}
               </div>
               <h3 className="font-serif font-extrabold text-[#2D231B] text-lg">
-                {categoryId === 'archived' 
-                  ? 'No Archived Projects' 
-                  : isFavouritesCategory 
-                    ? 'No Favourites Yet' 
+                {categoryId === 'archived'
+                  ? 'No Archived Projects'
+                  : isFavouritesCategory
+                    ? 'No Favourites Yet'
                     : "It's So Quiet Here..."}
               </h3>
               <p className="text-xs text-[#7C7167] font-semibold max-w-[280px] mx-auto leading-relaxed">
@@ -419,92 +425,157 @@ export function Dashboard({
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
-              {filteredProjects.map((p) => (
-                <div
-                  key={p.projectId}
-                  onClick={() => onSelectProject(p)}
-                  className="group bg-white rounded-3xl border border-[#E8E2D9] hover:border-[#F28482]/30 warm-shadow hover:warm-shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between overflow-hidden relative"
-                >
-                  <div className="p-6 space-y-4">
-                    <div className="flex justify-between items-start gap-4">
-                      <div className="space-y-1">
-                        <span className="text-[9px] font-mono font-bold text-[#A89F94] block flex items-center gap-1 uppercase tracking-widest">
-                          <Calendar className="w-3 h-3 text-[#84A59D]" />
-                          {new Date(p.createdAt).toLocaleDateString()}
-                        </span>
-                        <h3 className="font-serif font-extrabold text-[#2D231B] text-base group-hover:text-[#F28482] transition-colors line-clamp-1">{p.title}</h3>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+                {filteredProjects.map((p) => (
+                  <div
+                    key={p.projectId}
+                    onClick={() => onSelectProject(p)}
+                    className="group bg-white rounded-3xl border border-[#E8E2D9] hover:border-[#F28482]/30 warm-shadow hover:warm-shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between overflow-hidden relative"
+                  >
+                    <div className="p-6 space-y-4">
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-mono font-bold text-[#A89F94] block flex items-center gap-1 uppercase tracking-widest">
+                            <Calendar className="w-3 h-3 text-[#84A59D]" />
+                            {new Date(p.createdAt).toLocaleDateString()}
+                          </span>
+                          <h3 className="font-serif font-extrabold text-[#2D231B] text-base group-hover:text-[#F28482] transition-colors line-clamp-1">{p.title}</h3>
+                        </div>
+                        {getStatusBadge(p.status)}
                       </div>
-                      {getStatusBadge(p.status)}
+
+                      {/* Visual Project Thumbnail */}
+                      {getProjectCoverPhoto(p) ? (
+                        <div className="w-full h-32 rounded-2xl border border-[#E8E2D9] overflow-hidden bg-[#F9F6F2] relative">
+                          <img
+                            src={getProjectCoverPhoto(p)}
+                            alt={p.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-350"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-full h-32 rounded-2xl border border-dashed border-[#E8E2D9] bg-[#FDFCFB] flex flex-col items-center justify-center text-[#A89F94] gap-1 shrink-0">
+                          <span className="text-2xl">🧶</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider">No photos yet</span>
+                        </div>
+                      )}
+
+                      {p.notes && (
+                        <p className="text-[11px] text-[#7C7167] italic max-w-full truncate font-semibold">"{p.notes}"</p>
+                      )}
                     </div>
 
-                    {/* Visual Project Thumbnail */}
-                    {getProjectCoverPhoto(p) ? (
-                      <div className="w-full h-32 rounded-2xl border border-[#E8E2D9] overflow-hidden bg-[#F9F6F2] relative">
-                        <img
-                          src={getProjectCoverPhoto(p)}
-                          alt={p.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-350"
-                        />
+                    {/* Bottom footer bar row trigger */}
+                    <div className="bg-[#FDFCFB] border-t border-[#E8E2D9] px-6 py-3.5 flex justify-between items-center group-hover:bg-[#F9F6F2] transition-colors shrink-0">
+                      <div className="flex items-center gap-1.5 text-xs text-[#2D231B] font-extrabold">
+                        <span>Row Count Mark: <span className="text-[#F28482] font-mono">{p.rowCount}</span></span>
                       </div>
-                    ) : (
-                      <div className="w-full h-32 rounded-2xl border border-dashed border-[#E8E2D9] bg-[#FDFCFB] flex flex-col items-center justify-center text-[#A89F94] gap-1 shrink-0">
-                        <span className="text-2xl">🧶</span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider">No photos yet</span>
-                      </div>
-                    )}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleFavorite(p.projectId);
+                          }}
+                          className={`p-1 px-1.5 bg-white border rounded-lg shrink-0 cursor-pointer transition-colors ${p.isFavorite
+                            ? 'text-[#F28482] border-rose-100 hover:bg-rose-50/50'
+                            : 'text-[#A89F94] hover:text-rose-500 border-[#E8E2D9] hover:bg-rose-50/50'
+                            }`}
+                          title={p.isFavorite ? 'Remove from Favourites' : 'Add to Favourites'}
+                        >
+                          <Heart
+                            className="w-3.5 h-3.5 transition-colors"
+                            fill={p.isFavorite ? '#F28482' : 'none'}
+                            color={p.isFavorite ? '#F28482' : 'currentColor'}
+                          />
+                        </button>
 
-                    {p.notes && (
-                      <p className="text-[11px] text-[#7C7167] italic max-w-full truncate font-semibold">"{p.notes}"</p>
-                    )}
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const confirmed = await showConfirm('Are you sure you want to delete this project?');
+                            if (confirmed) {
+                              onDeleteProject(p.projectId);
+                            }
+                          }}
+                          className="p-1 px-1.5 bg-white hover:bg-red-55 text-[#A89F94] hover:text-red-500 border border-[#E8E2D9] hover:border-red-100 rounded-lg shrink-0 cursor-pointer"
+                          title="Delete project"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 cursor-pointer" />
+                        </button>
+                        <span className="text-[10px] font-extrabold text-[#84A59D] group-hover:translate-x-1 duration-150 flex items-center gap-0.5">
+                          Open Project
+                          <Play className="w-2.5 h-2.5 fill-[#84A59D] text-transparent" />
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white border border-[#E8E2D9] rounded-2xl p-4 warm-shadow">
+                  <div className="flex items-center gap-4">
+                    <span className="text-xs text-[#7C7167] font-semibold">
+                      Showing <span className="font-extrabold text-[#2D231B]">{page * pageSize + 1}</span> to{' '}
+                      <span className="font-extrabold text-[#2D231B]">
+                        {Math.min((page + 1) * pageSize, totalElements)}
+                      </span>{' '}
+                      of <span className="font-extrabold text-[#2D231B]">{totalElements}</span> projects
+                    </span>
+
+                    <div className="flex items-center gap-2 text-xs text-[#7C7167] font-semibold">
+                      <span>Show:</span>
+                      <select
+                        value={pageSize}
+                        onChange={(e) => {
+                          onPageSizeChange(Number(e.target.value));
+                          onPageChange(0);
+                        }}
+                        className="bg-white border border-[#E8E2D9] rounded-lg p-1 text-[#2D231B] font-bold focus:outline-none focus:border-[#F28482] cursor-pointer"
+                      >
+                        <option value={5}>5</option>
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                      </select>
+                    </div>
                   </div>
 
-                  {/* Bottom footer bar row trigger */}
-                  <div className="bg-[#FDFCFB] border-t border-[#E8E2D9] px-6 py-3.5 flex justify-between items-center group-hover:bg-[#F9F6F2] transition-colors shrink-0">
-                    <div className="flex items-center gap-1.5 text-xs text-[#2D231B] font-extrabold">
-                      <span>Row Count Mark: <span className="text-[#F28482] font-mono">{p.rowCount}</span></span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onToggleFavorite(p.projectId);
-                        }}
-                        className={`p-1 px-1.5 bg-white border rounded-lg shrink-0 cursor-pointer transition-colors ${p.isFavorite
-                          ? 'text-[#F28482] border-rose-100 hover:bg-rose-50/50'
-                          : 'text-[#A89F94] hover:text-rose-500 border-[#E8E2D9] hover:bg-rose-50/50'
-                          }`}
-                        title={p.isFavorite ? 'Remove from Favourites' : 'Add to Favourites'}
-                      >
-                        <Heart
-                          className="w-3.5 h-3.5 transition-colors"
-                          fill={p.isFavorite ? '#F28482' : 'none'}
-                          color={p.isFavorite ? '#F28482' : 'currentColor'}
-                        />
-                      </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      disabled={page === 0}
+                      onClick={() => onPageChange(page - 1)}
+                      className="p-2 px-3 border border-[#E8E2D9] rounded-xl text-[#7C7167] hover:text-[#2D231B] hover:bg-[#F9F6F2] disabled:opacity-40 disabled:hover:bg-transparent transition-all text-xs font-bold cursor-pointer"
+                    >
+                      Previous
+                    </button>
 
+                    {Array.from({ length: totalPages }, (_, i) => (
                       <button
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          const confirmed = await showConfirm('Are you sure you want to delete this project?');
-                          if (confirmed) {
-                            onDeleteProject(p.projectId);
-                          }
-                        }}
-                        className="p-1 px-1.5 bg-white hover:bg-red-55 text-[#A89F94] hover:text-red-500 border border-[#E8E2D9] hover:border-red-100 rounded-lg shrink-0 cursor-pointer"
-                        title="Delete project"
+                        key={i}
+                        onClick={() => onPageChange(i)}
+                        className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${page === i
+                            ? 'bg-[#F28482] text-white shadow-sm'
+                            : 'border border-[#E8E2D9] text-[#7C7167] hover:text-[#2D231B] hover:bg-[#F9F6F2]'
+                          }`}
                       >
-                        <Trash2 className="w-3.5 h-3.5 cursor-pointer" />
+                        {i + 1}
                       </button>
-                      <span className="text-[10px] font-extrabold text-[#84A59D] group-hover:translate-x-1 duration-150 flex items-center gap-0.5">
-                        Open Project
-                        <Play className="w-2.5 h-2.5 fill-[#84A59D] text-transparent" />
-                      </span>
-                    </div>
+                    ))}
+
+                    <button
+                      disabled={page === totalPages - 1}
+                      onClick={() => onPageChange(page + 1)}
+                      className="p-2 px-3 border border-[#E8E2D9] rounded-xl text-[#7C7167] hover:text-[#2D231B] hover:bg-[#F9F6F2] disabled:opacity-40 disabled:hover:bg-transparent transition-all text-xs font-bold cursor-pointer"
+                    >
+                      Next
+                    </button>
                   </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </>
       )}
