@@ -49,6 +49,10 @@ public class ChatSession {
     @Builder.Default
     private List<ChatMessage> messages = new ArrayList<>();
 
+    @Column(name = "total_tokens_consumed", nullable = false)
+    @Builder.Default
+    private int totalTokensConsumed = 0;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

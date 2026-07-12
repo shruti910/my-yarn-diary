@@ -1,5 +1,6 @@
 package com.crochet.ai.crochetservice.entity;
 
+import com.crochet.ai.crochetservice.util.SecureTextAttributeConverter;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
@@ -36,7 +37,8 @@ public class JournalLog {
     private UUID userId;
 
     @NotBlank(message = "Journal text cannot be empty")
-    @Column(name = "text_entry", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "encrypted_text_entry", nullable = false)
+    @Convert(converter = SecureTextAttributeConverter.class)
     private String textEntry;
 
     @Column(name = "image_base64", columnDefinition = "TEXT")

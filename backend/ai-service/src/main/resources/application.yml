@@ -14,6 +14,12 @@ internal:
   jwt:
     secret: ${INTERNAL_JWT_SECRET}
 
+llm:
+  active-provider: ${LLM_PROVIDER:gemini}
+
+db:
+  encryption-secret: ${DB_ENCRYPTION_SECRET}
+
 ---
 spring:
   config:
