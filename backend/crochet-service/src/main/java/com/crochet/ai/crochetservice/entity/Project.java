@@ -1,5 +1,6 @@
 package com.crochet.ai.crochetservice.entity;
 
+import com.crochet.ai.crochetservice.util.SecureTextAttributeConverter;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
@@ -65,7 +66,8 @@ public class Project {
     @Column(name = "row_count", nullable = false)
     private int rowCount;
 
-    @Column(name = "notes", columnDefinition = "TEXT")
+    @Column(name = "encrypted_notes")
+    @Convert(converter = SecureTextAttributeConverter.class)
     private String notes;
 
     @Column(name = "care_instructions", length = 500)

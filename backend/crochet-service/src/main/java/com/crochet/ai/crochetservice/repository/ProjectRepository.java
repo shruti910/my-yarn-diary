@@ -30,8 +30,7 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
                      "AND (p.isArchive = :isArchive) " +
                      "AND (:status IS NULL OR p.status = :status) " +
                      "AND (:search IS NULL OR " +
-                     "LOWER(p.title) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) OR " +
-                     "LOWER(p.notes) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))")
+                     "LOWER(p.title) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))")
        Page<Project> findProjectsForUser(
                      @Param("userId") UUID userId,
                      @Param("categoryId") UUID categoryId,
