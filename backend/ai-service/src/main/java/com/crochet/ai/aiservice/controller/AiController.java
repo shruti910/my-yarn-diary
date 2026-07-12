@@ -14,8 +14,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 
-import java.util.List;
-
 @Slf4j
 @RestController
 @RequestMapping("/api/v1")
@@ -33,10 +31,11 @@ public class AiController {
     public ResponseEntity<PagedResponse<ChatSessionDto>> getSessions(
             @RequestHeader("X-User-Id") String userId,
             @RequestParam(required = false, name = "category") String category,
-            @PageableDefault(page = 0, size = 10, sort = {"pinned", "createdAt"}, direction = Sort.Direction.DESC) Pageable pageable) {
-        
-        log.info("Fetching paginated active AI chats for user: {}, category: {}, pageable: {}", 
-                 userId, category, pageable);
+            @PageableDefault(page = 0, size = 10, sort = { "pinned",
+                    "createdAt" }, direction = Sort.Direction.DESC) Pageable pageable) {
+
+        log.info("Fetching paginated active AI chats for user: {}, category: {}, pageable: {}",
+                userId, category, pageable);
         Page<ChatSessionDto> result = aiService.getSessions(userId, category, pageable);
         return ResponseEntity.ok(PagedResponse.fromPage(result));
     }
@@ -51,7 +50,7 @@ public class AiController {
     @PostMapping("/chats")
     public ResponseEntity<ChatSessionDto> createSession(@RequestHeader("X-User-Id") String userId,
             @RequestBody ChatCreateRequest request) {
-        log.info("Creating a new AI chat workspace: '{}' for user: {}", request.getTitle(), userId);
+        log.info("Creating a new AI chat session for user: {}", userId);
         return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
                 .body(aiService.createSession(userId, request));
     }
@@ -62,9 +61,9 @@ public class AiController {
             @RequestHeader(value = "X-User-Terminology", defaultValue = "US") String userTerminology,
             @PathVariable String chatId,
             @RequestBody MessageRequest request) {
-        log.info("Sending message to AI chat session: {} by user: {} (prompt excerpt: '{}')",
-                chatId, userId, request.getText().substring(0, Math.min(request.getText().length(), 40)));
-        if (userTerminology != null && !"US".equalsIgnoreCase(userTerminology) && !"UK".equalsIgnoreCase(userTerminology)) {
+        log.info("Sending message to AI chat session: {} by user: {}", chatId, userId);
+        if (userTerminology != null && !"US".equalsIgnoreCase(userTerminology)
+                && !"UK".equalsIgnoreCase(userTerminology)) {
             throw new BadRequestException("Invalid terminology preference. Must be US or UK.");
         }
         return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
@@ -82,7 +81,7 @@ public class AiController {
     public ResponseEntity<ChatSessionDto> updateSession(@RequestHeader("X-User-Id") String userId,
             @PathVariable String chatId,
             @RequestBody ChatUpdateRequest request) {
-        log.info("Updating AI chat session: {} for user: {} with new title: '{}'", chatId, userId, request.getTitle());
+        log.info("Updating AI chat session: {} for user: {}", chatId, userId);
         return ResponseEntity.ok(aiService.updateSession(userId, chatId, request));
     }
 }
