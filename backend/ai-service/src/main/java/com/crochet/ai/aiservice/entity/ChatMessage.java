@@ -45,9 +45,8 @@ public class ChatMessage {
     @Column(name = "role", nullable = false)
     private ChatRole role;
 
-    @NotBlank(message = "Message text cannot be vacant")
     @Convert(converter = ChatTextEncryptorConverter.class)
-    @Column(name = "encrypted_text_body", nullable = false)
+    @Column(name = "encrypted_text_body", nullable = true)
     private String textBody;
 
     @Column(name = "image_data", columnDefinition = "TEXT")

@@ -19,6 +19,8 @@ public class OpenAiProvider implements LlmProvider {
                 0,
                 "openai",
                 "gpt-4o",
+                null,
+                null,
                 null);
     }
 }

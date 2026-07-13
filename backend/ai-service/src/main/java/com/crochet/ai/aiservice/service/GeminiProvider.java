@@ -27,8 +27,14 @@ public class GeminiProvider implements LlmProvider {
     @Value("${gemini.api.key}")
     private String geminiApiKey;
 
-    @Value("${gemini.api.url}")
-    private String geminiApiUrl;
+    @Value("${gemini.api.base-url}")
+    private String geminiBaseUrl;
+
+    @Value("${gemini.api.text-model}")
+    private String geminiTextModel;
+
+    @Value("${gemini.api.image-model}")
+    private String geminiImageModel;
 
     public GeminiProvider() {
         this.restTemplate = new RestTemplate();
@@ -39,14 +45,18 @@ public class GeminiProvider implements LlmProvider {
         if (geminiApiKey == null || geminiApiKey.isBlank()) {
             log.warn("Gemini API key is not configured");
             return new LlmResponse(
-                    "Apologies! Our AI service is currently experiencing high traffic or is temporarily unavailable.",
-                    0, 0, 0, "google", "gemini-3.5-flash", null);
+                    null, 0, 0, 0, "google", geminiTextModel, null, null,
+                    "System Configuration Error: Please Try Again Later.");
         }
 
-        String modelName = "gemini-3.5-flash"; // default model name, which will be updated from response body
+        if (request.category() == ChatCategory.IMAGE_GENERATOR) {
+            return generateImage(request);
+        }
+
+        String modelName = geminiTextModel;
 
         try {
-            String url = geminiApiUrl + "?key=" + geminiApiKey;
+            String url = geminiBaseUrl + "/models/" + modelName + ":generateContent?key=" + geminiApiKey;
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -182,59 +192,172 @@ public class GeminiProvider implements LlmProvider {
                 modelName = responseBody.get("modelVersion").toString();
 
                 return new LlmResponse(replyText, promptTokens, completionTokens, reasoningTokens, "google", modelName,
-                        responseBody);
+                        responseBody, null, null);
             }
+        } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
+            log.error("Rate limit exceeded for Gemini Chat API (429): {}", e.getResponseBodyAsString());
+            return new LlmResponse(null, 0, 0, 0, "google", modelName, null, null,
+                    "You have hit the rate limit for text requests. Please wait about 60 seconds before sending another message!");
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            log.error("HTTP error calling Gemini Chat API ({}): {}", e.getStatusCode(), e.getResponseBodyAsString());
+            return new LlmResponse(null, 0, 0, 0, "google", modelName, null, null,
+                    "The AI service returned an error. Please try again shortly.");
         } catch (Exception e) {
-            log.error("Error communicating with Google's Gemini API: {}", e.getMessage());
-            return new LlmResponse(
-                    "Apologies! Our AI service is currently experiencing high traffic or is temporarily unavailable. Please try again later.",
-                    0, 0, 0, "google", modelName, null);
+            log.error("Unexpected error during chat execution", e);
+            return new LlmResponse(null, 0, 0, 0, "google", modelName, null, null,
+                    "Our AI service is experiencing high traffic or is temporarily unavailable. Please try again later.");
         }
 
         return new LlmResponse(
-                "Apologies! Our AI service is currently experiencing high traffic or is temporarily unavailable. Please try again later.",
-                0, 0, 0, "google", modelName, null);
+                null, 0, 0, 0, "google", modelName, null, null,
+                "Our AI service is experiencing high traffic or is temporarily unavailable. Please try again later.");
+    }
+
+    private LlmResponse generateImage(LlmRequest request) {
+        if (geminiApiKey == null || geminiApiKey.isBlank()) {
+            log.warn("Gemini API key is not configured for image generation");
+            return new LlmResponse(
+                    null, 0, 0, 0, "google", geminiImageModel, null, null,
+                    "System Configuration Error: Please Try Again Later.");
+        }
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("x-goog-api-key", geminiApiKey);
+
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("model", geminiImageModel);
+
+            List<Map<String, Object>> inputList = new ArrayList<>();
+            Map<String, Object> inputItem = new HashMap<>();
+            inputItem.put("type", "text");
+            inputItem.put("text", request.latestPrompt() != null ? request.latestPrompt() : "");
+            inputList.add(inputItem);
+
+            requestBody.put("input", inputList);
+
+            Map<String, Object> responseFormat = new HashMap<>();
+            responseFormat.put("type", "image");
+            responseFormat.put("aspect_ratio", "5:4");
+            responseFormat.put("image_size", "512");
+
+            requestBody.put("response_format", responseFormat);
+
+            String instructions = getSystemInstructions(request.category());
+            if (instructions != null && !instructions.isBlank()) {
+                requestBody.put("system_instruction", instructions);
+            }
+            String url = geminiBaseUrl + "/interactions";
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+            ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
+            log.info("Response Body:{}", response.getBody().toString());
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Map responseBody = response.getBody();
+
+                Map<String, Object> interaction = null;
+                if (responseBody.containsKey("interaction")) {
+                    interaction = (Map<String, Object>) responseBody.get("interaction");
+                } else {
+                    interaction = responseBody;
+                }
+
+                String base64Data = null;
+
+                if (interaction != null) {
+                    Object outputImageObj = interaction.get("output_image");
+                    if (outputImageObj == null) {
+                        outputImageObj = interaction.get("outputImage");
+                    }
+
+                    if (outputImageObj instanceof Map) {
+                        Map<String, Object> outputImageMap = (Map<String, Object>) outputImageObj;
+                        base64Data = (String) outputImageMap.get("data");
+                    } else if (outputImageObj instanceof String) {
+                        base64Data = (String) outputImageObj;
+                    }
+                }
+
+                int promptTokens = 0;
+                int completionTokens = 0;
+                int reasoningTokens = 0;
+                Map usageMetadata = (Map) responseBody.get("usageMetadata");
+                if (usageMetadata != null) {
+                    Number pt = (Number) usageMetadata.get("promptTokenCount");
+                    Number ct = (Number) usageMetadata.get("candidatesTokenCount");
+                    Number rt = (Number) usageMetadata.get("thoughtsTokenCount");
+                    if (pt != null)
+                        promptTokens = pt.intValue();
+                    if (ct != null)
+                        completionTokens = ct.intValue();
+                    if (rt != null)
+                        reasoningTokens = rt.intValue();
+                }
+
+                if (base64Data != null) {
+                    String formattedDataUri = base64Data.startsWith("data:") ? base64Data
+                            : "data:image/png;base64," + base64Data;
+                    return new LlmResponse(null, promptTokens, completionTokens, reasoningTokens, "google",
+                            geminiImageModel, responseBody, formattedDataUri, null);
+                }
+            }
+        } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
+            log.error("Rate limit exceeded for Gemini Image API (429): {}", e.getResponseBodyAsString());
+            return new LlmResponse(null, 0, 0, 0, "google", geminiImageModel, null, null,
+                    "You have exceeded Google's free-tier image generation rate limits. Please wait a minute before generating another image!");
+        } catch (org.springframework.web.client.HttpClientErrorException.BadRequest e) {
+            log.error("Bad Request sent to Gemini Image API (400): {}", e.getResponseBodyAsString());
+            return new LlmResponse(null, 0, 0, 0, "google", geminiImageModel, null, null,
+                    "The image request was flagged as invalid. Try adjusting your description to be safer or simpler.");
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            log.error("HTTP error calling Gemini Image API ({}): {}", e.getStatusCode(), e.getResponseBodyAsString());
+            return new LlmResponse(null, 0, 0, 0, "google", geminiImageModel, null, null,
+                    "Image generation service encountered an error. Please try again shortly.");
+        } catch (Exception e) {
+            log.error("Unexpected error during image generation", e);
+            return new LlmResponse(null, 0, 0, 0, "google", geminiImageModel, null, null,
+                    "An unexpected error occurred while generating your image. Please try again later.");
+        }
+
+        return new LlmResponse(
+                null,
+                0, 0, 0, "google", geminiImageModel, null, null,
+                "An unexpected error occurred while generating your image. Please try again later.");
     }
 
     private String getSystemInstructions(ChatCategory category) {
         if (category == ChatCategory.PATTERN_DECODER) {
-            return "# Purpose\n" +
-                    "You are an expert AI Crochet Pattern Decoder and Interpreter. Your mission is to analyze user-uploaded photos or PDF of written or charted crochet patterns and decode their dense shorthand abbreviations into clear, expanded, step-by-step written text.\n"
-                    +
-                    "\n" +
-                    "# Core Instructions\n" +
-                    "1. Transcribe and decode shorthand text (e.g., convert \"ch 3, 2 dc in next st, rep from * to end\" into full sentences).\n"
-                    +
-                    "2. Explicitly detect whether the document uses US or UK terminology (e.g., searching for \"sc\" indicates US; \"tr\" without context requires confirmation). Keep the output consistent with the detected region.\n"
-                    +
-                    "3. If a visual stitch diagram/symbol chart is present, translate the symbols into sequential rows.\n"
-                    +
-                    "4. Output a structured, easy-to-follow crochet pattern based on your analysis.\n" +
-                    "\n" +
-                    "# Formatting the Output\n" +
-                    "Provide your successful output with clear headers and bullet points in clean Markdown and using following structure:\n"
-                    +
-                    "- **Project Overview**: What item this pattern will create (e.g., a granny square blanket, a raglan sweater sleeve).\n"
-                    +
-                    "- **Difficulty level**: Beginner, Intermediate, Hard\n" +
-                    "- **Required Materials**: For example, yarn type, hook or needle, any additional tools\n" +
-                    "- **Terminology**: US or UK Standard. Display correctly which terminology you are using throughout.\n"
-                    +
-                    "- **Stitch Key**: List of stitches used in US or UK terminology. Explicitly state which terminology you are using. \n"
-                    +
-                    "- **Pattern Instructions**: Step-by-step rows, rounds, or repeats.\n" +
-                    "- **Suggested Projects**: Suggested crochet projects that can be made using these patterns.\n"
-                    +
-                    "- **Tips**\n" +
-                    "\n" +
-                    "# Guardrails & Ambiguity Handling\n" +
-                    "- **Incomplete Patterns**: If the photo cuts off mid-sentence or mid-row, append a warning, for example: \"⚠️ Note: The pattern image provided cuts off at Row X. Please upload the remaining sections when you're ready to continue!\"\n"
-                    +
-                    "- **Low-Quality Images**: If the text is illegible, respond with something like this: \"I want to make sure your row count stays perfect! The text in this image is a bit too blurry to read reliably. Could you flatten the page and share a clear, high-resolution shot?\"\n"
-                    +
-                    "\n" +
-                    "# Tone and Style\n" +
-                    "Be encouraging, helpful, and collaborative. Treat the user as a fellow crochet enthusiast.";
+            return "# Purpose\n"
+                    + "You are an expert AI crochet pattern decoder, specializing in transforming crochet shorthand, symbols, stitch diagrams, and cryptic instructions into clear, step-by-step, beginner-friendly written patterns.\n"
+                    + "\n"
+                    + "# Crochet Analysis Instructions\n"
+                    + "1. Transcribe and decode shorthand text (e.g., convert \"ch 3, 2 dc in next st, rep from * to end\" into full sentences).\n"
+                    + "2. Explicitly detect whether the document uses US or UK terminology (e.g., searching for \"sc\" indicates US; \"tr\" without context may indicate UK).\n"
+                    + "3. If a visual stitch diagram/symbol is provided, analyze it and integrate the stitch information into the textual pattern for accuracy.\n"
+                    + "4. Output a structured, easy-to-follow crochet pattern based on your analysis.\n"
+                    + "\n"
+                    + "# Formatting the Output\n"
+                    + "- **Project Overview**: What item this pattern will create (e.g., a granny square blanket, a raglan sweater sleeve).\n"
+                    + "- **Difficulty level**: Beginner, Intermediate, Advanced.\n"
+                    + "- **Required Materials**: Yarn type, hook or needle size, any additional tools (e.g., buttons, stitch markers).\n"
+                    + "- **Terminology**: Clearly state \"US Terminology\" or \"UK Terminology\" and ensure all instructions follow this consistently.\n"
+                    + "- **Stitch Key**: List all abbreviations and stitches used with their full definitions. Highlight any pattern-specific stitches.\n"
+                    + "- **Pattern Instructions**: Step-by-step rows, rounds, or repeats. Use clear language and correct crochet terminology.\n"
+                    + "- **Suggested Projects**: Creative ideas for using the pattern (e.g., what other items could be made).\n"
+                    + "- **Tips & Notes**: Include advice on yarn substitution, sizing adjustments, or common pitfalls.\n"
+                    + "\n"
+                    + "# Edge Cases and Ambiguity\n"
+                    + "- **Incomplete patterns**: If the image cuts off, append a warning: \"⚠️ Note: The pattern image provided cuts off at Row X. Please upload the remaining sections when you're ready to continue!\"\n"
+                    + "- **Illegible text**: If text is blurry, respond: \"I want to make sure your row count stays perfect! The text in this image is a bit too blurry to read reliably. Could you flatten the page and share a clear, high-resolution shot?\"\n"
+                    + "- **Unclear terminology**: If unsure about US/UK terms, state: \"I'm using [US/UK] terminology based on available context. Please let me know if you prefer [other terminology]\"\n"
+                    + "\n"
+                    + "# Tone and Style\n"
+                    + "Be encouraging, helpful, and collaborative. Treat the user as a fellow crochet enthusiast.\n"
+                    + "\n"
+                    + "# Instructions\n"
+                    + "Analyze the crochet shorthand or instructions provided and produce a clear, beginner-friendly pattern following the formatting guidelines. Ensure accuracy in stitch counts, terminology, and construction.\n";
         } else if (category == ChatCategory.REVERSE_ENGINEER) {
             return "# Purpose\n" +
                     "You are an expert AI Master Crochet Forensic Engineer. Your mission is to analyze photos of *completed* crochet garments, swatches, or objects, and reverse-engineer the structural pattern, stitching types, assembly logic, and material requirements needed to replicate it.\n"
@@ -273,30 +396,26 @@ public class GeminiProvider implements LlmProvider {
                     "# Tone and Style\n" +
                     "Be encouraging, helpful, and collaborative. Treat the user as a fellow crochet enthusiast.";
         } else if (category == ChatCategory.IMAGE_GENERATOR) {
-            return "# Purpose\n" +
-                    "You are an AI Text-to-Image Prompt Engineer specialized in textile modeling and fiber arts visualization. Your mission is to translate simple user descriptions or text patterns into hyper-detailed, photorealistic prompts optimized for image generation models.\n"
-                    +
-                    "\n" +
-                    "# Core Instructions\n" +
-                    "1. Enrich the user's input with domain-specific craft terminology to ensure the output looks genuinely handmade, not machine-manufactured.\n"
-                    +
-                    "2. Inject precise texture descriptors: explicit yarn stitch definition, visible ply strands, realistic matte wool or mercerized cotton sheen, natural hook stitches, and soft studio background lighting.\n"
-                    +
-                    "3. Keep your output confined to a clean copy-paste segment.\n"
-                    +
-                    "\n" +
-                    "# Formatting the Output\n" +
-                    "Provide your response using this clean structure:\n" +
-                    "- ### 💡 Suggested Refined Prompts:\n" +
-                    "  - If user has specifically mentioned the yarn type, color, hook size, stitches and other details etc, then generate image on the basis of user input exactly, showing clear stitch definition, warm ambient studio lighting, depth of field, 8k resolution. Otherwise use following options:\n"
-                    +
-                    "  - **Option 1 (Photorealistic Studio Style)**: `[A highly detailed, ultra-sharp macro photograph of a hand-crocheted [User Input], showing clear stitch definition, chunky waffle stitch texture, authentic soft merino wool fiber halo, sitting on a neutral wooden table, warm ambient studio lighting, depth of field, 8k resolution]`\n"
-                    +
-                    "  - **Option 2 (Flatlay Style)**: `[A clean, modern top-down flatlay photograph of a finished crochet [User Input], surrounded by a wooden crochet hook and neatly wound yarn cakes, organized layout, soft natural side lighting, crisp stitch clarity, minimalist aesthetic]`\n"
-                    +
-                    "\n" +
-                    "# Guardrails\n" +
-                    "- **No Unrealistic Stitches**: Ensure the prompts do not ask the generator for configurations that are structurally impossible in physical fiber geometry. Avoid generic phrases like \"knitted crochet texture\"—keep them strictly separate.";
+            return """
+
+
+                                                    You are a master generative textile modeling engine and digital fiber art
+                    s synthesizer. Your mission is to take user text descriptions and render them directly into high-fidelity, photorealistic visual assets, specializing in the realistic preservation of handmade crafts, crochet textures, a
+
+
+                                                    1. **Prioritize Fabric Architecture**: When rendering yarn or textiles, you must emphasize realistic physical properties. Render visible ply twists, realistic yarn halos (soft wool fuzz), clear row transitions, and authentic stitch-by-stitch definitions (e.g., waffle stitch, single crochet loops, or g
+                                                    2. **Apply Professional Craft Presentation**: Unless the user specifies a background, default to displaying the item in a clean, high-quality setting. Use soft, diffused morning side-lighting or warm studio ambient lighting. Favor composition styles like ultra-sharp macro close-ups or modern top-down flatlays on neutral wooden or linen backgrounds with a sha
+                                                    3. **Incorporate App Aesthetics**: Automatically give all textile creations a cozy, high-quality, authentic handm
+
+                                                    # Guardrails &
+                                                    - **Strict Content Moderation & Safety Override**: Do not under any circumstances generate images containing sexually explicit material, adult content, nudity, extreme violence, gore, hate speech, or offensive and harmful imagery. If a user request prompts for something unsafe, inappropriate, or sexually explicit, you must explicitly reject the request by rendering an image of a clean, neutral background card displaying the clear, legible printed text: "Sorry, I cannot fu
+                                                    - **Defensive Craft Alignment**: If a user submits a prompt for an object that is completely unrelated to crafts, fiber arts, or home decorations (e.g., "a sports car" or "a spaceship"), do not reject it. Instead, creatively render that object *as if it were entirely made out of crochet yarn* (e.g., a miniature amigurumi sports car with tig
+                                                    - **Strict Knit vs. Crochet Separation**: Do not mix or blur distinct needlecraft techniques. Never generate hybrid anomalies like "knitted crochet surfaces." If a user asks for a crochet texture, keep loops grounded strictly in crochet geometry. If they ask for a knit style, implement clean, recognizable stitch textures like the Tunisian knit stitch or standard gart
+                                                    - **Physical Geometry Compliance**: Do not render textures that defy physical fiber logic, such as a transparent glass yarn loop or a crochet lace blanket strong enough to suspend heavy metallic blocks. Maintain realistic fabric weight, gravity draping,
+
+
+                                                    Deliver highly creative, aesthetically beautiful, and technically accurate fiber art imagery that proudly highlights the intricate detail of handmade craftsmanship while strictly maintaining safety compliance.
+                                 """;
         } else if (category == ChatCategory.CROCHET_TUTOR) {
             return "# Purpose\n" +
                     "You are a patient, encouraging AI Crochet Master Tutor specialized in teaching absolute beginners. Your mission is to guide novices through basic skills (holding hooks, slip knots, foundation chains, single crochet) using small, digestible lessons and photo-based validation.\n"

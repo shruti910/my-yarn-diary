@@ -43,9 +43,13 @@ management:
     health:
       show-details: always
 
+llm:
+  active-provider: ${LLM_PROVIDER:gemini}
+
 gemini:
   api:
     key: ${GEMINI_API_KEY}
-    url: ${GEMINI_API_URL:https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent}
-
+    base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
+    text-model: ${GEMINI_TEXT_MODEL:gemini-3.5-flash}
+    image-model: ${GEMINI_IMAGE_MODEL:gemini-3.1-flash-image}
 

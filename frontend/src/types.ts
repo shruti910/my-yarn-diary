@@ -95,9 +95,10 @@ export interface JournalLog {
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
-  text: string;
+  text?: string | null;
   imageData?: string;
   createdAt: string;
+  errorMessage?: string;
 }
 
 export type ChatCategory = 'crochet-buddy' | 'pattern-decoder' | 'reverse-engineer' | 'image-generator' | 'crochet-tutor';

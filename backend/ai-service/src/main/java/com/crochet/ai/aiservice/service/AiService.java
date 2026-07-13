@@ -123,6 +123,20 @@ public class AiService {
                 userTerminology);
         LlmResponse llmResponse = llmProvider.executeChat(llmRequest);
 
+        // Intercept error messages and return them directly to the client
+        if (llmResponse.errorMessage() != null) {
+            log.warn("LLM provider returned an operational error: {}", llmResponse.errorMessage());
+            
+            return ChatMessageDto.builder()
+                    .id(UUID.randomUUID().toString())
+                    .role(ChatRole.model.name())
+                    .text(null)
+                    .imageData(null)
+                    .createdAt(LocalDateTime.now())
+                    .errorMessage(llmResponse.errorMessage())
+                    .build();
+        }
+
         // 3. Save both message rows atomically
         ChatMessage userMsg = ChatMessage.builder()
                 .messageId(UUID.randomUUID())
@@ -145,6 +159,7 @@ public class AiService {
                 .chatId(session.getChatId())
                 .role(ChatRole.model)
                 .textBody(llmResponse.text())
+                .imageData(llmResponse.imageResponse())
                 .providerName(llmResponse.providerName())
                 .modelName(llmResponse.modelName())
                 .promptTokens(llmResponse.promptTokens())
@@ -172,6 +187,7 @@ public class AiService {
                 .id(modelMsg.getMessageId().toString())
                 .role(modelMsg.getRole().name())
                 .text(modelMsg.getTextBody())
+                .imageData(modelMsg.getImageData())
                 .createdAt(modelMsg.getCreatedAt())
                 .build();
     }
