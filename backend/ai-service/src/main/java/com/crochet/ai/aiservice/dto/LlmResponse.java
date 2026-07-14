@@ -9,5 +9,7 @@ public record LlmResponse(
     int reasoningTokens,
     String providerName,
     String modelName,
-    Map<String, Object> metadata
+    Map<String, Object> metadata,
+    String imageResponse,
+    String errorMessage
 ) {}

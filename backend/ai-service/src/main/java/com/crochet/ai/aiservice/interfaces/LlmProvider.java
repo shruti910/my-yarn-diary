@@ -1,4 +1,4 @@
-package com.crochet.ai.aiservice.service.interfaces;
+package com.crochet.ai.aiservice.interfaces;
 
 import com.crochet.ai.aiservice.dto.LlmRequest;
 import com.crochet.ai.aiservice.dto.LlmResponse;

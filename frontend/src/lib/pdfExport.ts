@@ -215,8 +215,27 @@ export async function exportProjectToPdf(
     coverPhotoBase64 = project.photos?.find(p => p.isCover)?.photoBase64 || null;
   }
 
+  // Check if there are any PDF patterns and count their pages beforehand
+  const pdfPatterns = (project.patterns || []).filter(p => p.patternType === 'pdf' && p.patternContent);
+  let pdfPatternsPageCount = 0;
+  for (const pattern of pdfPatterns) {
+    try {
+      const base64Data = pattern.patternContent.replace(/^data:application\/pdf;base64,/, '');
+      const bytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+      const patternPdfDoc = await PDFDocument.load(bytes);
+      pdfPatternsPageCount += patternPdfDoc.getPageCount();
+    } catch (e) {
+      console.warn(`Failed to read PDF page count for ${pattern.fileName || ''}:`, e);
+    }
+  }
+
+  // Fallback to project.photos if productPhotos is empty
+  const allProductPhotos = project.productPhotos && project.productPhotos.length > 0
+    ? project.productPhotos
+    : (project.photos || []).map(p => p.photoBase64);
+
   // Preload all image assets to calculate dimensions
-  const imageCache = await preloadImages(coverPhotoBase64, project.productPhotos || [], logs, project.patterns || []);
+  const imageCache = await preloadImages(coverPhotoBase64, allProductPhotos, logs, project.patterns || []);
 
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -286,7 +305,7 @@ export async function exportProjectToPdf(
   doc.setTextColor('#2D231B');
   doc.text(String(project.rowCount || 0), ctx.marginLeft + 5, ctx.currentY + 23.5);
   doc.text(project.totalTime || '0 hrs', ctx.marginLeft + 60, ctx.currentY + 23.5);
-  doc.text(project.isFavorite ? 'YES ♥' : 'NO', ctx.marginLeft + 115, ctx.currentY + 23.5);
+  doc.text(project.isFavorite ? 'YES' : 'NO', ctx.marginLeft + 115, ctx.currentY + 23.5);
 
   ctx.currentY += panelH + 8;
 
@@ -537,7 +556,56 @@ export async function exportProjectToPdf(
   }
 
   // ==========================================
-  // 6. PATTERNS SECTION
+  // 6. PRODUCT GALLERY (excluding cover)
+  // ==========================================
+  const galleryPhotos = allProductPhotos.filter(p => {
+    if (!p) return false;
+    const cleanP = p.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
+    const cleanCover = coverPhotoBase64 ? coverPhotoBase64.replace(/^data:image\/[a-zA-Z]+;base64,/, '') : '';
+    return cleanP !== cleanCover;
+  });
+  if (galleryPhotos.length > 0) {
+    ctx.ensureSpace(30);
+    // Header
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor('#2D231B');
+    doc.text('PRODUCT GALLERY', ctx.marginLeft, ctx.currentY + 4);
+    doc.setDrawColor('#F28482');
+    doc.setLineWidth(0.4);
+    doc.line(ctx.marginLeft, ctx.currentY + 6, ctx.marginLeft + 15, ctx.currentY + 6);
+    ctx.currentY += 10;
+
+    // Render photos in a 2-column layout grid. Width of each image: 81mm, Height: 55mm
+    const gridW = 81;
+    const gridH = 55;
+    const gap = 8;
+
+    for (let i = 0; i < galleryPhotos.length; i += 2) {
+      ctx.ensureSpace(gridH + 6);
+
+      // Photo 1
+      const photo1 = galleryPhotos[i];
+      const x1 = ctx.marginLeft;
+      doc.setDrawColor('#E8E2D9');
+      doc.rect(x1, ctx.currentY, gridW, gridH, 'S');
+      addImageSafe(doc, photo1, x1 + 1, ctx.currentY + 1, gridW - 2, gridH - 2);
+
+      // Photo 2 (if exists)
+      if (i + 1 < galleryPhotos.length) {
+        const photo2 = galleryPhotos[i + 1];
+        const x2 = ctx.marginLeft + gridW + gap;
+        doc.rect(x2, ctx.currentY, gridW, gridH, 'S');
+        addImageSafe(doc, photo2, x2 + 1, ctx.currentY + 1, gridW - 2, gridH - 2);
+      }
+
+      ctx.currentY += gridH + 6;
+    }
+    ctx.currentY += 4;
+  }
+
+  // ==========================================
+  // 7. ATTACHED PATTERNS
   // ==========================================
   if (project.patterns && project.patterns.length > 0) {
     ctx.ensureSpace(20);
@@ -569,7 +637,7 @@ export async function exportProjectToPdf(
       const name = pattern.fileName || 'Unnamed Pattern File';
       let suffix = '';
       if (pattern.patternType === 'pdf') {
-        suffix = ' (Appended to the end of this document)';
+        suffix = ' (Appended below)';
       }
       const displayName = name + suffix;
       const truncatedName = displayName.length > 70 ? displayName.substring(0, 67) + '...' : displayName;
@@ -632,54 +700,17 @@ export async function exportProjectToPdf(
     }
   }
 
-  // ==========================================
-  // 7. COMPLETED GALLERY (excluding cover)
-  // ==========================================
-  const galleryPhotos = (project.productPhotos || []).filter(p => p !== coverPhotoBase64);
-  if (galleryPhotos.length > 0) {
-    ctx.ensureSpace(30);
-    // Header
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor('#2D231B');
-    doc.text('PRODUCT GALLERY', ctx.marginLeft, ctx.currentY + 4);
-    doc.setDrawColor('#F28482');
-    doc.setLineWidth(0.4);
-    doc.line(ctx.marginLeft, ctx.currentY + 6, ctx.marginLeft + 15, ctx.currentY + 6);
-    ctx.currentY += 10;
-
-    // Render photos in a 2-column layout grid. Width of each image: 81mm, Height: 55mm
-    const gridW = 81;
-    const gridH = 55;
-    const gap = 8;
-
-    for (let i = 0; i < galleryPhotos.length; i += 2) {
-      ctx.ensureSpace(gridH + 6);
-
-      // Photo 1
-      const photo1 = galleryPhotos[i];
-      const x1 = ctx.marginLeft;
-      doc.setDrawColor('#E8E2D9');
-      doc.rect(x1, ctx.currentY, gridW, gridH, 'S');
-      addImageSafe(doc, photo1, x1 + 1, ctx.currentY + 1, gridW - 2, gridH - 2);
-
-      // Photo 2 (if exists)
-      if (i + 1 < galleryPhotos.length) {
-        const photo2 = galleryPhotos[i + 1];
-        const x2 = ctx.marginLeft + gridW + gap;
-        doc.rect(x2, ctx.currentY, gridW, gridH, 'S');
-        addImageSafe(doc, photo2, x2 + 1, ctx.currentY + 1, gridW - 2, gridH - 2);
-      }
-
-      ctx.currentY += gridH + 6;
-    }
-    ctx.currentY += 4;
-  }
+  // Save page count right here before progress journal starts!
+  const pageCountA = doc.getNumberOfPages();
 
   // ==========================================
   // 8. PROGRESS JOURNAL TIMELINE
   // ==========================================
   if (logs && logs.length > 0) {
+    // Force a new page for the timeline so that PDF pages can be inserted without splitting/sandwiching it.
+    doc.addPage();
+    ctx.currentY = ctx.marginTop;
+
     ctx.ensureSpace(20);
     // Header
     doc.setFont('helvetica', 'bold');
@@ -802,28 +833,30 @@ export async function exportProjectToPdf(
   const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
-    drawHeaderAndFooter(doc, i, totalPages, project.title);
+    const physicalPageNum = i <= pageCountA ? i : i + pdfPatternsPageCount;
+    drawHeaderAndFooter(doc, physicalPageNum, totalPages + pdfPatternsPageCount, project.title);
   }
 
   // Save/Merge the document
   const cleanProjectName = project.title.replace(/[^a-zA-Z0-9]/g, '');
   const fileName = `${cleanProjectName}_MyYarnDiary.pdf`;
 
-  // Check if there are any PDF patterns to append
-  const pdfPatterns = (project.patterns || []).filter(p => p.patternType === 'pdf' && p.patternContent);
-
   if (pdfPatterns.length > 0) {
     try {
       const pdfBytes = doc.output('arraybuffer');
       const mainPdfDoc = await PDFDocument.load(pdfBytes);
 
+      let insertIndex = pageCountA;
       for (const pattern of pdfPatterns) {
         try {
           const base64Data = pattern.patternContent.replace(/^data:application\/pdf;base64,/, '');
           const bytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
           const patternPdfDoc = await PDFDocument.load(bytes);
           const copiedPages = await mainPdfDoc.copyPages(patternPdfDoc, patternPdfDoc.getPageIndices());
-          copiedPages.forEach((page) => mainPdfDoc.addPage(page));
+          copiedPages.forEach((page) => {
+            mainPdfDoc.insertPage(insertIndex, page);
+            insertIndex++;
+          });
         } catch (patternErr) {
           console.error(`Failed to append PDF pattern ${pattern.fileName || ''}:`, patternErr);
         }
