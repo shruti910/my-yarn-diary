@@ -1,13 +1,14 @@
 package com.crochet.ai.aiservice.service;
 
-import com.crochet.ai.aiservice.service.interfaces.LlmProvider;
 import com.crochet.ai.aiservice.dto.LlmRequest;
 import com.crochet.ai.aiservice.dto.LlmResponse;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import com.crochet.ai.aiservice.interfaces.LlmProvider;
+
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 
-@Component
-@ConditionalOnProperty(name = "llm.active-provider", havingValue = "openai")
+@Component("openaiProvider")
+@ConditionalOnExpression("'${llm.text-generation-provider}' == 'openai' or '${llm.image-generation-provider}' == 'openai'")
 public class OpenAiProvider implements LlmProvider {
 
     @Override

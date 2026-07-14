@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Send, Image, Plus, Trash2, ArrowRight, MessagesSquare, Compass, AlertCircle, Camera, X, Edit2, Check, Pin, PinOff, Copy } from 'lucide-react';
+import { Send, Image, Plus, Trash2, ArrowRight, MessagesSquare, Compass, AlertCircle, Camera, X, Edit2, Check, Pin, PinOff, Copy, Download, Maximize2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { ChatSession, ChatMessage, ChatCategory } from '../types';
 import { useDialog } from './DialogProvider';
 
-const detectTerminology = (text: string): 'US' | 'UK' | null => {
+const detectTerminology = (text: string | null | undefined): 'US' | 'UK' | null => {
+  if (!text) return null;
   const clean = text.toLowerCase();
   if (/terminology:\s*uk/i.test(clean) || /uk standard/i.test(clean) || /uk terminology/i.test(clean)) {
     return 'UK';
@@ -41,13 +42,25 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
   const { showConfirm, showAlert } = useDialog();
   const [error, setError] = useState<string | null>(null);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
-  const handleCopyMessage = (msgId: string, text: string) => {
+  const handleCopyMessage = (msgId: string, text: string | null | undefined) => {
+    if (!text) return;
     navigator.clipboard.writeText(text);
     setCopiedMsgId(msgId);
     setTimeout(() => {
       setCopiedMsgId(null);
     }, 2000);
+  };
+
+  const handleDownloadImage = (imageData: string, msgId: string) => {
+    if (!imageData) return;
+    const link = document.createElement('a');
+    link.href = imageData;
+    link.download = `yarn-diary-concept-${msgId}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // In-chat image attachments (multiple, up to 3)
@@ -623,6 +636,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
         id: data.id || 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(4),
         role: 'model',
         text: data.text || '',
+        imageData: data.imageData || undefined,
         errorMessage: data.errorMessage || undefined,
         createdAt: data.createdAt || new Date().toISOString()
       };
@@ -630,8 +644,8 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
       setSessions(prev => prev.map(s => {
         if (s.chatId === targetChatId) {
           // Prevent double append in case background refetch already populated the message
-          const hasMessage = s.messages.some(m => 
-            m.id === responseMsg.id || 
+          const hasMessage = s.messages.some(m =>
+            m.id === responseMsg.id ||
             (m.role === 'model' && responseMsg.text && responseMsg.text.trim() !== '' && m.text === responseMsg.text)
           );
           if (hasMessage) return s;
@@ -707,14 +721,15 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
         id: data.id || 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(4),
         role: 'model',
         text: data.text || '',
+        imageData: data.imageData || undefined,
         errorMessage: data.errorMessage || undefined,
         createdAt: data.createdAt || new Date().toISOString()
       };
 
       setSessions(prev => prev.map(s => {
         if (s.chatId === targetChatId) {
-          const hasMessage = s.messages.some(m => 
-            m.id === responseMsg.id || 
+          const hasMessage = s.messages.some(m =>
+            m.id === responseMsg.id ||
             (m.role === 'model' && responseMsg.text && responseMsg.text.trim() !== '' && m.text === responseMsg.text)
           );
           if (hasMessage) return s;
@@ -1008,84 +1023,124 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
 
                   <div className="space-y-1">
                     {/* Message payload cards */}
-                    <div className={`p-4 rounded-3xl md:p-5 warm-shadow ${isUser
-                      ? 'bg-[#F28482]/10 text-[#2D231B] rounded-tr-none border border-[#F28482]/20'
-                      : 'bg-white text-[#2D231B] rounded-tl-none border border-[#E8E2D9]'
-                      }`}>
-                      {msg.imageData && (
-                        <div className="flex flex-wrap gap-2 mb-3 justify-center">
-                          {msg.imageData.split('|||').map((imgUrl, i) => (
-                            <img
-                              key={i}
-                              src={imgUrl}
-                              alt={`Uploaded visual thread ${i + 1}`}
-                              className="rounded-xl max-h-48 object-contain border border-[#E8E2D9]"
-                            />
-                          ))}
-                        </div>
-                      )}
+                    {msg.imageData ? (
+                      <div className="flex flex-col gap-3">
+                        {msg.imageData.split('|||').map((imgUrl, i) => (
+                          <div key={i} className="flex flex-col max-w-sm rounded-2xl overflow-hidden shadow-md border border-neutral-200 bg-white">
 
-                      {isUser ? (
-                        <p className="text-xs font-semibold whitespace-pre-wrap leading-relaxed">{msg.text}</p>
-                      ) : (
-                        <>
-                          <div className="markdown-body text-xs">
-                            <Markdown>{msg.text}</Markdown>
+                            {/* Visual Asset Container Frame */}
+                            <div className="relative overflow-hidden bg-neutral-50 aspect-square flex items-center justify-center">
+                              <img
+                                src={imgUrl}
+                                alt={`AI Generated Concept Image ${i + 1}`}
+                                className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                                onClick={() => setLightboxImage(imgUrl)}
+                              />
+                            </div>
+
+                            {/* 🎯 Always-Visible Utility Control Strip */}
+                            <div className="flex items-center justify-between p-3 bg-neutral-50/80 border-t border-neutral-100 font-sans">
+                              <span className="text-xs font-medium text-neutral-500">
+                                {msg.role === 'user' ? 'Uploaded Image' : 'AI Generated Concept Image'}
+                              </span>
+
+                              <div className="flex items-center gap-2">
+                                {/* Always Visible Expand Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => setLightboxImage(imgUrl)}
+                                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-neutral-700 bg-white hover:bg-neutral-100 border border-neutral-200 rounded-lg shadow-sm transition-colors cursor-pointer"
+                                  title="Make Image Big"
+                                >
+                                  <Maximize2 size={14} />
+                                  <span>Expand</span>
+                                </button>
+
+                                {/* Always Visible Download Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadImage(imgUrl, `${msg.id}-${i}`)}
+                                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-red-400 hover:bg-red-500 rounded-lg shadow-sm transition-colors cursor-pointer"
+                                  title="Download Image File"
+                                >
+                                  <Download size={14} />
+                                  <span>Download</span>
+                                </button>
+                              </div>
+                            </div>
+
                           </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className={`p-4 rounded-3xl md:p-5 warm-shadow ${isUser
+                        ? 'bg-[#F28482]/10 text-[#2D231B] rounded-tr-none border border-[#F28482]/20'
+                        : 'bg-white text-[#2D231B] rounded-tl-none border border-[#E8E2D9]'
+                        }`}>
+                        {isUser ? (
+                          <p className="text-xs font-semibold whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                        ) : (
+                          <>
+                            <div className="markdown-body text-xs">
+                              <Markdown>{msg.text || ''}</Markdown>
+                            </div>
 
-                          {(() => {
-                            const prevMsg = index > 0 ? activeChat.messages[index - 1] : null;
-                            const isResponseToImage = prevMsg?.imageData || category === 'pattern-decoder';
+                            {(() => {
+                              const prevMsg = index > 0 ? activeChat.messages[index - 1] : null;
+                              const isResponseToImage = prevMsg?.imageData || category === 'pattern-decoder';
 
-                            if (isResponseToImage) {
-                              const detectedTerm = detectTerminology(msg.text);
-                              const preferredTerm = user?.crochetTerminology || 'US';
+                              if (isResponseToImage) {
+                                const detectedTerm = detectTerminology(msg.text);
+                                const preferredTerm = user?.crochetTerminology || 'US';
 
-                              if (detectedTerm && detectedTerm !== preferredTerm && !msg.text.toLowerCase().includes('translated')) {
-                                return (
-                                  <div className="mt-3 p-3 bg-amber-50/70 border border-amber-200/50 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#6B5A45] animate-fade-in shadow-xs">
-                                    <div className="flex items-center gap-2">
-                                      <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 animate-pulse" />
-                                      <span>
-                                        Detected <strong>{detectedTerm === 'US' ? 'US' : 'UK'} Standard</strong> terminology standard in pattern.
-                                        Your preference is <strong>{preferredTerm} Standard</strong>.
-                                      </span>
+                                if (detectedTerm && detectedTerm !== preferredTerm && !msg.text?.toLowerCase().includes('translated')) {
+                                  return (
+                                    <div className="mt-3 p-3 bg-amber-50/70 border border-amber-200/50 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#6B5A45] animate-fade-in shadow-xs">
+                                      <div className="flex items-center gap-2">
+                                        <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 animate-pulse" />
+                                        <span>
+                                          Detected <strong>{detectedTerm === 'US' ? 'US' : 'UK'} Standard</strong> terminology standard in pattern.
+                                          Your preference is <strong>{preferredTerm} Standard</strong>.
+                                        </span>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleTranslateMessage(detectedTerm, preferredTerm)}
+                                        className="px-2.5 py-1.5 bg-[#F28482] text-white font-extrabold rounded-lg hover:bg-[#E07A78] hover:scale-[1.02] active:scale-[0.98] transition-all whitespace-nowrap cursor-pointer shadow-xs"
+                                      >
+                                        Translate to {preferredTerm}
+                                      </button>
                                     </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleTranslateMessage(detectedTerm, preferredTerm)}
-                                      className="px-2.5 py-1.5 bg-[#F28482] text-white font-extrabold rounded-lg hover:bg-[#E07A78] hover:scale-[1.02] active:scale-[0.98] transition-all whitespace-nowrap cursor-pointer shadow-xs"
-                                    >
-                                      Translate to {preferredTerm}
-                                    </button>
-                                  </div>
-                                );
+                                  );
+                                }
                               }
-                            }
-                            return null;
-                          })()}
-                        </>
-                      )}
-                    </div>
+                              return null;
+                            })()}
+                          </>
+                        )}
+                      </div>
+                    )}
                     {/* Timestamp & Copy Actions */}
                     <div className={`flex items-center gap-2.5 mt-1.5 px-1.5 ${isUser ? 'justify-end' : 'justify-start'}`}>
                       <span className="text-[9px] font-mono font-bold text-[#A89F94]">
                         {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => handleCopyMessage(msg.id, msg.text)}
-                        className="text-[9px] font-bold text-[#A89F94] hover:text-[#F28482] flex items-center gap-1 cursor-pointer transition-colors"
-                        title="Copy message to clipboard"
-                      >
-                        {copiedMsgId === msg.id ? (
-                          <span className="text-emerald-600 font-extrabold flex items-center gap-0.5">
-                            <Check className="w-2.5 h-2.5 shrink-0" /> Copied!
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-0.5"><Copy className="w-2.5 h-2.5" /> Copy</span>
-                        )}
-                      </button>
+                      {!msg.imageData && (
+                        <button
+                          type="button"
+                          onClick={() => handleCopyMessage(msg.id, msg.text)}
+                          className="text-[9px] font-bold text-[#A89F94] hover:text-[#F28482] flex items-center gap-1 cursor-pointer transition-colors"
+                          title="Copy message to clipboard"
+                        >
+                          {copiedMsgId === msg.id ? (
+                            <span className="text-emerald-600 font-extrabold flex items-center gap-0.5">
+                              <Check className="w-2.5 h-2.5 shrink-0" /> Copied!
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-0.5"><Copy className="w-2.5 h-2.5" /> Copy</span>
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1304,6 +1359,36 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
                 </button>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Lightbox Modal */}
+      <AnimatePresence>
+        {lightboxImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 backdrop-blur-xs"
+            onClick={() => setLightboxImage(null)}
+          >
+            <button
+              type="button"
+              onClick={() => setLightboxImage(null)}
+              className="absolute top-4 right-4 text-white hover:text-neutral-300 transition-colors p-2 cursor-pointer bg-black/40 rounded-full"
+            >
+              <X size={24} />
+            </button>
+            <motion.img
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              src={lightboxImage}
+              alt="Expanded view"
+              className="max-w-full max-h-[90vh] object-contain rounded-xl select-none"
+              onClick={(e) => e.stopPropagation()}
+            />
           </motion.div>
         )}
       </AnimatePresence>

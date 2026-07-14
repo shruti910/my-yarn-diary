@@ -1,12 +1,12 @@
 package com.crochet.ai.aiservice.service;
 
-import com.crochet.ai.aiservice.service.interfaces.LlmProvider;
 import com.crochet.ai.aiservice.dto.*;
 import com.crochet.ai.aiservice.entity.ChatMessage;
 import com.crochet.ai.aiservice.entity.ChatRole;
 import com.crochet.ai.aiservice.entity.ChatSession;
 import com.crochet.ai.aiservice.entity.UserRateLimit;
 import com.crochet.ai.aiservice.exception.*;
+import com.crochet.ai.aiservice.interfaces.LlmProvider;
 import com.crochet.ai.aiservice.repository.ChatMessageRepository;
 import com.crochet.ai.aiservice.repository.ChatSessionRepository;
 import com.crochet.ai.aiservice.repository.UserRateLimitRepository;
@@ -121,12 +121,13 @@ public class AiService {
                 request.getImageData(),
                 session.getCategory(),
                 userTerminology);
+
         LlmResponse llmResponse = llmProvider.executeChat(llmRequest);
 
         // Intercept error messages and return them directly to the client
         if (llmResponse.errorMessage() != null) {
             log.warn("LLM provider returned an operational error: {}", llmResponse.errorMessage());
-            
+
             return ChatMessageDto.builder()
                     .id(UUID.randomUUID().toString())
                     .role(ChatRole.model.name())
@@ -175,7 +176,7 @@ public class AiService {
         chatMessageRepository.save(userMsg);
         chatMessageRepository.save(modelMsg);
 
-        // 4. Increment usage metrics and update session running token count
+        // 4. Increment usage metrics and update running token count
         int totalSpent = llmResponse.promptTokens() + llmResponse.completionTokens() + llmResponse.reasoningTokens();
         session.setTotalTokensConsumed(session.getTotalTokensConsumed() + totalSpent);
         chatSessionRepository.save(session);

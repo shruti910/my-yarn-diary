@@ -1,13 +1,14 @@
 package com.crochet.ai.aiservice.service;
 
-import com.crochet.ai.aiservice.service.interfaces.LlmProvider;
 import com.crochet.ai.aiservice.dto.ChatCategory;
 import com.crochet.ai.aiservice.dto.LlmRequest;
 import com.crochet.ai.aiservice.dto.LlmResponse;
 import com.crochet.ai.aiservice.entity.ChatMessage;
+import com.crochet.ai.aiservice.interfaces.LlmProvider;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -17,8 +18,8 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
 
-@Component
-@ConditionalOnProperty(name = "llm.active-provider", havingValue = "gemini")
+@Component("geminiProvider")
+@ConditionalOnExpression("'${llm.text-generation-provider}' == 'gemini' or '${llm.image-generation-provider}' == 'gemini'")
 @Slf4j
 public class GeminiProvider implements LlmProvider {
 
@@ -131,6 +132,10 @@ public class GeminiProvider implements LlmProvider {
                 }
                 latestContentMap.put("parts", latestPartsList);
                 contentsList.add(latestContentMap);
+            } else {
+                return new LlmResponse(
+                        null, 0, 0, 0, "google", modelName, null, null,
+                        "Prompt is blank or empty. Please provide a valid prompt.");
             }
 
             Map<String, Object> requestBody = new HashMap<>();
