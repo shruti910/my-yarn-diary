@@ -1,0 +1,11 @@
+server:
+  port: 3000
+
+USER_SERVICE_URL: http://user-service:8081
+CROCHET_SERVICE_URL: http://crochet-service:8082
+AI_SERVICE_URL: http://ai-service:8083
+
+logging:
+  level:
+    root: INFO
+    com.crochet.ai.gateway: INFO

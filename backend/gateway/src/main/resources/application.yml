@@ -1,0 +1,52 @@
+spring:
+  profiles:
+    active: local
+  application:
+    name: gateway
+  main:
+    web-application-type: reactive
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:5173"
+              - "https://my-yarn-diary.vercel.app"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+      routes:
+        - id: user_service_routes
+          uri: ${USER_SERVICE_URL}
+          predicates:
+            - Path=/api/v1/users, /api/v1/users/**, /api/v1/auth, /api/v1/auth/**
+          filters:
+            - FirebaseAuthenticationFilter
+
+        - id: crochet_service_routes
+          uri: ${CROCHET_SERVICE_URL}
+          predicates:
+            - Path=/api/v1/projects, /api/v1/projects/**, /api/v1/patterns, /api/v1/patterns/**, /api/v1/categories, /api/v1/categories/**, /api/v1/galleries, /api/v1/galleries/**, /api/v1/yarns, /api/v1/yarns/**, /api/v1/hooks, /api/v1/hooks/**, /api/v1/logs, /api/v1/logs/**, /api/v1/photos, /api/v1/photos/**
+          filters:
+            - FirebaseAuthenticationFilter
+
+        - id: ai_service_routes
+          uri: ${AI_SERVICE_URL}
+          predicates:
+            - Path=/api/v1/chats, /api/v1/chats/**
+          filters:
+            - FirebaseAuthenticationFilter
+
+firebase:
+  project-id: ${FIREBASE_PROJECT_ID}
+
+internal:
+  jwt:
+    secret: ${INTERNAL_JWT_SECRET}

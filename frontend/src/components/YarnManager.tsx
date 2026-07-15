@@ -1,29 +1,88 @@
-import React from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Trash2, Save, Loader2 } from 'lucide-react';
 import { Yarn } from '../types';
 
 interface YarnManagerProps {
-  yarns: Yarn[];
-  onChange: (yarns: Yarn[]) => void;
+  projectId: string;
+  initialYarns?: Yarn[];
+  isNewProject?: boolean;
+  fetchWithToken: (url: string, options?: RequestInit) => Promise<any>;
   disabled?: boolean;
 }
 
-export function YarnManager({ yarns, onChange, disabled }: YarnManagerProps) {
-  const addYarn = () => {
-    onChange([...yarns, { brand: '', lineName: '', colorway: '', dyeLot: '', weight: '', fiberContent: '', quantityUsed: 0, unit: 'skeins' }]);
+export function YarnManager({ projectId, initialYarns, isNewProject, fetchWithToken, disabled }: YarnManagerProps) {
+  const [yarns, setYarns] = useState<Yarn[]>(initialYarns || []);
+  const [isLoading, setIsLoading] = useState(!initialYarns || initialYarns.length === 0);
+  const [savingId, setSavingId] = useState<number | null>(null);
+
+  const fetchYarns = async () => {
+    try {
+      const data = await fetchWithToken(`/api/v1/projects/${projectId}/yarns`);
+      setYarns(data || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const removeYarn = (index: number) => {
-    const newYarns = [...yarns];
-    newYarns.splice(index, 1);
-    onChange(newYarns);
+  useEffect(() => {
+    if (isNewProject) {
+      setYarns([]);
+      setIsLoading(false);
+    } else if (initialYarns !== undefined) {
+      setYarns(initialYarns);
+      setIsLoading(false);
+    } else {
+      fetchYarns();
+    }
+  }, [projectId, isNewProject, initialYarns]);
+
+  const addYarn = async () => {
+    try {
+      const newYarn = { brand: 'New Brand', lineName: '', colorway: '', dyeLot: '', weight: '', fiberContent: '', quantityUsed: 0, unit: 'skeins' };
+      await fetchWithToken(`/api/v1/projects/${projectId}/yarns`, {
+        method: 'POST',
+        body: JSON.stringify(newYarn)
+      });
+      fetchYarns();
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const updateYarn = (index: number, field: keyof Yarn, value: any) => {
+  const removeYarn = async (yarnId: number) => {
+    try {
+      await fetchWithToken(`/api/v1/yarns/${yarnId}`, { method: 'DELETE' });
+      fetchYarns();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const updateYarnState = (index: number, field: keyof Yarn, value: any) => {
     const newYarns = [...yarns];
     newYarns[index] = { ...newYarns[index], [field]: value };
-    onChange(newYarns);
+    setYarns(newYarns);
   };
+
+  const saveYarn = async (yarn: Yarn) => {
+    if (!yarn.yarnId) return;
+    setSavingId(yarn.yarnId);
+    try {
+      await fetchWithToken(`/api/v1/yarns/${yarn.yarnId}`, {
+        method: 'PUT',
+        body: JSON.stringify(yarn)
+      });
+      await fetchYarns();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  if (isLoading) return <div className="text-xs text-[#A89F94] italic">Loading yarns...</div>;
 
   return (
     <div className="space-y-4">
@@ -43,26 +102,36 @@ export function YarnManager({ yarns, onChange, disabled }: YarnManagerProps) {
         <p className="text-xs text-[#A89F94] italic">No yarns added yet.</p>
       ) : (
         <div className="space-y-3">
-          {yarns.map((yarn, idx) => (
-            <div key={idx} className="p-3 bg-[#FDFCFB] border border-[#E8E2D9] rounded-xl space-y-3 relative">
-              <button
-                type="button"
-                onClick={() => removeYarn(idx)}
-                disabled={disabled}
-                className="absolute top-3 right-3 text-[#A89F94] hover:text-red-500 disabled:opacity-50"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+          {yarns.map((yarn, yarnIdx) => (
+            <div key={yarn.yarnId || yarnIdx} className="p-3 bg-[#FDFCFB] border border-[#E8E2D9] rounded-xl space-y-3 relative group">
+              <div className="absolute top-3 right-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => saveYarn(yarn)}
+                  disabled={disabled || savingId === yarn.yarnId}
+                  className="text-[#A89F94] hover:text-[#7C7167] disabled:opacity-50 flex items-center"
+                >
+                  {savingId === yarn.yarnId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => yarn.yarnId && removeYarn(yarn.yarnId)}
+                  disabled={disabled}
+                  className="text-[#A89F94] hover:text-red-500 disabled:opacity-50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
               
-              <div className="grid grid-cols-2 gap-3 pr-6">
+              <div className="grid grid-cols-2 gap-3 pr-16">
                 <div>
                   <label className="text-[9px] font-bold text-[#A89F94] uppercase">Brand</label>
                   <input
                     type="text"
                     value={yarn.brand || ''}
                     disabled={disabled}
-                    required
-                    onChange={(e) => updateYarn(idx, 'brand', e.target.value)}
+                    onChange={(e) => updateYarnState(yarnIdx, 'brand', e.target.value)}
+                    onBlur={() => saveYarn(yarn)}
                     className="w-full bg-transparent border-b border-[#E8E2D9] text-xs py-1 focus:outline-none focus:border-[#F28482]"
                     placeholder="e.g. Red Heart"
                   />
@@ -73,7 +142,8 @@ export function YarnManager({ yarns, onChange, disabled }: YarnManagerProps) {
                     type="text"
                     value={yarn.lineName || ''}
                     disabled={disabled}
-                    onChange={(e) => updateYarn(idx, 'lineName', e.target.value)}
+                    onChange={(e) => updateYarnState(yarnIdx, 'lineName', e.target.value)}
+                    onBlur={() => saveYarn(yarn)}
                     className="w-full bg-transparent border-b border-[#E8E2D9] text-xs py-1 focus:outline-none focus:border-[#F28482]"
                     placeholder="e.g. Super Saver"
                   />
@@ -85,14 +155,16 @@ export function YarnManager({ yarns, onChange, disabled }: YarnManagerProps) {
                       type="color"
                       disabled={disabled}
                       value={yarn.colorway?.startsWith('#') ? yarn.colorway : '#000000'}
-                      onChange={(e) => updateYarn(idx, 'colorway', e.target.value)}
+                      onChange={(e) => updateYarnState(yarnIdx, 'colorway', e.target.value)}
+                      onBlur={() => saveYarn(yarn)}
                       className="color-picker-round"
                     />
                     <input
                       type="text"
                       value={yarn.colorway || ''}
                       disabled={disabled}
-                      onChange={(e) => updateYarn(idx, 'colorway', e.target.value)}
+                      onChange={(e) => updateYarnState(yarnIdx, 'colorway', e.target.value)}
+                      onBlur={() => saveYarn(yarn)}
                       className="flex-1 min-w-0 bg-transparent border-b border-[#E8E2D9] text-xs py-1 focus:outline-none focus:border-[#F28482]"
                       placeholder="Name or Hex"
                     />
@@ -104,7 +176,8 @@ export function YarnManager({ yarns, onChange, disabled }: YarnManagerProps) {
                     type="text"
                     value={yarn.dyeLot || ''}
                     disabled={disabled}
-                    onChange={(e) => updateYarn(idx, 'dyeLot', e.target.value)}
+                    onChange={(e) => updateYarnState(yarnIdx, 'dyeLot', e.target.value)}
+                    onBlur={() => saveYarn(yarn)}
                     className="w-full bg-transparent border-b border-[#E8E2D9] text-xs py-1 focus:outline-none focus:border-[#F28482] mt-1"
                     placeholder="e.g. 12345"
                   />
@@ -115,7 +188,8 @@ export function YarnManager({ yarns, onChange, disabled }: YarnManagerProps) {
                     type="text"
                     value={yarn.weight || ''}
                     disabled={disabled}
-                    onChange={(e) => updateYarn(idx, 'weight', e.target.value)}
+                    onChange={(e) => updateYarnState(yarnIdx, 'weight', e.target.value)}
+                    onBlur={() => saveYarn(yarn)}
                     className="w-full bg-transparent border-b border-[#E8E2D9] text-xs py-1 focus:outline-none focus:border-[#F28482]"
                     placeholder="e.g. 4 / Worsted"
                   />
@@ -126,7 +200,8 @@ export function YarnManager({ yarns, onChange, disabled }: YarnManagerProps) {
                     type="text"
                     value={yarn.fiberContent || ''}
                     disabled={disabled}
-                    onChange={(e) => updateYarn(idx, 'fiberContent', e.target.value)}
+                    onChange={(e) => updateYarnState(yarnIdx, 'fiberContent', e.target.value)}
+                    onBlur={() => saveYarn(yarn)}
                     className="w-full bg-transparent border-b border-[#E8E2D9] text-xs py-1 focus:outline-none focus:border-[#F28482]"
                     placeholder="e.g. 100% Acrylic"
                   />
@@ -140,20 +215,28 @@ export function YarnManager({ yarns, onChange, disabled }: YarnManagerProps) {
                       disabled={disabled}
                       min="0"
                       step="0.5"
-                      onChange={(e) => updateYarn(idx, 'quantityUsed', e.target.value ? parseFloat(e.target.value) : 0)}
+                      onChange={(e) => updateYarnState(yarnIdx, 'quantityUsed', e.target.value ? parseFloat(e.target.value) : 0)}
+                      onBlur={() => saveYarn(yarn)}
                       className="w-24 bg-transparent border-b border-[#E8E2D9] text-xs py-1 focus:outline-none focus:border-[#F28482]"
                       placeholder="0"
                     />
                     <select
                       value={yarn.unit || 'skeins'}
                       disabled={disabled}
-                      onChange={(e) => updateYarn(idx, 'unit', e.target.value)}
-                      className="w-28 bg-transparent border-b border-[#E8E2D9] text-xs py-1 focus:outline-none focus:border-[#F28482] cursor-pointer"
+                      onChange={(e) => {
+                        updateYarnState(yarnIdx, 'unit', e.target.value);
+                        saveYarn({ ...yarn, unit: e.target.value });
+                      }}
+                      className="bg-transparent border-b border-[#E8E2D9] text-xs py-1 focus:outline-none focus:border-[#F28482]"
                     >
                       <option value="skeins">skeins</option>
+                      <option value="balls">balls</option>
+                      <option value="cakes">cakes</option>
+                      <option value="hanks">hanks</option>
                       <option value="meters">meters</option>
-                      <option value="grams">grams</option>
                       <option value="yards">yards</option>
+                      <option value="grams">grams</option>
+                      <option value="ounces">ounces</option>
                     </select>
                   </div>
                 </div>

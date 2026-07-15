@@ -9,17 +9,25 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.crochet.ai.userservice.entity.AuditLog;
+import com.crochet.ai.userservice.repository.AuditLogRepository;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.UserRecord;
+import lombok.extern.slf4j.Slf4j;
 import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 @Service
 public class UserService {
 
     private final UserRepository userRepository;
+    private final AuditLogRepository auditLogRepository;
 
     @Autowired
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, AuditLogRepository auditLogRepository) {
         this.userRepository = userRepository;
+        this.auditLogRepository = auditLogRepository;
     }
 
     @Transactional
@@ -94,7 +102,6 @@ public class UserService {
                 .userId(userId)
                 .displayName(displayName != null && !displayName.isBlank() ? displayName : "Crafter")
                 .email(email != null && !email.isBlank() ? email : "")
-                .passwordHash("firebase_managed")
                 .profilePicture(profilePicture != null && !profilePicture.isBlank() ? profilePicture : "")
                 .membershipStatus(MembershipStatus.FREE)
                 .membershipActive(false)
@@ -178,21 +185,6 @@ public class UserService {
     }
 
     @Transactional
-    public void changePassword(String userId, PasswordUpdateRequest request) {
-        UUID uuid = UUID.fromString(userId);
-        User user = userRepository.findByUserId(uuid)
-                .orElseThrow(() -> new ResourceNotFoundException("User profile not found with ID: " + userId));
-
-        String currentHash = "sha256_" + request.getCurrentPassword().hashCode();
-        if (!user.getPasswordHash().equals(currentHash)) {
-            throw new BadRequestException("Current password matches incorrectly");
-        }
-
-        user.setPasswordHash("sha256_" + request.getNewPassword().hashCode());
-        userRepository.save(user);
-    }
-
-    @Transactional
     public UserResponse updateMembership(String userId, MembershipUpdateRequest request) {
         UUID uuid = UUID.fromString(userId);
         User user = userRepository.findByUserId(uuid)
@@ -225,5 +217,42 @@ public class UserService {
                 user.getCreatedAt(),
                 user.getUpdatedAt()
         );
+    }
+
+    @Transactional
+    public void changePassword(String userIdStr, String firebaseUid, String newPassword) {
+        if (firebaseUid == null || firebaseUid.isBlank()) {
+            throw new BadRequestException("Firebase UID is required for this operation.");
+        }
+        UUID userId;
+        try {
+            userId = UUID.fromString(userIdStr);
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("Invalid User ID format: " + userIdStr);
+        }
+
+        try {
+            // 1. Update Firebase Password
+            UserRecord.UpdateRequest updateRequest = new UserRecord.UpdateRequest(firebaseUid)
+                    .setPassword(newPassword);
+            FirebaseAuth.getInstance().updateUser(updateRequest);
+
+            // 2. Revoke active device refresh tokens
+            FirebaseAuth.getInstance().revokeRefreshTokens(firebaseUid);
+
+            // 3. Write Audit Log entry
+            AuditLog auditLog = AuditLog.builder()
+                    .userId(userId)
+                    .action("PASSWORD_CHANGE")
+                    .timestamp(java.time.LocalDateTime.now())
+                    .build();
+            auditLogRepository.save(auditLog);
+
+            log.info("Successfully updated password, revoked refresh tokens, and logged audit event for user {}", userIdStr);
+
+        } catch (com.google.firebase.auth.FirebaseAuthException e) {
+            log.error("Firebase Auth operation failed for user {}: {}", userIdStr, e.getMessage());
+            throw new ConflictException("Firebase Auth modification failed: " + e.getMessage());
+        }
     }
 }

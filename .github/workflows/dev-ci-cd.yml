@@ -12,7 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       java_backend: ${{ steps.filter.outputs.java_backend }}
-      express_gateway: ${{ steps.filter.outputs.express_gateway }}
       react_frontend: ${{ steps.filter.outputs.react_frontend }}
       infra: ${{ steps.filter.outputs.infra }}
     steps:
@@ -24,8 +23,7 @@ jobs:
         uses: dorny/paths-filter@v3
         with:
           filters: |
-            java_backend: 'backend/!(gateway)/**'
-            express_gateway: 'backend/gateway/**'
+            java_backend: 'backend/**'
             react_frontend: 'frontend/**'
             infra: |
               - 'docker-compose.yml'
@@ -38,7 +36,6 @@ jobs:
     if: |
       needs.path-filter.outputs.infra == 'true' ||
       needs.path-filter.outputs.java_backend == 'true' ||
-      needs.path-filter.outputs.express_gateway == 'true' ||
       needs.path-filter.outputs.react_frontend == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -50,7 +47,7 @@ jobs:
           # Dry-runs and parses your yaml orchestration settings to verify network/volume bindings
           docker compose config
 
-  # JOB 3: Test and Compile Java Microservices (Skips Gateway)
+  # JOB 3: Test and Compile Java Microservices & Gateway
   java-backend-validation:
     name: Java Services Build
     needs: path-filter
@@ -72,34 +69,7 @@ jobs:
           cd backend
           mvn clean package -DskipTests=false
 
-  # JOB 4: Test and Compile Express TS Gateway
-  express-gateway-validation:
-    name: Express Gateway Build
-    needs: path-filter
-    if: needs.path-filter.outputs.express_gateway == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Codebase
-        uses: actions/checkout@v4.2.2
-
-      - name: Set up Node.js for Gateway
-        uses: actions/setup-node@v4.2.0
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: backend/gateway/package-lock.json
-
-      - name: Install Gateway Dependencies
-        run: |
-          cd backend/gateway
-          npm ci
-
-      - name: Compile TypeScript Architecture
-        run: |
-          cd backend/gateway
-          npm run build --if-present
-
-  # JOB 5: Test and Verify React Frontend Application
+  # JOB 4: Test and Verify React Frontend Application
   frontend-validation:
     name: Frontend Client Build
     needs: path-filter

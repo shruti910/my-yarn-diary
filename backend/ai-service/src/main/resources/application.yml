@@ -10,6 +10,21 @@ spring:
     enabled: true
     baseline-on-migrate: true
 
+internal:
+  jwt:
+    secret: ${INTERNAL_JWT_SECRET}
+
+llm:
+  text-generation-provider: ${LLM_TEXT_GENERATION_PROVIDER:gemini} #gemini or openai
+  image-generation-provider: ${LLM_IMAGE_GENERATION_PROVIDER:pollinations} #pollinations or gemini or openai
+  image-generation-token-cost: ${IMAGE_GENERATION_TOKEN_COST:2500} #image generation token cost for pollinations.ai
+  image-generation-default-width: ${IMAGE_GENERATION_DEFAULT_WIDTH:512} #image generation default width
+  image-generation-default-height: ${IMAGE_GENERATION_DEFAULT_HEIGHT:512} #image generation default height
+  image-generation-default-model: ${IMAGE_GENERATION_DEFAULT_MODEL:flux} #image generation default model
+
+db:
+  encryption-secret: ${DB_ENCRYPTION_SECRET}
+
 ---
 spring:
   config:

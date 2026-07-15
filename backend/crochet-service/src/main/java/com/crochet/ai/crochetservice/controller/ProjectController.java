@@ -1,7 +1,6 @@
 package com.crochet.ai.crochetservice.controller;
 
 import com.crochet.ai.crochetservice.dto.*;
-import com.crochet.ai.crochetservice.entity.Project;
 import com.crochet.ai.crochetservice.service.CrochetService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,7 +8,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 
 @Slf4j
 @RestController
@@ -25,15 +27,26 @@ public class ProjectController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ProjectSummaryResponse>> getProjects(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<PagedResponse<ProjectSummaryResponse>> getProjects(
+            @RequestHeader("X-User-Id") String userId,
             @RequestParam(required = false, name = "categoryId") String categoryId,
-            @RequestParam(required = false, name = "favorite") Boolean favorite) {
-        if (Boolean.TRUE.equals(favorite)) {
-            log.info("Fetching favorite projects list for user: {}", userId);
-            return ResponseEntity.ok(crochetService.getFavoriteProjects(userId));
+            @RequestParam(required = false, name = "favorite") Boolean favorite,
+            @RequestParam(required = false, name = "archive") Boolean archive,
+            @RequestParam(required = false, name = "status") String status,
+            @RequestParam(required = false, name = "search") String search,
+            @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+
+        Boolean actualArchive = archive;
+        if ("archived".equalsIgnoreCase(categoryId)) {
+            actualArchive = true;
         }
-        log.info("Fetching projects list for user: {} (categoryId context: {})", userId, categoryId);
-        return ResponseEntity.ok(crochetService.getProjects(userId, categoryId));
+
+        log.info(
+                "Fetching paginated projects list for user: {} (categoryId: {}, favorite: {}, archive: {}, status: {}, search: {}, pageable: {})",
+                userId, categoryId, favorite, actualArchive, status, search, pageable);
+        Page<ProjectSummaryResponse> result = crochetService.getProjects(userId, categoryId, favorite, actualArchive,
+                status, search, pageable);
+        return ResponseEntity.ok(PagedResponse.fromPage(result));
     }
 
     @GetMapping("/{projectId}")
@@ -43,10 +56,18 @@ public class ProjectController {
         return ResponseEntity.ok(crochetService.getProjectDetailsResponse(userId, projectId));
     }
 
+    @GetMapping("/{projectId}/full")
+    public ResponseEntity<ProjectFullResponse> getProjectFullDetails(@RequestHeader("X-User-Id") String userId,
+            @PathVariable String projectId) {
+        log.info("Fetching full project details for projectId: {} and user: {}", projectId, userId);
+        return ResponseEntity.ok(crochetService.getProjectFullDetailsResponse(userId, projectId));
+    }
+
     @PostMapping
     public ResponseEntity<ProjectResponse> createProject(@RequestHeader("X-User-Id") String userId,
             @RequestBody ProjectRequest request) {
-        log.info("Creating project: '{}' for user: {} with status: {}", request.getTitle(), userId, request.getStatus());
+        log.info("Creating project: '{}' for user: {} with status: {}", request.getTitle(), userId,
+                request.getStatus());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(crochetService.createProject(userId, request));
     }
@@ -59,12 +80,11 @@ public class ProjectController {
         return ResponseEntity.ok(crochetService.updateProject(userId, projectId, request));
     }
 
-    @PatchMapping("/{projectId}")
-    public ResponseEntity<ProjectResponse> patchProject(@RequestHeader("X-User-Id") String userId,
-            @PathVariable String projectId,
-            @RequestBody ProjectPatchRequest request) {
-        log.info("Patching projectId: {} for user: {}", projectId, userId);
-        return ResponseEntity.ok(crochetService.patchProject(userId, projectId, request));
+    @PostMapping("/{projectId}/favorite")
+    public ResponseEntity<ProjectResponse> toggleFavoriteProject(@RequestHeader("X-User-Id") String userId,
+            @PathVariable String projectId) {
+        log.info("Toggling favorite status for projectId: {} for user: {}", projectId, userId);
+        return ResponseEntity.ok(crochetService.toggleFavoriteProject(userId, projectId));
     }
 
     @DeleteMapping("/{projectId}")

@@ -16,5 +16,6 @@
         <module>ai-service</module>
         <module>crochet-service</module>
         <module>user-service</module>
+        <module>gateway</module>
     </modules>
 </project>

@@ -8,6 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -163,39 +165,66 @@ public class CrochetService {
     }
 
     // --- TRACKED PROJECTS ---
-    public List<ProjectSummaryResponse> getProjects(String userId, String categoryId) {
+    public Page<ProjectSummaryResponse> getProjects(
+            String userId, 
+            String categoryId, 
+            Boolean favorite, 
+            Boolean archive, 
+            String statusStr, 
+            String search, 
+            Pageable pageable) {
         UUID userUuid = UUID.fromString(userId);
-        List<Project> projects;
+        boolean isArchive = Boolean.TRUE.equals(archive);
         
-        // If category is "Favourites ❤️", return favorited projects
-        if (categoryId != null && !categoryId.equalsIgnoreCase("all")) {
+        UUID categoryUuid = null;
+        Boolean isFavorite = favorite;
+
+        // If category is "Favourites ❤️" or "Favourites", handle it
+        if (categoryId != null && !categoryId.equalsIgnoreCase("all") && !categoryId.equalsIgnoreCase("archived")) {
             try {
-                UUID categoryUuid = UUID.fromString(categoryId);
-                Optional<Category> categoryOpt = categoryRepository.findByCategoryId(categoryUuid);
+                UUID parsedCategoryUuid = UUID.fromString(categoryId);
+                Optional<Category> categoryOpt = categoryRepository.findByCategoryId(parsedCategoryUuid);
                 if (categoryOpt.isPresent()) {
-                    String normName = categoryOpt.get().getName().trim().toLowerCase();
+                    Category category = categoryOpt.get();
+                    if (!category.getUserId().equals(userUuid)) {
+                        throw new ForbiddenException("Forbidden access attempt");
+                    }
+                    String normName = category.getName().trim().toLowerCase();
                     if (normName.equals("favourites ❤️") || normName.equals("favourites")) {
-                        projects = projectRepository.findByUserIdAndIsFavoriteTrue(userUuid);
-                        return projects.stream().map(this::mapToSummaryResponse).collect(Collectors.toList());
+                        isFavorite = true;
+                    } else {
+                        categoryUuid = parsedCategoryUuid;
                     }
                 }
             } catch (IllegalArgumentException e) {
-                // If categoryId is not a valid UUID, proceed to normal logic
+                // Ignore, treat as no category filter
             }
         }
-        
-        if (categoryId == null || categoryId.equalsIgnoreCase("all")) {
-            projects = projectRepository.findByUserId(userUuid);
-        } else {
-            UUID categoryUuid = UUID.fromString(categoryId);
-            projects = projectRepository.findByUserIdAndCategoryId(userUuid, categoryUuid);
+
+        ProjectStatus status = null;
+        if (statusStr != null && !statusStr.isBlank() && !statusStr.equalsIgnoreCase("all")) {
+            status = ProjectStatus.fromValue(statusStr);
         }
-        
-        return projects.stream().map(this::mapToSummaryResponse).collect(Collectors.toList());
+
+        String searchPattern = null;
+        if (search != null && !search.isBlank()) {
+            searchPattern = search.trim();
+        }
+
+        Page<Project> projectsPage = projectRepository.findProjectsForUser(
+                userUuid, 
+                categoryUuid, 
+                isFavorite, 
+                isArchive, 
+                status, 
+                searchPattern, 
+                pageable);
+
+        return projectsPage.map(this::mapToSummaryResponse);
     }
 
     private ProjectSummaryResponse mapToSummaryResponse(Project project) {
-        List<String> productPhotos = new ArrayList<>();
+        String base64CoverPhoto = null;
         if (project.getPhotoEntities() != null && !project.getPhotoEntities().isEmpty()) {
             Photo cover = null;
             for (Photo p : project.getPhotoEntities()) {
@@ -205,9 +234,9 @@ public class CrochetService {
                 }
             }
             if (cover != null) {
-                productPhotos.add(cover.getPhotoBase64());
+                base64CoverPhoto = cover.getPhotoBase64();
             } else {
-                productPhotos.add(project.getPhotoEntities().get(0).getPhotoBase64());
+                base64CoverPhoto = project.getPhotoEntities().get(0).getPhotoBase64();
             }
         }
         return new ProjectSummaryResponse(
@@ -224,7 +253,7 @@ public class CrochetService {
                 project.getEndDate(),
                 project.isFavorite(),
                 project.isArchive(),
-                productPhotos,
+                base64CoverPhoto,
                 project.getCreatedAt(),
                 project.getUpdatedAt()
         );
@@ -245,6 +274,10 @@ public class CrochetService {
         return mapToProjectResponse(getProjectDetails(userId, projectId));
     }
 
+    public ProjectFullResponse getProjectFullDetailsResponse(String userId, String projectId) {
+        return mapToProjectFullResponse(getProjectDetails(userId, projectId));
+    }
+
     @Transactional
     public ProjectResponse createProject(String userId, ProjectRequest request) {
         validateProjectDates(request);
@@ -253,6 +286,10 @@ public class CrochetService {
         
         Category category = categoryRepository.findByCategoryId(categoryUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Category directory not found: " + request.getCategoryId()));
+        
+        if (!category.getUserId().equals(userUuid)) {
+            throw new ForbiddenException("Forbidden access attempt");
+        }
         
         String checkName = category.getName().trim().toLowerCase();
         if (checkName.equals("favourites ❤️") || checkName.equals("favourites")) {
@@ -285,62 +322,22 @@ public class CrochetService {
                 .build();
         
         project = projectRepository.save(project);
-
-        if (request.getYarns() != null) {
-            List<Yarn> yarns = new ArrayList<>();
-            for (YarnRequest yr : request.getYarns()) {
-                yarns.add(Yarn.builder()
-                        .project(project)
-                        .brand(yr.brand())
-                        .lineName(yr.lineName())
-                        .colorway(yr.colorway())
-                        .dyeLot(yr.dyeLot())
-                        .weight(yr.weight())
-                        .fiberContent(yr.fiberContent())
-                        .quantityUsed(yr.quantityUsed())
-                        .unit(yr.unit() != null ? yr.unit() : "meters")
-                        .build());
-            }
-            project.setYarnEntities(yarns);
-        }
-
-        if (request.getHooks() != null) {
-            List<Hook> hooks = new ArrayList<>();
-            for (HookRequest hr : request.getHooks()) {
-                if ((hr.sizeMm() == null || hr.sizeMm() <= 0) && (hr.sizeUs() == null || hr.sizeUs().isBlank())) {
-                    throw new BadRequestException("Hook size (mm) or Hook size (US) is required.");
-                }
-                if (hr.sizeMm() != null && hr.sizeMm() <= 0) {
-                    throw new BadRequestException("Hook size (mm) must be a positive number.");
-                }
-                hooks.add(Hook.builder()
-                        .project(project)
-                        .sizeMm(hr.sizeMm())
-                        .sizeUs(hr.sizeUs())
-                        .material(hr.material())
-                        .brand(hr.brand())
-                        .build());
-            }
-            project.setHookEntities(hooks);
-        }
-
-        if (request.getProductPhotos() != null) {
-            project.setProductPhotos(request.getProductPhotos());
-            syncCoverPhotoPreference(project, request.getCoverPhoto());
-        }
-
-        return mapToProjectResponse(projectRepository.save(project));
+        return mapToProjectResponse(project);
     }
 
     @Transactional
     public ProjectResponse updateProject(String userId, String projectId, ProjectRequest request) {
         validateProjectDates(request);
+
         Project project = getProjectDetails(userId, projectId);
- 
-        UUID categoryUuid = UUID.fromString(request.getCategoryId());
-        if (!project.getCategoryId().equals(categoryUuid)) {
+
+        if (request.getCategoryId() != null) {
+            UUID categoryUuid = UUID.fromString(request.getCategoryId());
             Category category = categoryRepository.findByCategoryId(categoryUuid)
                     .orElseThrow(() -> new ResourceNotFoundException("Category not found: " + request.getCategoryId()));
+            if (!category.getUserId().equals(UUID.fromString(userId))) {
+                throw new ForbiddenException("Forbidden access attempt");
+            }
             String checkName = category.getName().trim().toLowerCase();
             if (checkName.equals("favourites ❤️") || checkName.equals("favourites")) {
                 throw new BadRequestException("Projects cannot be moved directly into the Favourites category.");
@@ -351,40 +348,6 @@ public class CrochetService {
  
         project.setTitle(request.getTitle());
         
-        if (request.getYarns() != null) {
-            project.getYarnEntities().clear();
-            for (YarnRequest yr : request.getYarns()) {
-                project.getYarnEntities().add(Yarn.builder()
-                        .project(project)
-                        .brand(yr.brand())
-                        .lineName(yr.lineName())
-                        .colorway(yr.colorway())
-                        .dyeLot(yr.dyeLot())
-                        .weight(yr.weight())
-                        .fiberContent(yr.fiberContent())
-                        .quantityUsed(yr.quantityUsed())
-                        .unit(yr.unit() != null ? yr.unit() : "meters")
-                        .build());
-            }
-        }
-        if (request.getHooks() != null) {
-            project.getHookEntities().clear();
-            for (HookRequest hr : request.getHooks()) {
-                if ((hr.sizeMm() == null || hr.sizeMm() <= 0) && (hr.sizeUs() == null || hr.sizeUs().isBlank())) {
-                    throw new BadRequestException("Hook size (mm) or Hook size (US) is required.");
-                }
-                if (hr.sizeMm() != null && hr.sizeMm() <= 0) {
-                    throw new BadRequestException("Hook size (mm) must be a positive number.");
-                }
-                project.getHookEntities().add(Hook.builder()
-                        .project(project)
-                        .sizeMm(hr.sizeMm())
-                        .sizeUs(hr.sizeUs())
-                        .material(hr.material())
-                        .brand(hr.brand())
-                        .build());
-            }
-        }
         if (request.getStatus() != null) project.setStatus(request.getStatus());
         
         project.setRowCount(request.getRowCount());
@@ -394,166 +357,8 @@ public class CrochetService {
         if (request.getTotalTime() != null) project.setTotalTime(request.getTotalTime());
         if (request.getStartDate() != null) project.setStartDate(request.getStartDate());
         if (request.getEndDate() != null) project.setEndDate(request.getEndDate());
-        if (request.getProductPhotos() != null) project.setProductPhotos(request.getProductPhotos());
         if (request.getIsArchive() != null) project.setArchive(request.getIsArchive());
-        syncCoverPhotoPreference(project, request.getCoverPhoto());
  
-        if (request.getPatterns() != null) {
-            List<Pattern> currentPatterns = project.getPatternEntities();
-            List<Pattern> updatedPatterns = new ArrayList<>();
-            
-            for (ProjectPatternRequest pr : request.getPatterns()) {
-                if (pr.patternId() != null && !pr.patternId().isBlank()) {
-                    UUID patternUuid = UUID.fromString(pr.patternId());
-                    Optional<Pattern> existing = currentPatterns.stream()
-                            .filter(p -> p.getPatternId().equals(patternUuid))
-                            .findFirst();
-                    if (existing.isPresent()) {
-                        Pattern ext = existing.get();
-                        ext.setPatternType(pr.patternType());
-                        ext.setPatternContent(pr.patternContent());
-                        ext.setFileName(pr.fileName());
-                        updatedPatterns.add(ext);
-                    } else {
-                        updatedPatterns.add(Pattern.builder()
-                                .project(project)
-                                .patternId(patternUuid)
-                                .patternType(pr.patternType())
-                                .patternContent(pr.patternContent())
-                                .fileName(pr.fileName())
-                                .build());
-                    }
-                } else {
-                    updatedPatterns.add(Pattern.builder()
-                            .project(project)
-                            .patternId(UUID.randomUUID())
-                            .patternType(pr.patternType())
-                            .patternContent(pr.patternContent())
-                            .fileName(pr.fileName())
-                            .build());
-                }
-            }
-            
-            project.getPatternEntities().clear();
-            project.getPatternEntities().addAll(updatedPatterns);
-        }
- 
-        return mapToProjectResponse(projectRepository.save(project));
-    }
-
-
-
-    @Transactional
-    public ProjectResponse patchProject(String userId, String projectId, ProjectPatchRequest request) {
-        Project project = getProjectDetails(userId, projectId);
-        
-        // Date validation
-        String start = request.getStartDate() != null ? request.getStartDate() : project.getStartDate();
-        String end = request.getEndDate() != null ? request.getEndDate() : project.getEndDate();
-        if (start != null && end != null && !start.isBlank() && !end.isBlank()) {
-            if (start.compareTo(end) > 0) {
-                throw new BadRequestException("Start date cannot be after end date");
-            }
-        }
-
-        if (request.getCategoryId() != null) {
-            UUID categoryUuid = UUID.fromString(request.getCategoryId());
-            if (!project.getCategoryId().equals(categoryUuid)) {
-                Category category = categoryRepository.findByCategoryId(categoryUuid)
-                        .orElseThrow(() -> new ResourceNotFoundException("Category not found: " + request.getCategoryId()));
-                String checkName = category.getName().trim().toLowerCase();
-                if (checkName.equals("favourites ❤️") || checkName.equals("favourites")) {
-                    throw new BadRequestException("Projects cannot be moved directly into the Favourites category.");
-                }
-                project.setCategory(category);
-                project.setCategoryId(categoryUuid);
-            }
-        }
-
-        if (request.getTitle() != null) {
-            project.setTitle(request.getTitle());
-        }
-
-        if (request.getYarns() != null) {
-            project.getYarnEntities().clear();
-            for (YarnRequest yr : request.getYarns()) {
-                project.getYarnEntities().add(Yarn.builder()
-                        .project(project)
-                        .brand(yr.brand())
-                        .lineName(yr.lineName())
-                        .colorway(yr.colorway())
-                        .dyeLot(yr.dyeLot())
-                        .weight(yr.weight())
-                        .fiberContent(yr.fiberContent())
-                        .quantityUsed(yr.quantityUsed())
-                        .unit(yr.unit() != null ? yr.unit() : "meters")
-                        .build());
-            }
-        }
-
-        if (request.getHooks() != null) {
-            project.getHookEntities().clear();
-            for (HookRequest hr : request.getHooks()) {
-                if ((hr.sizeMm() == null || hr.sizeMm() <= 0) && (hr.sizeUs() == null || hr.sizeUs().isBlank())) {
-                    throw new BadRequestException("Hook size (mm) or Hook size (US) is required.");
-                }
-                if (hr.sizeMm() != null && hr.sizeMm() <= 0) {
-                    throw new BadRequestException("Hook size (mm) must be a positive number.");
-                }
-                project.getHookEntities().add(Hook.builder()
-                        .project(project)
-                        .sizeMm(hr.sizeMm())
-                        .sizeUs(hr.sizeUs())
-                        .material(hr.material())
-                        .brand(hr.brand())
-                        .build());
-            }
-        }
-
-        if (request.getStatus() != null) {
-            project.setStatus(request.getStatus());
-        }
-
-        if (request.getRowCount() != null) {
-            project.setRowCount(request.getRowCount());
-        }
-
-        if (request.getNotes() != null) {
-            project.setNotes(request.getNotes());
-        }
-
-        if (request.getCareInstructions() != null) {
-            project.setCareInstructions(request.getCareInstructions());
-        }
-
-        if (request.getTotalTime() != null) {
-            project.setTotalTime(request.getTotalTime());
-        }
-
-        if (request.getStartDate() != null) {
-            project.setStartDate(request.getStartDate());
-        }
-
-        if (request.getEndDate() != null) {
-            project.setEndDate(request.getEndDate());
-        }
-
-        if (request.getProductPhotos() != null) {
-            project.setProductPhotos(request.getProductPhotos());
-        }
-
-        if (request.getIsArchive() != null) {
-            project.setArchive(request.getIsArchive());
-        }
-
-        if (request.getProductPhotos() != null || request.getCoverPhoto() != null) {
-            syncCoverPhotoPreference(project, request.getCoverPhoto());
-        }
-
-        if (request.getIsFavorite() != null) {
-            project.setFavorite(request.getIsFavorite());
-        }
-
         return mapToProjectResponse(projectRepository.save(project));
     }
 
@@ -580,9 +385,11 @@ public class CrochetService {
     }
 
     // --- PROGRESS JOURNAL LOGS ---
-    public List<JournalLogResponse> getJournalLogs(String userId, String projectId) {
+    public Page<JournalLogResponse> getJournalLogs(String userId, String projectId, Pageable pageable) {
         Project project = getProjectDetails(userId, projectId);
-        return journalLogRepository.findByProjectId(project.getProjectId()).stream().map(this::mapToJournalLogResponse).collect(Collectors.toList());
+        UUID userUuid = UUID.fromString(userId);
+        return journalLogRepository.findByUserIdAndProjectId(userUuid, project.getProjectId(), pageable)
+                .map(this::mapToJournalLogResponse);
     }
 
     @Transactional
@@ -670,9 +477,16 @@ public class CrochetService {
         return gallery;
     }
 
+    public List<PatternResponse> getProjectPatterns(String userId, String projectId) {
+        Project project = getProjectDetails(userId, projectId);
+        return project.getPatternEntities().stream()
+                .map(this::mapToPatternResponse)
+                .collect(Collectors.toList());
+    }
+
     // --- PROJECT PATTERNS ---
     @Transactional
-    public ProjectResponse addProjectPattern(String userId, String projectId, ProjectPatternRequest request) {
+    public PatternResponse addProjectPattern(String userId, String projectId, ProjectPatternRequest request) {
         Project project = getProjectDetails(userId, projectId);
 
         Pattern pattern = Pattern.builder()
@@ -684,9 +498,7 @@ public class CrochetService {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        project.getPatternEntities().add(pattern);
-        projectRepository.save(project);
-        return mapToProjectResponse(getProjectDetails(userId, projectId));
+        return mapToPatternResponse(patternRepository.save(pattern));
     }
 
     // Validators to check project context & ownership and prevent orphans
@@ -757,7 +569,7 @@ public class CrochetService {
     }
 
     @Transactional
-    public ProjectResponse updateProjectPattern(String userId, String patternId, ProjectPatternRequest request) {
+    public PatternResponse updateProjectPattern(String userId, String patternId, ProjectPatternRequest request) {
         Pattern pattern = getValidatedPattern(userId, patternId);
         pattern.setFileName(request.fileName());
         if (request.patternContent() != null) {
@@ -766,18 +578,16 @@ public class CrochetService {
         if (request.patternType() != null) {
             pattern.setPatternType(request.patternType());
         }
-        patternRepository.save(pattern);
-        return mapToProjectResponse(pattern.getProject());
+        return mapToPatternResponse(patternRepository.save(pattern));
     }
 
     @Transactional
-    public ProjectResponse deleteProjectPattern(String userId, String patternId) {
+    public void deleteProjectPattern(String userId, String patternId) {
         Pattern pattern = getValidatedPattern(userId, patternId);
         Project project = pattern.getProject();
         project.getPatternEntities().remove(pattern);
         projectRepository.save(project);
         patternRepository.delete(pattern);
-        return mapToProjectResponse(project);
     }
 
     // --- SUB-RESOURCES CRUD (Yarns, Hooks, Photos) ---
@@ -823,19 +633,7 @@ public class CrochetService {
         return mapToYarnResponse(yarnRepository.save(yarn));
     }
 
-    @Transactional
-    public YarnResponse patchYarn(String userId, Long yarnId, YarnRequest request) {
-        Yarn yarn = getValidatedYarn(userId, yarnId);
-        if (request.brand() != null) yarn.setBrand(request.brand());
-        if (request.lineName() != null) yarn.setLineName(request.lineName());
-        if (request.colorway() != null) yarn.setColorway(request.colorway());
-        if (request.dyeLot() != null) yarn.setDyeLot(request.dyeLot());
-        if (request.weight() != null) yarn.setWeight(request.weight());
-        if (request.fiberContent() != null) yarn.setFiberContent(request.fiberContent());
-        if (request.quantityUsed() != null) yarn.setQuantityUsed(request.quantityUsed());
-        if (request.unit() != null) yarn.setUnit(request.unit());
-        return mapToYarnResponse(yarnRepository.save(yarn));
-    }
+
 
     @Transactional
     public void deleteYarn(String userId, Long yarnId) {
@@ -879,15 +677,7 @@ public class CrochetService {
         return mapToHookResponse(hookRepository.save(hook));
     }
 
-    @Transactional
-    public HookResponse patchHook(String userId, Long hookId, HookRequest request) {
-        Hook hook = getValidatedHook(userId, hookId);
-        if (request.sizeMm() != null) hook.setSizeMm(request.sizeMm());
-        if (request.sizeUs() != null) hook.setSizeUs(request.sizeUs());
-        if (request.material() != null) hook.setMaterial(request.material());
-        if (request.brand() != null) hook.setBrand(request.brand());
-        return mapToHookResponse(hookRepository.save(hook));
-    }
+
 
     @Transactional
     public void deleteHook(String userId, Long hookId) {
@@ -913,6 +703,23 @@ public class CrochetService {
                 .createdAt(LocalDateTime.now())
                 .build();
         return mapToPhotoResponse(photoRepository.save(photo));
+    }
+
+    @Transactional
+    public PhotoResponse updatePhoto(String userId, String projectId, PhotoUpdateRequest request) {
+        Project project = getProjectDetails(userId, projectId);
+        Photo photo = getValidatedPhoto(userId, request.id());
+        
+        if (request.isCover()) {
+            syncCoverPhotoPreference(project, String.valueOf(request.id()));
+        } else {
+            photo.setCover(false);
+            photoRepository.save(photo);
+            syncCoverPhotoPreference(project, null);
+        }
+        
+        projectRepository.save(project);
+        return mapToPhotoResponse(photoRepository.findById(request.id()).orElse(photo));
     }
 
     public PhotoResponse getPhotoDetails(String userId, Long photoId) {
@@ -1170,11 +977,30 @@ public class CrochetService {
             project.getEndDate(),
             project.isFavorite(),
             project.isArchive(),
+            project.getCreatedAt(),
+            project.getUpdatedAt()
+        );
+    }
+
+    private ProjectFullResponse mapToProjectFullResponse(Project project) {
+        return new ProjectFullResponse(
+            project.getProjectId(),
+            project.getUserId(),
+            project.getCategoryId(),
+            project.getTitle(),
+            project.getStatus(),
+            project.getRowCount(),
+            project.getNotes(),
+            project.getCareInstructions(),
+            project.getTotalTime(),
+            project.getStartDate(),
+            project.getEndDate(),
+            project.isFavorite(),
+            project.isArchive(),
             project.getYarnEntities().stream().map(this::mapToYarnResponse).collect(Collectors.toList()),
             project.getHookEntities().stream().map(this::mapToHookResponse).collect(Collectors.toList()),
             project.getPhotoEntities().stream().map(this::mapToPhotoResponse).collect(Collectors.toList()),
             project.getPatternEntities().stream().map(this::mapToPatternResponse).collect(Collectors.toList()),
-            project.getProductPhotos(),
             project.getCreatedAt(),
             project.getUpdatedAt()
         );

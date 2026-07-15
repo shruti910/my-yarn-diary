@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/v1")
@@ -21,8 +23,15 @@ public class PatternController {
         this.crochetService = crochetService;
     }
 
+    @GetMapping("/projects/{projectId}/patterns")
+    public ResponseEntity<List<PatternResponse>> getProjectPatterns(@RequestHeader("X-User-Id") String userId,
+            @PathVariable String projectId) {
+        log.info("Fetching patterns for projectId: {} and user: {}", projectId, userId);
+        return ResponseEntity.ok(crochetService.getProjectPatterns(userId, projectId));
+    }
+
     @PostMapping("/projects/{projectId}/patterns")
-    public ResponseEntity<ProjectResponse> addProjectPattern(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<PatternResponse> addProjectPattern(@RequestHeader("X-User-Id") String userId,
             @PathVariable String projectId,
             @RequestBody ProjectPatternRequest request) {
         log.info("Adding pattern of type: {} to projectId: {}", request.patternType(), projectId);
@@ -31,7 +40,7 @@ public class PatternController {
     }
 
     @PutMapping("/patterns/{patternId}")
-    public ResponseEntity<ProjectResponse> updateProjectPattern(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<PatternResponse> updateProjectPattern(@RequestHeader("X-User-Id") String userId,
             @PathVariable String patternId,
             @RequestBody ProjectPatternRequest request) {
         log.info("Updating patternId: {} for user: {}", patternId, userId);
@@ -39,9 +48,10 @@ public class PatternController {
     }
 
     @DeleteMapping("/patterns/{patternId}")
-    public ResponseEntity<ProjectResponse> deleteProjectPattern(@RequestHeader("X-User-Id") String userId,
+    public ResponseEntity<Void> deleteProjectPattern(@RequestHeader("X-User-Id") String userId,
             @PathVariable String patternId) {
         log.info("Deleting patternId: {} for user: {}", patternId, userId);
-        return ResponseEntity.ok(crochetService.deleteProjectPattern(userId, patternId));
+        crochetService.deleteProjectPattern(userId, patternId);
+        return ResponseEntity.noContent().build();
     }
 }

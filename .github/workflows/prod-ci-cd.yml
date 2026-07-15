@@ -1,0 +1,97 @@
+name: My Yarn Diary - Prod CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  # JOB 1: Detect path changes across the monorepo structure
+  path-filter:
+    name: Detect Code Adjustments
+    runs-on: ubuntu-latest
+    outputs:
+      java_backend: ${{ steps.filter.outputs.java_backend }}
+      react_frontend: ${{ steps.filter.outputs.react_frontend }}
+      infra: ${{ steps.filter.outputs.infra }}
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4.2.2
+
+      - name: Run Path Differential Filter
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            java_backend: 'backend/**'
+            react_frontend: 'frontend/**'
+            infra: |
+              - 'docker-compose.yml'
+              - '.github/workflows/**'
+
+  # JOB 2: Validate Infrastructure & Docker Composites
+  infra-validation:
+    name: Infrastructure Config Verification
+    needs: path-filter
+    if: |
+      needs.path-filter.outputs.infra == 'true' ||
+      needs.path-filter.outputs.java_backend == 'true' ||
+      needs.path-filter.outputs.react_frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4.2.2
+
+      - name: Validate Docker Compose Configuration Syntax
+        run: |
+          # Dry-runs and parses your yaml orchestration settings to verify network/volume bindings
+          docker compose config
+
+  # JOB 3: Test and Compile Java Microservices & Gateway
+  java-backend-validation:
+    name: Java Services Build
+    needs: path-filter
+    if: needs.path-filter.outputs.java_backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4.4.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Execute Maven Package
+        run: |
+          cd backend
+          mvn clean package -DskipTests=false
+
+  # JOB 4: Test and Verify React Frontend Application
+  frontend-validation:
+    name: Frontend Client Build
+    needs: path-filter
+    if: needs.path-filter.outputs.react_frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up Node.js for Frontend
+        uses: actions/setup-node@v4.2.0
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Production Compilation Check
+        run: |
+          cd frontend
+          npm run build --if-present

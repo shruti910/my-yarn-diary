@@ -8,6 +8,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+
 import java.util.List;
 
 @Slf4j
@@ -24,10 +29,14 @@ public class JournalLogController {
     }
 
     @GetMapping("/projects/{projectId}/logs")
-    public ResponseEntity<List<JournalLogResponse>> getJournalLogs(@RequestHeader("X-User-Id") String userId,
-            @PathVariable String projectId) {
-        log.info("Fetching journal logs for projectId: {} and user: {}", projectId, userId);
-        return ResponseEntity.ok(crochetService.getJournalLogs(userId, projectId));
+    public ResponseEntity<PagedResponse<JournalLogResponse>> getJournalLogs(
+            @RequestHeader("X-User-Id") String userId,
+            @PathVariable String projectId,
+            @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        log.info("Fetching paginated journal logs for projectId: {} and user: {}, pageable: {}",
+                projectId, userId, pageable);
+        Page<JournalLogResponse> result = crochetService.getJournalLogs(userId, projectId, pageable);
+        return ResponseEntity.ok(PagedResponse.fromPage(result));
     }
 
     @PostMapping("/projects/{projectId}/logs")

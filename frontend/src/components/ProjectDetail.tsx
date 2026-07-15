@@ -38,7 +38,7 @@ interface ProjectDetailProps {
   categories: Category[];
   token: string;
   onBack: () => void;
-  onUpdateProject: (updates: Partial<Project> & { coverPhoto?: string | null }) => Promise<any>;
+  onUpdateProject: (updates: Partial<Project>) => Promise<any>;
   onUpdateProjectState: (updatedProject: Project) => void;
   onToggleFavorite: (projectId: string) => void;
   onDeleteProject: (projectId: string) => void;
@@ -63,6 +63,10 @@ export function ProjectDetail({
   onUpdateCrochetTerminology
 }: ProjectDetailProps) {
   const [logs, setLogs] = useState<JournalLog[]>([]);
+  const [logsPage, setLogsPage] = useState(0);
+  const [logsPageSize, setLogsPageSize] = useState(5);
+  const [logsTotalPages, setLogsTotalPages] = useState(0);
+  const [logsTotalElements, setLogsTotalElements] = useState(0);
   const [textEntry, setTextEntry] = useState('');
   const [logImage, setLogImage] = useState<string | null>(null);
   const [logImageMime, setLogImageMime] = useState('');
@@ -82,7 +86,7 @@ export function ProjectDetail({
   const [targetCategoryId, setTargetCategoryId] = useState(project.categoryId);
   const [startDate, setStartDate] = useState(project.startDate || '');
   const [endDate, setEndDate] = useState(project.endDate || '');
-  const [productPhotos, setProductPhotos] = useState<string[]>(project.productPhotos || []);
+  const [productPhotos, setProductPhotos] = useState<string[]>((project.photos || []).map(p => p.photoBase64));
   const initialCoverPhotoId = project.photos?.find(p => p.isCover)?.id;
   const [coverPhoto, setCoverPhoto] = useState<string | null>(initialCoverPhotoId ? String(initialCoverPhotoId) : null);
   const [careInstructions, setCareInstructions] = useState(project.careInstructions || '');
@@ -98,6 +102,7 @@ export function ProjectDetail({
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const autoSaveTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFetchedLogsRef = React.useRef<{ projectId: string; page: number; size: number } | null>(null);
   const [activeTab, setActiveTab] = useState<'journal' | 'pattern'>('journal');
 
   const isDateRangeInvalid = !!(startDate && endDate && startDate > endDate);
@@ -111,7 +116,7 @@ export function ProjectDetail({
     setTargetCategoryId(project.categoryId);
     setStartDate(project.startDate || '');
     setEndDate(project.endDate || '');
-    setProductPhotos(project.productPhotos || []);
+    setProductPhotos((project.photos || []).map(p => p.photoBase64));
     setCareInstructions(project.careInstructions || '');
     setTotalTime(project.totalTime || '');
     const coverId = project.photos?.find(p => p.isCover)?.id;
@@ -127,7 +132,7 @@ export function ProjectDetail({
     project.yarns?.map(y => `${y.brand}:${y.lineName}:${y.colorway}:${y.quantityUsed}`).join(','),
     project.hooks?.map(h => `${h.sizeMm}:${h.sizeUs}:${h.material}`).join(','),
     project.photos?.map(p => `${p.id}:${p.isCover}`).join(','),
-    project.productPhotos?.join(',')
+    project.photos?.map(p => p.photoBase64).join(',')
   ]);
 
   const fetchWithToken = async (url: string, options: RequestInit = {}) => {
@@ -187,22 +192,63 @@ export function ProjectDetail({
     }
   };
 
-  const loadLogs = async () => {
+  const loadLogs = async (targetPage = logsPage, targetSize = logsPageSize, forceReload = false) => {
+    if (
+      !forceReload &&
+      lastFetchedLogsRef.current &&
+      lastFetchedLogsRef.current.projectId === project.projectId &&
+      lastFetchedLogsRef.current.page === targetPage &&
+      lastFetchedLogsRef.current.size === targetSize
+    ) {
+      return;
+    }
+    lastFetchedLogsRef.current = { projectId: project.projectId, page: targetPage, size: targetSize };
     try {
-      const data = await fetchWithToken(`/api/v1/projects/${project.projectId}/logs`);
-      if (data) {
-        const sorted = (data as JournalLog[]).sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
-        setLogs(sorted);
+      const data = await fetchWithToken(`/api/v1/projects/${project.projectId}/logs?page=${targetPage}&size=${targetSize}&sort=createdAt,desc`);
+      if (data && data.content) {
+        setLogs(data.content);
+        setLogsTotalPages(data.totalPages);
+        setLogsTotalElements(data.totalElements);
+        setLogsPage(data.number);
+        setLogsPageSize(data.size);
       }
     } catch (err) {
       console.error('Failed to load journal progression logs:', err);
     }
   };
 
+  const fetchPhotos = async () => {
+    try {
+      const photosData = await fetchWithToken(`/api/v1/projects/${project.projectId}/photos`);
+      if (photosData) {
+        onUpdateProjectState({
+          ...project,
+          photos: photosData
+        });
+        setProductPhotos(photosData.map((p: any) => p.photoBase64));
+        const coverId = photosData.find(p => p.isCover)?.id;
+        setCoverPhoto(coverId ? String(coverId) : null);
+      }
+    } catch (err) {
+      console.error('Failed to fetch photos:', err);
+    }
+  };
+
   useEffect(() => {
-    if (!token) return;
-    loadLogs();
-  }, [project.projectId, token]);
+    if (!token || project.isNewProject) return;
+    loadLogs(logsPage, logsPageSize);
+  }, [project.projectId, token, logsPage, logsPageSize, project.isNewProject]);
+
+  useEffect(() => {
+    if (!token || project.isNewProject) return;
+    if (project.photos !== undefined) {
+      setProductPhotos(project.photos.map(p => p.photoBase64));
+      const coverId = project.photos.find(p => p.isCover)?.id;
+      setCoverPhoto(coverId ? String(coverId) : null);
+    } else {
+      fetchPhotos();
+    }
+  }, [project.projectId, token, project.isNewProject, project.photos]);
 
   const handleFieldChange = () => {
     setIsSaved(false);
@@ -241,17 +287,13 @@ export function ProjectDetail({
       try {
         await onUpdateProject({
           title: capitalized,
-          yarns,
-          hooks,
           status,
           notes,
           categoryId: targetCategoryId,
           startDate,
           endDate,
           careInstructions,
-          totalTime,
-          productPhotos,
-          coverPhoto
+          totalTime
         });
         setTitle(capitalized);
         setIsSaved(true);
@@ -324,17 +366,13 @@ export function ProjectDetail({
     try {
       await onUpdateProject({
         title: capitalized,
-        yarns,
-        hooks,
         status,
         notes,
         categoryId: targetCategoryId,
         startDate,
         endDate,
         careInstructions,
-        totalTime,
-        productPhotos,
-        coverPhoto
+        totalTime
       });
       setTitle(capitalized);
       setIsSaved(true);
@@ -360,8 +398,7 @@ export function ProjectDetail({
           startDate,
           endDate,
           careInstructions,
-          totalTime,
-          productPhotos
+          totalTime
         },
         logs,
         activeCategory?.name || 'General',
@@ -459,16 +496,28 @@ export function ProjectDetail({
       const results = await Promise.all(filesToProcess.map(file => processFile(file)));
       const validResults = results.filter(res => res !== '');
       if (validResults.length > 0) {
-        setProductPhotos(prev => {
-          const updated = [...prev, ...validResults];
-          setIsSaved(false);
-          return updated;
-        });
+        
+        for (const res of validResults) {
+          await fetchWithToken(`/api/v1/projects/${project.projectId}/photos`, {
+            method: 'POST',
+            body: res
+          });
+        }
+        
+        const photosData = await fetchWithToken(`/api/v1/projects/${project.projectId}/photos`);
+        if (photosData) {
+          onUpdateProjectState({
+            ...project,
+            photos: photosData
+          });
+          setProductPhotos(photosData.map((p: any) => p.photoBase64));
+        }
+
         if (status !== ProjectStatus.Completed) {
           const confirmed = await showConfirm('Do you want to move this project to the "Completed" stage?');
           if (confirmed) {
             setStatus(ProjectStatus.Completed);
-            setIsSaved(false);
+            onUpdateProject({ status: ProjectStatus.Completed });
           }
         }
       }
@@ -480,17 +529,34 @@ export function ProjectDetail({
     }
   };
 
-  const removeProductPhoto = (index: number) => {
+  const removeProductPhoto = async (index: number) => {
     const photoBase64 = productPhotos[index];
-    setProductPhotos(prev => {
-      const updated = prev.filter((_, i) => i !== index);
-      setIsSaved(false);
-      const photoObj = project.photos?.find(p => p.photoBase64 === photoBase64);
-      if (photoObj && (coverPhoto === String(photoObj.id) || coverPhoto === photoBase64)) {
+    const photoObj = project.photos?.find(p => p.photoBase64 === photoBase64);
+    
+    if (photoObj) {
+      try {
+        await fetchWithToken(`/api/v1/photos/${photoObj.id}`, { method: 'DELETE' });
+        const photosData = await fetchWithToken(`/api/v1/projects/${project.projectId}/photos`);
+        if (photosData) {
+          onUpdateProjectState({
+            ...project,
+            photos: photosData
+          });
+          setProductPhotos(photosData.map((p: any) => p.photoBase64));
+        }
+        
+        if (coverPhoto === String(photoObj.id) || coverPhoto === photoBase64) {
+          setCoverPhoto(null);
+        }
+      } catch (err) {
+        console.error('Failed to delete photo:', err);
+      }
+    } else {
+      setProductPhotos(prev => prev.filter((_, i) => i !== index));
+      if (coverPhoto === photoBase64) {
         setCoverPhoto(null);
       }
-      return updated;
-    });
+    }
   };
 
   const incrementRow = async (amount: number) => {
@@ -591,6 +657,7 @@ export function ProjectDetail({
         setTextEntry('');
         setLogImage(null);
         setLogImageBase64(null);
+        loadLogs(0, logsPageSize, true);
       }
     } catch (err) {
       console.error('Failed to append progress log:', err);
@@ -605,6 +672,7 @@ export function ProjectDetail({
     try {
       await fetchWithToken(`/api/v1/logs/${logId}`, { method: 'DELETE' });
       setLogs(prev => prev.filter(l => l.logId !== logId));
+      loadLogs(0, logsPageSize, true);
     } catch (err) {
       console.error('Failed to delete log entry:', err);
     }
@@ -999,16 +1067,20 @@ export function ProjectDetail({
 
               <div className="pt-4 border-t border-[#FDFCFB]">
                 <YarnManager
-                  yarns={yarns}
-                  onChange={(newYarns) => { setYarns(newYarns); handleFieldChange(); }}
+                  projectId={project.projectId}
+                  initialYarns={project.yarns}
+                  isNewProject={project.isNewProject}
+                  fetchWithToken={fetchWithToken}
                   disabled={isSubmitting}
                 />
               </div>
 
               <div className="pt-4 border-t border-[#FDFCFB]">
                 <HookManager
-                  hooks={hooks}
-                  onChange={(newHooks) => { setHooks(newHooks); handleFieldChange(); }}
+                  projectId={project.projectId}
+                  initialHooks={project.hooks}
+                  isNewProject={project.isNewProject}
+                  fetchWithToken={fetchWithToken}
                   disabled={isSubmitting}
                 />
               </div>
@@ -1123,9 +1195,18 @@ export function ProjectDetail({
                       {productPhotos.length > 1 && (
                         <button
                           type="button"
-                          onClick={() => {
-                            setCoverPhoto(matchedPhoto ? String(matchedPhoto.id) : photo);
-                            setIsSaved(false);
+                          onClick={async () => {
+                            if (matchedPhoto) {
+                              try {
+                                await fetchWithToken(`/api/v1/projects/${project.projectId}/photos`, {
+                                  method: 'PUT',
+                                  body: JSON.stringify({ id: matchedPhoto.id, isCover: true })
+                                });
+                                await fetchPhotos();
+                              } catch (err) {
+                                console.error('Failed to update cover photo:', err);
+                              }
+                            }
                           }}
                           className={`absolute bottom-1 left-1 p-1 rounded-lg text-[9px] font-extrabold transition-all flex items-center gap-0.5 shadow-xs cursor-pointer ${
                             isCover
@@ -1330,7 +1411,8 @@ export function ProjectDetail({
                     <p className="text-xs text-[#A89F94] font-semibold">No progress logs filed yet. Document row milestones and attach snaps to build a gorgeous pattern project history.</p>
                   </div>
                 ) : (
-                  <div className="space-y-4 animate-fade-in">
+                  <>
+                    <div className="space-y-4 animate-fade-in">
                     {logs.map((log) => (
                       <div
                         key={log.logId}
@@ -1372,8 +1454,54 @@ export function ProjectDetail({
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
+                  
+                  {/* Logs Pagination Controls */}
+                  {logsTotalPages > 1 && (
+                    <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#FDFCFB] border border-[#E8E2D9] rounded-2xl p-4">
+                      <span className="text-xs text-[#7C7167] font-semibold">
+                        Showing <span className="font-extrabold text-[#2D231B]">{logsPage * logsPageSize + 1}</span> to{' '}
+                        <span className="font-extrabold text-[#2D231B]">
+                          {Math.min((logsPage + 1) * logsPageSize, logsTotalElements)}
+                        </span>{' '}
+                        of <span className="font-extrabold text-[#2D231B]">{logsTotalElements}</span> entries
+                      </span>
+                      
+                      <div className="flex items-center gap-1">
+                        <button
+                          disabled={logsPage === 0}
+                          onClick={() => setLogsPage(logsPage - 1)}
+                          className="p-1.5 px-2.5 border border-[#E8E2D9] rounded-lg text-[#7C7167] hover:text-[#2D231B] hover:bg-[#F9F6F2] disabled:opacity-40 disabled:hover:bg-transparent transition-all text-xs font-bold cursor-pointer"
+                        >
+                          Prev
+                        </button>
+                        
+                        {Array.from({ length: logsTotalPages }, (_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setLogsPage(i)}
+                            className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              logsPage === i
+                                ? 'bg-[#F28482] text-white'
+                                : 'border border-[#E8E2D9] text-[#7C7167] hover:text-[#2D231B] hover:bg-[#F9F6F2]'
+                            }`}
+                          >
+                            {i + 1}
+                          </button>
+                        ))}
+                        
+                        <button
+                          disabled={logsPage === logsTotalPages - 1}
+                          onClick={() => setLogsPage(logsPage + 1)}
+                          className="p-1.5 px-2.5 border border-[#E8E2D9] rounded-lg text-[#7C7167] hover:text-[#2D231B] hover:bg-[#F9F6F2] disabled:opacity-40 disabled:hover:bg-transparent transition-all text-xs font-bold cursor-pointer"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
             </>
           ) : (
             <PatternViewer 

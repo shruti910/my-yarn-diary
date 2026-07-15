@@ -22,6 +22,10 @@ spring:
     enabled: true
     baseline-on-migrate: true
 
+internal:
+  jwt:
+    secret: ${INTERNAL_JWT_SECRET}
+
 logging:
   include-application-name: true
   structured:

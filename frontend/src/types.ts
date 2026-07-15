@@ -27,6 +27,7 @@ export enum ProjectStatus {
 }
 
 export interface Yarn {
+  yarnId?: number;
   brand?: string;
   lineName?: string;
   colorway?: string;
@@ -38,6 +39,7 @@ export interface Yarn {
 }
 
 export interface Hook {
+  hookId?: number;
   sizeMm: number;
   sizeUs?: string;
   material?: string;
@@ -65,7 +67,6 @@ export interface Project {
   notes?: string;
   startDate?: string;
   endDate?: string;
-  productPhotos?: string[];
   careInstructions?: string;
   totalTime?: string;
   isFavorite?: boolean;
@@ -73,6 +74,8 @@ export interface Project {
   updatedAt?: string;
   patterns?: Pattern[];
   photos?: PhotoResponse[];
+  base64CoverPhoto?: string;
+  isNewProject?: boolean;
 }
 
 export interface PhotoResponse {
@@ -95,9 +98,10 @@ export interface JournalLog {
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
-  text: string;
+  text?: string | null;
   imageData?: string;
   createdAt: string;
+  errorMessage?: string;
 }
 
 export type ChatCategory = 'crochet-buddy' | 'pattern-decoder' | 'reverse-engineer' | 'image-generator' | 'crochet-tutor';
