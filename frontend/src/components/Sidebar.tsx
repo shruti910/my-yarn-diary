@@ -29,7 +29,7 @@ const capitalizeWords = (str: string): string => {
 };
 
 const isValidName = (str: string): boolean => {
-  return /^[ \p{L}\p{N}\-_()#.]+$/u.test(str) && /[\p{L}\p{N}]/u.test(str);
+  return /^[ \p{L}\p{N}\-_()#.\p{Emoji}\p{Extended_Pictographic}\p{M}\p{Cf}]+$/u.test(str) && /[\p{L}\p{N}\p{Emoji}\p{Extended_Pictographic}]/u.test(str);
 };
 
 const isStockOrEmptyAvatar = (url?: string): boolean => {
@@ -307,8 +307,13 @@ export function Sidebar({
     if (!trimmed || isSubmitting) return;
 
     const capitalized = capitalizeWords(trimmed);
+    const norm = capitalized.toLowerCase();
+    if (norm === 'default' || norm === 'favourites ❤️') {
+      await showAlert(`"${capitalized}" is a reserved category name.`);
+      return;
+    }
     if (!isValidName(capitalized)) {
-      await showAlert('Category name can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, and brackets.');
+      await showAlert('Category name can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, parentheses, and emojis.');
       return;
     }
 
@@ -336,8 +341,13 @@ export function Sidebar({
     if (!trimmed || isSubmitting) return;
 
     const capitalized = capitalizeWords(trimmed);
+    const norm = capitalized.toLowerCase();
+    if (norm === 'default' || norm === 'favourites ❤️') {
+      await showAlert(`"${capitalized}" is a reserved category name.`);
+      return;
+    }
     if (!isValidName(capitalized)) {
-      await showAlert('Category name can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, and brackets.');
+      await showAlert('Category name can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, parentheses, and emojis.');
       return;
     }
 
@@ -533,7 +543,7 @@ export function Sidebar({
             const isActive = catId === activeCategoryId;
             const isSystem = cat.userId === 'all';
             const isDefaultFold = cat.name.trim().toLowerCase() === 'default';
-            const isFavouritesFold = cat.name.trim().toLowerCase() === 'favourites ❤️' || cat.name.trim().toLowerCase() === 'favourites';
+            const isFavouritesFold = cat.name === 'Favourites ❤️';
             const isProtected = isDefaultFold || isFavouritesFold;
             const isEditing = catId === editingCategoryId;
 

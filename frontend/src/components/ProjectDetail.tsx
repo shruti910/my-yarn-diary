@@ -29,7 +29,7 @@ const capitalizeWords = (str: string): string => {
 };
 
 const isValidName = (str: string): boolean => {
-  return /^[ \p{L}\p{N}\-_()#.]+$/u.test(str) && /[\p{L}\p{N}]/u.test(str);
+  return /^[ \p{L}\p{N}\-_()#.\p{Emoji}\p{Extended_Pictographic}\p{M}\p{Cf}]+$/u.test(str) && /[\p{L}\p{N}\p{Emoji}\p{Extended_Pictographic}]/u.test(str);
 };
 
 
@@ -345,7 +345,7 @@ export function ProjectDetail({
 
     const capitalized = capitalizeWords(trimmed);
     if (!isValidName(capitalized)) {
-      await showAlert('Project name can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, and brackets.');
+      await showAlert('Project name can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, parentheses, and emojis.');
       return;
     }
 
@@ -1055,8 +1055,7 @@ export function ProjectDetail({
                   className="w-full bg-[#FDFCFB] border border-[#E8E2D9] text-xs p-2.5 rounded-xl text-[#2D231B] focus:outline-none focus:border-[#F28482] focus:ring-1 focus:ring-[#F28482] font-semibold disabled:opacity-60"
                 >
                   {categories.filter(cat => {
-                    const norm = cat.name.trim().toLowerCase();
-                    return norm !== 'favourites ❤️' && norm !== 'favourites';
+                    return cat.name !== 'Favourites ❤️';
                   }).map((cat) => (
                     <option key={cat.categoryId} value={cat.categoryId}>
                       {cat.name}

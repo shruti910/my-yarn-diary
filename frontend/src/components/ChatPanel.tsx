@@ -273,7 +273,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
   };
 
   const isValidName = (str: string): boolean => {
-    return /^[ \p{L}\p{N}\-_()#.]+$/u.test(str) && /[\p{L}\p{N}]/u.test(str);
+    return /^[ \p{L}\p{N}\-_()#.\p{Emoji}\p{Extended_Pictographic}\p{M}\p{Cf}]+$/u.test(str) && /[\p{L}\p{N}\p{Emoji}\p{Extended_Pictographic}]/u.test(str);
   };
 
   const submitCreateChat = async () => {
@@ -285,7 +285,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
 
     const capitalized = capitalizeWords(trimmed);
     if (!isValidName(capitalized)) {
-      await showAlert('Session title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, and brackets.');
+      await showAlert('Session title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, parentheses, and emojis.');
       return;
     }
 
@@ -345,7 +345,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
 
     const capitalized = capitalizeWords(trimmed);
     if (!isValidName(capitalized)) {
-      await showAlert('Session title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, and brackets.');
+      await showAlert('Session title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, parentheses, and emojis.');
       return;
     }
 
@@ -413,7 +413,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
 
     const capitalized = capitalizeWords(trimmed);
     if (!isValidName(capitalized)) {
-      await showAlert('Session title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, and brackets.');
+      await showAlert('Session title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, parentheses, and emojis.');
       return;
     }
 
@@ -546,7 +546,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
       const textForTitle = userText.trim();
       if (textForTitle) {
         const rawTitle = textForTitle.length > 30 ? textForTitle.substring(0, 30) + '...' : textForTitle;
-        const cleaned = rawTitle.replace(/[^\p{L}\p{N}\s\-_()#.]/gu, '').trim();
+        const cleaned = rawTitle.replace(/[^\p{L}\p{N}\s\-_()#.\p{Emoji}\p{Extended_Pictographic}]/gu, '').trim();
         if (cleaned) {
           defaultTitle = cleaned;
         }
