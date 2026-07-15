@@ -27,6 +27,7 @@ export enum ProjectStatus {
 }
 
 export interface Yarn {
+  yarnId?: number;
   brand?: string;
   lineName?: string;
   colorway?: string;
@@ -38,6 +39,7 @@ export interface Yarn {
 }
 
 export interface Hook {
+  hookId?: number;
   sizeMm: number;
   sizeUs?: string;
   material?: string;
@@ -73,6 +75,7 @@ export interface Project {
   updatedAt?: string;
   patterns?: Pattern[];
   photos?: PhotoResponse[];
+  isNewProject?: boolean;
 }
 
 export interface PhotoResponse {

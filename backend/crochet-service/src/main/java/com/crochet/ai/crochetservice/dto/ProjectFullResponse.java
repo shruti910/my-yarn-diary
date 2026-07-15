@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-public record ProjectResponse(
+public record ProjectFullResponse(
     UUID projectId,
     UUID userId,
     UUID categoryId,
@@ -19,6 +19,11 @@ public record ProjectResponse(
     String endDate,
     boolean isFavorite,
     boolean isArchive,
+    List<YarnResponse> yarns,
+    List<HookResponse> hooks,
+    List<PhotoResponse> photos,
+    List<PatternResponse> patterns,
+    List<String> productPhotos,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {}

@@ -56,6 +56,13 @@ public class ProjectController {
         return ResponseEntity.ok(crochetService.getProjectDetailsResponse(userId, projectId));
     }
 
+    @GetMapping("/{projectId}/full")
+    public ResponseEntity<ProjectFullResponse> getProjectFullDetails(@RequestHeader("X-User-Id") String userId,
+            @PathVariable String projectId) {
+        log.info("Fetching full project details for projectId: {} and user: {}", projectId, userId);
+        return ResponseEntity.ok(crochetService.getProjectFullDetailsResponse(userId, projectId));
+    }
+
     @PostMapping
     public ResponseEntity<ProjectResponse> createProject(@RequestHeader("X-User-Id") String userId,
             @RequestBody ProjectRequest request) {
@@ -73,12 +80,11 @@ public class ProjectController {
         return ResponseEntity.ok(crochetService.updateProject(userId, projectId, request));
     }
 
-    @PatchMapping("/{projectId}")
-    public ResponseEntity<ProjectResponse> patchProject(@RequestHeader("X-User-Id") String userId,
-            @PathVariable String projectId,
-            @RequestBody ProjectPatchRequest request) {
-        log.info("Patching projectId: {} for user: {}", projectId, userId);
-        return ResponseEntity.ok(crochetService.patchProject(userId, projectId, request));
+    @PostMapping("/{projectId}/favorite")
+    public ResponseEntity<ProjectResponse> toggleFavoriteProject(@RequestHeader("X-User-Id") String userId,
+            @PathVariable String projectId) {
+        log.info("Toggling favorite status for projectId: {} for user: {}", projectId, userId);
+        return ResponseEntity.ok(crochetService.toggleFavoriteProject(userId, projectId));
     }
 
     @DeleteMapping("/{projectId}")

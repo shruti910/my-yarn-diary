@@ -1,29 +1,88 @@
-import React from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Trash2, Save, Loader2 } from 'lucide-react';
 import { Hook } from '../types';
 
 interface HookManagerProps {
-  hooks: Hook[];
-  onChange: (hooks: Hook[]) => void;
+  projectId: string;
+  initialHooks?: Hook[];
+  isNewProject?: boolean;
+  fetchWithToken: (url: string, options?: RequestInit) => Promise<any>;
   disabled?: boolean;
 }
 
-export function HookManager({ hooks, onChange, disabled }: HookManagerProps) {
-  const addHook = () => {
-    onChange([...hooks, { sizeMm: 4.0, sizeUs: '', material: '', brand: '' }]);
+export function HookManager({ projectId, initialHooks, isNewProject, fetchWithToken, disabled }: HookManagerProps) {
+  const [hooks, setHooks] = useState<Hook[]>(initialHooks || []);
+  const [isLoading, setIsLoading] = useState(!initialHooks || initialHooks.length === 0);
+  const [savingId, setSavingId] = useState<number | null>(null);
+
+  const fetchHooks = async () => {
+    try {
+      const data = await fetchWithToken(`/api/v1/projects/${projectId}/hooks`);
+      setHooks(data || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const removeHook = (index: number) => {
-    const newHooks = [...hooks];
-    newHooks.splice(index, 1);
-    onChange(newHooks);
+  useEffect(() => {
+    if (isNewProject) {
+      setHooks([]);
+      setIsLoading(false);
+    } else if (initialHooks && initialHooks.length > 0) {
+      setHooks(initialHooks);
+      setIsLoading(false);
+    } else {
+      fetchHooks();
+    }
+  }, [projectId, isNewProject, initialHooks]);
+
+  const addHook = async () => {
+    try {
+      const newHook = { sizeMm: 4.0, sizeUs: '', material: '', brand: '' };
+      await fetchWithToken(`/api/v1/projects/${projectId}/hooks`, {
+        method: 'POST',
+        body: JSON.stringify(newHook)
+      });
+      fetchHooks();
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const updateHook = (index: number, field: keyof Hook, value: any) => {
+  const removeHook = async (hookId: number) => {
+    try {
+      await fetchWithToken(`/api/v1/hooks/${hookId}`, { method: 'DELETE' });
+      fetchHooks();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const updateHookState = (index: number, field: keyof Hook, value: any) => {
     const newHooks = [...hooks];
     newHooks[index] = { ...newHooks[index], [field]: value };
-    onChange(newHooks);
+    setHooks(newHooks);
   };
+
+  const saveHook = async (hook: Hook) => {
+    if (!hook.hookId) return;
+    setSavingId(hook.hookId);
+    try {
+      await fetchWithToken(`/api/v1/hooks/${hook.hookId}`, {
+        method: 'PUT',
+        body: JSON.stringify(hook)
+      });
+      await fetchHooks();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  if (isLoading) return <div className="text-xs text-[#A89F94] italic">Loading hooks...</div>;
 
   return (
     <div className="space-y-4">
@@ -43,18 +102,28 @@ export function HookManager({ hooks, onChange, disabled }: HookManagerProps) {
         <p className="text-xs text-[#A89F94] italic">No hooks added yet.</p>
       ) : (
         <div className="space-y-3">
-          {hooks.map((hook, idx) => (
-            <div key={idx} className="p-3 bg-[#FDFCFB] border border-[#E8E2D9] rounded-xl space-y-3 relative">
-              <button
-                type="button"
-                onClick={() => removeHook(idx)}
-                disabled={disabled}
-                className="absolute top-3 right-3 text-[#A89F94] hover:text-red-500 disabled:opacity-50"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+          {hooks.map((hook, hookIdx) => (
+            <div key={hook.hookId || hookIdx} className="p-3 bg-[#FDFCFB] border border-[#E8E2D9] rounded-xl space-y-3 relative group">
+              <div className="absolute top-3 right-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => saveHook(hook)}
+                  disabled={disabled || savingId === hook.hookId}
+                  className="text-[#A89F94] hover:text-[#7C7167] disabled:opacity-50 flex items-center"
+                >
+                  {savingId === hook.hookId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => hook.hookId && removeHook(hook.hookId)}
+                  disabled={disabled}
+                  className="text-[#A89F94] hover:text-red-500 disabled:opacity-50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
               
-              <div className="grid grid-cols-2 gap-3 pr-6">
+              <div className="grid grid-cols-2 gap-3 pr-16">
                 <div>
                   <label className="text-[9px] font-bold text-[#A89F94] uppercase">Size (mm)</label>
                   <input
@@ -65,8 +134,9 @@ export function HookManager({ hooks, onChange, disabled }: HookManagerProps) {
                     disabled={disabled}
                     onChange={(e) => {
                       const val = e.target.value;
-                      updateHook(idx, 'sizeMm', val ? parseFloat(val) : null);
+                      updateHookState(hookIdx, 'sizeMm', val ? parseFloat(val) : null);
                     }}
+                    onBlur={() => saveHook(hook)}
                     className="w-full bg-transparent border-b border-[#E8E2D9] text-xs py-1 focus:outline-none focus:border-[#F28482]"
                     placeholder="e.g. 5.0"
                   />
@@ -77,7 +147,8 @@ export function HookManager({ hooks, onChange, disabled }: HookManagerProps) {
                     type="text"
                     value={hook.sizeUs || ''}
                     disabled={disabled}
-                    onChange={(e) => updateHook(idx, 'sizeUs', e.target.value)}
+                    onChange={(e) => updateHookState(hookIdx, 'sizeUs', e.target.value)}
+                    onBlur={() => saveHook(hook)}
                     className="w-full bg-transparent border-b border-[#E8E2D9] text-xs py-1 focus:outline-none focus:border-[#F28482]"
                     placeholder="e.g. H/8"
                   />
@@ -88,7 +159,8 @@ export function HookManager({ hooks, onChange, disabled }: HookManagerProps) {
                     type="text"
                     value={hook.material || ''}
                     disabled={disabled}
-                    onChange={(e) => updateHook(idx, 'material', e.target.value)}
+                    onChange={(e) => updateHookState(hookIdx, 'material', e.target.value)}
+                    onBlur={() => saveHook(hook)}
                     className="w-full bg-transparent border-b border-[#E8E2D9] text-xs py-1 focus:outline-none focus:border-[#F28482]"
                     placeholder="e.g. Aluminum"
                   />
@@ -99,7 +171,8 @@ export function HookManager({ hooks, onChange, disabled }: HookManagerProps) {
                     type="text"
                     value={hook.brand || ''}
                     disabled={disabled}
-                    onChange={(e) => updateHook(idx, 'brand', e.target.value)}
+                    onChange={(e) => updateHookState(hookIdx, 'brand', e.target.value)}
+                    onBlur={() => saveHook(hook)}
                     className="w-full bg-transparent border-b border-[#E8E2D9] text-xs py-1 focus:outline-none focus:border-[#F28482]"
                     placeholder="e.g. Clover"
                   />

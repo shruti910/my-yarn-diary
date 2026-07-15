@@ -107,14 +107,30 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
   const [numPages, setNumPages] = useState(0);
   const [pdfLoading, setPdfLoading] = useState(false);
 
-  // Synchronize patterns from project prop
+  // Synchronize patterns from project patterns endpoint
   useEffect(() => {
-    const projPatterns = project.patterns || [];
-    setPatterns(projPatterns);
-    if (projPatterns.length > 0 && !selectedPatternId) {
-      setSelectedPatternId(projPatterns[0].patternId);
+    const fetchPatterns = async () => {
+      try {
+        const data = await fetchWithToken(`/api/v1/projects/${project.projectId}/patterns`);
+        if (data) {
+          setPatterns(data);
+          if (data.length > 0 && !selectedPatternId) {
+            setSelectedPatternId(data[0].patternId);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch patterns:', err);
+      }
+    };
+    if (project.patterns && project.patterns.length > 0) {
+      setPatterns(project.patterns);
+      if (project.patterns.length > 0 && !selectedPatternId) {
+        setSelectedPatternId(project.patterns[0].patternId);
+      }
+    } else {
+      fetchPatterns();
     }
-  }, [project.patterns]);
+  }, [project.projectId, project.patterns]);
 
   // Load PDF.js CDN
   useEffect(() => {
@@ -287,19 +303,15 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
           })
         });
         if (res) {
-          const updatedProject = {
-            ...res,
-            categoryId: res.categoryId || res.folderId
-          } as Project;
-          onUpdateProjectState(updatedProject);
-          const nextPatterns = updatedProject.patterns || [];
-          setPatterns(nextPatterns);
-
-          const newPat = nextPatterns.find(p => !patterns.some(prev => prev.patternId === p.patternId));
-          if (newPat) {
-            setSelectedPatternId(newPat.patternId);
-          } else if (nextPatterns.length > 0) {
-            setSelectedPatternId(nextPatterns[nextPatterns.length - 1].patternId);
+          const nextPatterns = await fetchWithToken(`/api/v1/projects/${project.projectId}/patterns`);
+          if (nextPatterns) {
+            setPatterns(nextPatterns);
+            const newPat = nextPatterns.find(p => !patterns.some(prev => prev.patternId === p.patternId));
+            if (newPat) {
+              setSelectedPatternId(newPat.patternId);
+            } else if (nextPatterns.length > 0) {
+              setSelectedPatternId(nextPatterns[nextPatterns.length - 1].patternId);
+            }
           }
           setUploadType(null);
           showToast('Pattern uploaded successfully!', 'success');
@@ -341,19 +353,15 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
         })
       });
       if (res) {
-        const updatedProject = {
-          ...res,
-          categoryId: res.categoryId || res.folderId
-        } as Project;
-        onUpdateProjectState(updatedProject);
-        const nextPatterns = updatedProject.patterns || [];
-        setPatterns(nextPatterns);
-
-        const newPat = nextPatterns.find(p => !patterns.some(prev => prev.patternId === p.patternId));
-        if (newPat) {
-          setSelectedPatternId(newPat.patternId);
-        } else if (nextPatterns.length > 0) {
-          setSelectedPatternId(nextPatterns[nextPatterns.length - 1].patternId);
+        const nextPatterns = await fetchWithToken(`/api/v1/projects/${project.projectId}/patterns`);
+        if (nextPatterns) {
+          setPatterns(nextPatterns);
+          const newPat = nextPatterns.find(p => !patterns.some(prev => prev.patternId === p.patternId));
+          if (newPat) {
+            setSelectedPatternId(newPat.patternId);
+          } else if (nextPatterns.length > 0) {
+            setSelectedPatternId(nextPatterns[nextPatterns.length - 1].patternId);
+          }
         }
         setTextTitle('');
         setTextContent('');
@@ -382,12 +390,10 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
         })
       });
       if (res) {
-        const updatedProject = {
-          ...res,
-          categoryId: res.categoryId || res.folderId
-        } as Project;
-        onUpdateProjectState(updatedProject);
-        setPatterns(updatedProject.patterns || []);
+        const nextPatterns = await fetchWithToken(`/api/v1/projects/${project.projectId}/patterns`);
+        if (nextPatterns) {
+          setPatterns(nextPatterns);
+        }
         setIsEditingText(false);
         setTextTitle('');
         setTextContent('');
@@ -410,15 +416,12 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
         method: 'DELETE'
       });
       if (res) {
-        const updatedProject = {
-          ...res,
-          categoryId: res.categoryId || res.folderId
-        } as Project;
-        onUpdateProjectState(updatedProject);
-        const nextPatterns = updatedProject.patterns || [];
-        setPatterns(nextPatterns);
-        if (selectedPatternId === patternId) {
-          setSelectedPatternId(nextPatterns.length > 0 ? nextPatterns[0].patternId : '');
+        const nextPatterns = await fetchWithToken(`/api/v1/projects/${project.projectId}/patterns`);
+        if (nextPatterns) {
+          setPatterns(nextPatterns);
+          if (selectedPatternId === patternId) {
+            setSelectedPatternId(nextPatterns.length > 0 ? nextPatterns[0].patternId : '');
+          }
         }
         showToast('Pattern deleted successfully!', 'success');
       }
@@ -859,7 +862,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
                 ) : (
                   <div
                     className="w-full max-w-2xl bg-white border border-[#E8E2D9] rounded-3xl p-6 md:p-8 shadow-xs markdown-body overflow-auto leading-relaxed select-text"
-                    style={{ fontSize: `${textSize}px` }}
+                    style={{ fontSize: `${textSize}px`, wordBreak: 'break-word', overflowWrap: 'break-word' }}
                   >
                     <h3 className="font-serif font-extrabold text-[#2D231B] text-xl border-b border-[#E8E2D9] pb-3 mb-4 leading-snug">
                       {activePattern.fileName}
@@ -1014,7 +1017,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
               {activePattern.patternType === 'text' && (
                 <div
                   className="w-full max-w-3xl bg-white border border-[#E8E2D9] rounded-[2rem] p-8 md:p-12 shadow-lg markdown-body overflow-auto leading-relaxed select-text"
-                  style={{ fontSize: `${textSize}px` }}
+                  style={{ fontSize: `${textSize}px`, wordBreak: 'break-word', overflowWrap: 'break-word' }}
                 >
                   <h3 className="font-serif font-extrabold text-[#2D231B] text-2xl border-b border-[#E8E2D9] pb-3 mb-6 leading-snug">
                     {activePattern.fileName}

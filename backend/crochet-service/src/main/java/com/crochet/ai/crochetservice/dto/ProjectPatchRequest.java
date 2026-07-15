@@ -6,14 +6,11 @@ import java.util.List;
 public record ProjectPatchRequest(
     String categoryId,
     String title,
-    List<YarnRequest> yarns,
-    List<HookRequest> hooks,
     ProjectStatus status,
     Integer rowCount,
     String notes,
     String startDate,
     String endDate,
-    List<String> productPhotos,
     Boolean isArchive,
     String coverPhoto,
     String careInstructions,
@@ -22,14 +19,11 @@ public record ProjectPatchRequest(
 ) {
     public String getCategoryId() { return categoryId; }
     public String getTitle() { return title; }
-    public List<YarnRequest> getYarns() { return yarns; }
-    public List<HookRequest> getHooks() { return hooks; }
     public ProjectStatus getStatus() { return status; }
     public Integer getRowCount() { return rowCount; }
     public String getNotes() { return notes; }
     public String getStartDate() { return startDate; }
     public String getEndDate() { return endDate; }
-    public List<String> getProductPhotos() { return productPhotos; }
     public Boolean getIsArchive() { return isArchive; }
     public String getCoverPhoto() { return coverPhoto; }
     public String getCareInstructions() { return careInstructions; }

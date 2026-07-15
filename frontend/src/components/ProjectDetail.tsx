@@ -38,7 +38,7 @@ interface ProjectDetailProps {
   categories: Category[];
   token: string;
   onBack: () => void;
-  onUpdateProject: (updates: Partial<Project> & { coverPhoto?: string | null }) => Promise<any>;
+  onUpdateProject: (updates: Partial<Project>) => Promise<any>;
   onUpdateProjectState: (updatedProject: Project) => void;
   onToggleFavorite: (projectId: string) => void;
   onDeleteProject: (projectId: string) => void;
@@ -206,10 +206,39 @@ export function ProjectDetail({
     }
   };
 
+  const fetchPhotos = async () => {
+    try {
+      const photosData = await fetchWithToken(`/api/v1/projects/${project.projectId}/photos`);
+      if (photosData) {
+        onUpdateProjectState({
+          ...project,
+          photos: photosData,
+          productPhotos: photosData.map((p: any) => p.photoBase64)
+        });
+        setProductPhotos(photosData.map((p: any) => p.photoBase64));
+        const coverId = photosData.find(p => p.isCover)?.id;
+        setCoverPhoto(coverId ? String(coverId) : null);
+      }
+    } catch (err) {
+      console.error('Failed to fetch photos:', err);
+    }
+  };
+
   useEffect(() => {
-    if (!token) return;
+    if (!token || project.isNewProject) return;
     loadLogs(logsPage, logsPageSize);
-  }, [project.projectId, token, logsPage, logsPageSize]);
+  }, [project.projectId, token, logsPage, logsPageSize, project.isNewProject]);
+
+  useEffect(() => {
+    if (!token || project.isNewProject) return;
+    if (project.photos && project.photos.length > 0) {
+      setProductPhotos(project.photos.map(p => p.photoBase64));
+      const coverId = project.photos.find(p => p.isCover)?.id;
+      setCoverPhoto(coverId ? String(coverId) : null);
+    } else {
+      fetchPhotos();
+    }
+  }, [project.projectId, token, project.isNewProject, project.photos]);
 
   const handleFieldChange = () => {
     setIsSaved(false);
@@ -248,17 +277,13 @@ export function ProjectDetail({
       try {
         await onUpdateProject({
           title: capitalized,
-          yarns,
-          hooks,
           status,
           notes,
           categoryId: targetCategoryId,
           startDate,
           endDate,
           careInstructions,
-          totalTime,
-          productPhotos,
-          coverPhoto
+          totalTime
         });
         setTitle(capitalized);
         setIsSaved(true);
@@ -331,17 +356,13 @@ export function ProjectDetail({
     try {
       await onUpdateProject({
         title: capitalized,
-        yarns,
-        hooks,
         status,
         notes,
         categoryId: targetCategoryId,
         startDate,
         endDate,
         careInstructions,
-        totalTime,
-        productPhotos,
-        coverPhoto
+        totalTime
       });
       setTitle(capitalized);
       setIsSaved(true);
@@ -466,16 +487,29 @@ export function ProjectDetail({
       const results = await Promise.all(filesToProcess.map(file => processFile(file)));
       const validResults = results.filter(res => res !== '');
       if (validResults.length > 0) {
-        setProductPhotos(prev => {
-          const updated = [...prev, ...validResults];
-          setIsSaved(false);
-          return updated;
-        });
+        
+        for (const res of validResults) {
+          await fetchWithToken(`/api/v1/projects/${project.projectId}/photos`, {
+            method: 'POST',
+            body: res
+          });
+        }
+        
+        const photosData = await fetchWithToken(`/api/v1/projects/${project.projectId}/photos`);
+        if (photosData) {
+          onUpdateProjectState({
+            ...project,
+            photos: photosData,
+            productPhotos: photosData.map((p: any) => p.photoBase64)
+          });
+          setProductPhotos(photosData.map((p: any) => p.photoBase64));
+        }
+
         if (status !== ProjectStatus.Completed) {
           const confirmed = await showConfirm('Do you want to move this project to the "Completed" stage?');
           if (confirmed) {
             setStatus(ProjectStatus.Completed);
-            setIsSaved(false);
+            onUpdateProject({ status: ProjectStatus.Completed });
           }
         }
       }
@@ -487,17 +521,35 @@ export function ProjectDetail({
     }
   };
 
-  const removeProductPhoto = (index: number) => {
+  const removeProductPhoto = async (index: number) => {
     const photoBase64 = productPhotos[index];
-    setProductPhotos(prev => {
-      const updated = prev.filter((_, i) => i !== index);
-      setIsSaved(false);
-      const photoObj = project.photos?.find(p => p.photoBase64 === photoBase64);
-      if (photoObj && (coverPhoto === String(photoObj.id) || coverPhoto === photoBase64)) {
+    const photoObj = project.photos?.find(p => p.photoBase64 === photoBase64);
+    
+    if (photoObj) {
+      try {
+        await fetchWithToken(`/api/v1/photos/${photoObj.id}`, { method: 'DELETE' });
+        const photosData = await fetchWithToken(`/api/v1/projects/${project.projectId}/photos`);
+        if (photosData) {
+          onUpdateProjectState({
+            ...project,
+            photos: photosData,
+            productPhotos: photosData.map((p: any) => p.photoBase64)
+          });
+          setProductPhotos(photosData.map((p: any) => p.photoBase64));
+        }
+        
+        if (coverPhoto === String(photoObj.id) || coverPhoto === photoBase64) {
+          setCoverPhoto(null);
+        }
+      } catch (err) {
+        console.error('Failed to delete photo:', err);
+      }
+    } else {
+      setProductPhotos(prev => prev.filter((_, i) => i !== index));
+      if (coverPhoto === photoBase64) {
         setCoverPhoto(null);
       }
-      return updated;
-    });
+    }
   };
 
   const incrementRow = async (amount: number) => {
@@ -1008,16 +1060,20 @@ export function ProjectDetail({
 
               <div className="pt-4 border-t border-[#FDFCFB]">
                 <YarnManager
-                  yarns={yarns}
-                  onChange={(newYarns) => { setYarns(newYarns); handleFieldChange(); }}
+                  projectId={project.projectId}
+                  initialYarns={project.yarns}
+                  isNewProject={project.isNewProject}
+                  fetchWithToken={fetchWithToken}
                   disabled={isSubmitting}
                 />
               </div>
 
               <div className="pt-4 border-t border-[#FDFCFB]">
                 <HookManager
-                  hooks={hooks}
-                  onChange={(newHooks) => { setHooks(newHooks); handleFieldChange(); }}
+                  projectId={project.projectId}
+                  initialHooks={project.hooks}
+                  isNewProject={project.isNewProject}
+                  fetchWithToken={fetchWithToken}
                   disabled={isSubmitting}
                 />
               </div>
@@ -1132,9 +1188,18 @@ export function ProjectDetail({
                       {productPhotos.length > 1 && (
                         <button
                           type="button"
-                          onClick={() => {
-                            setCoverPhoto(matchedPhoto ? String(matchedPhoto.id) : photo);
-                            setIsSaved(false);
+                          onClick={async () => {
+                            if (matchedPhoto) {
+                              try {
+                                await fetchWithToken(`/api/v1/projects/${project.projectId}/photos`, {
+                                  method: 'PUT',
+                                  body: JSON.stringify({ id: matchedPhoto.id, isCover: true })
+                                });
+                                await fetchPhotos();
+                              } catch (err) {
+                                console.error('Failed to update cover photo:', err);
+                              }
+                            }
                           }}
                           className={`absolute bottom-1 left-1 p-1 rounded-lg text-[9px] font-extrabold transition-all flex items-center gap-0.5 shadow-xs cursor-pointer ${
                             isCover

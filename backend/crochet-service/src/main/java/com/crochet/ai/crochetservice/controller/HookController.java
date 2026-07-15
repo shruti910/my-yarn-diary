@@ -54,13 +54,6 @@ public class HookController {
         return ResponseEntity.ok(crochetService.updateHook(userId, hookId, request));
     }
 
-    @PatchMapping("/hooks/{hookId}")
-    public ResponseEntity<HookResponse> patchHook(@RequestHeader("X-User-Id") String userId,
-            @PathVariable Long hookId,
-            @RequestBody HookRequest request) {
-        log.info("Patching hook ID: {} for user: {}", hookId, userId);
-        return ResponseEntity.ok(crochetService.patchHook(userId, hookId, request));
-    }
 
     @DeleteMapping("/hooks/{hookId}")
     public ResponseEntity<Void> deleteHook(@RequestHeader("X-User-Id") String userId,

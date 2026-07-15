@@ -54,13 +54,6 @@ public class YarnController {
         return ResponseEntity.ok(crochetService.updateYarn(userId, yarnId, request));
     }
 
-    @PatchMapping("/yarns/{yarnId}")
-    public ResponseEntity<YarnResponse> patchYarn(@RequestHeader("X-User-Id") String userId,
-            @PathVariable Long yarnId,
-            @RequestBody YarnRequest request) {
-        log.info("Patching yarn ID: {} for user: {}", yarnId, userId);
-        return ResponseEntity.ok(crochetService.patchYarn(userId, yarnId, request));
-    }
 
     @DeleteMapping("/yarns/{yarnId}")
     public ResponseEntity<Void> deleteYarn(@RequestHeader("X-User-Id") String userId,

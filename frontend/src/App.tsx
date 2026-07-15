@@ -687,7 +687,8 @@ export default function App() {
       if (res) {
         const merged = {
           ...res,
-          categoryId: res.categoryId || res.folderId
+          categoryId: res.categoryId || res.folderId,
+          isNewProject: true
         } as Project;
         setProjects(prev => [merged, ...prev]);
         setSelectedProject(merged); // Automatically view the new project
@@ -701,7 +702,7 @@ export default function App() {
     }
   };
 
-  const handleUpdateProject = async (updates: Partial<Project> & { coverPhoto?: string | null }) => {
+  const handleUpdateProject = async (updates: Partial<Project>) => {
     if (!selectedProject) return;
     const { projectId } = selectedProject;
 
@@ -712,6 +713,21 @@ export default function App() {
     } as Project;
     setProjects(prev => prev.map(p => p.projectId === projectId ? mergedLocally : p));
     setSelectedProject(mergedLocally);
+
+    const getPayload = (current: Project, upds: Partial<Project>) => {
+      return {
+        categoryId: upds.categoryId !== undefined ? upds.categoryId : current.categoryId,
+        title: upds.title !== undefined ? upds.title : current.title,
+        status: upds.status !== undefined ? upds.status : current.status,
+        rowCount: upds.rowCount !== undefined ? upds.rowCount : current.rowCount,
+        notes: upds.notes !== undefined ? upds.notes : current.notes,
+        startDate: upds.startDate !== undefined ? upds.startDate : current.startDate,
+        endDate: upds.endDate !== undefined ? upds.endDate : current.endDate,
+        isArchive: upds.isArchive !== undefined ? upds.isArchive : current.isArchive,
+        careInstructions: upds.careInstructions !== undefined ? upds.careInstructions : current.careInstructions,
+        totalTime: upds.totalTime !== undefined ? upds.totalTime : current.totalTime,
+      };
+    };
 
     // Check if we are ONLY updating the row count (and possibly status)
     const isOnlyRowCount = Object.keys(updates).every(k => k === 'rowCount' || k === 'status');
@@ -726,8 +742,8 @@ export default function App() {
       rowCountTimeoutRef.current = setTimeout(async () => {
         try {
           const res = await fetchWithToken(`/api/v1/projects/${projectId}`, {
-            method: 'PATCH',
-            body: JSON.stringify(updates)
+            method: 'PUT',
+            body: JSON.stringify(getPayload(selectedProject, updates))
           });
 
           if (res) {
@@ -754,8 +770,8 @@ export default function App() {
 
     try {
       const res = await fetchWithToken(`/api/v1/projects/${projectId}`, {
-        method: 'PATCH',
-        body: JSON.stringify(updates)
+        method: 'PUT',
+        body: JSON.stringify(getPayload(selectedProject, updates))
       });
       if (res) {
         const merged = {
@@ -809,10 +825,26 @@ export default function App() {
   const handleArchiveProject = async (projectId: string) => {
     try {
       const currentProject = projects.find(p => p.projectId === projectId);
-      const nextArchiveState = currentProject ? !currentProject.isArchive : true;
+      if (!currentProject) return;
+      const nextArchiveState = !currentProject.isArchive;
+      const currentCover = currentProject.photos?.find(p => p.isCover);
+      const currentCoverVal = currentCover ? String(currentCover.id) : null;
+      const payload = {
+        categoryId: currentProject.categoryId,
+        title: currentProject.title,
+        status: currentProject.status,
+        rowCount: currentProject.rowCount,
+        notes: currentProject.notes,
+        startDate: currentProject.startDate,
+        endDate: currentProject.endDate,
+        isArchive: nextArchiveState,
+        coverPhoto: currentCoverVal,
+        careInstructions: currentProject.careInstructions,
+        totalTime: currentProject.totalTime,
+      };
       const res = await fetchWithToken(`/api/v1/projects/${projectId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ isArchive: nextArchiveState })
+        method: 'PUT',
+        body: JSON.stringify(payload)
       });
       if (res) {
         const merged = {
@@ -848,11 +880,8 @@ export default function App() {
 
   const handleToggleFavorite = async (projectId: string) => {
     try {
-      const currentProject = projects.find(p => p.projectId === projectId);
-      const nextFavoriteState = currentProject ? !currentProject.isFavorite : true;
-      const res = await fetchWithToken(`/api/v1/projects/${projectId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ isFavorite: nextFavoriteState })
+      const res = await fetchWithToken(`/api/v1/projects/${projectId}/favorite`, {
+        method: 'POST'
       });
       if (res) {
         setProjects(prev => prev.map(p => p.projectId === projectId ? {
@@ -915,7 +944,7 @@ export default function App() {
   const handleSelectProject = async (projectSummary: Project) => {
     setSelectedProject(projectSummary);
     try {
-      const detailedProject = await fetchWithToken(`/api/v1/projects/${projectSummary.projectId}`);
+      const detailedProject = await fetchWithToken(`/api/v1/projects/${projectSummary.projectId}/full`);
       if (detailedProject) {
         const mapped = {
           ...detailedProject,
@@ -930,8 +959,11 @@ export default function App() {
     }
   };
 
+  const matchedProjectInList = selectedProject ? projects.find(p => p.projectId === selectedProject.projectId) : null;
   const liveSelectedProject = selectedProject
-    ? projects.find(p => p.projectId === selectedProject.projectId) || selectedProject
+    ? (matchedProjectInList
+        ? { ...matchedProjectInList, isNewProject: selectedProject.isNewProject } as Project
+        : selectedProject)
     : null;
 
   if (!token || !user) {
