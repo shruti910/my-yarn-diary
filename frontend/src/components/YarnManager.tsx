@@ -30,7 +30,7 @@ export function YarnManager({ projectId, initialYarns, isNewProject, fetchWithTo
     if (isNewProject) {
       setYarns([]);
       setIsLoading(false);
-    } else if (initialYarns && initialYarns.length > 0) {
+    } else if (initialYarns !== undefined) {
       setYarns(initialYarns);
       setIsLoading(false);
     } else {

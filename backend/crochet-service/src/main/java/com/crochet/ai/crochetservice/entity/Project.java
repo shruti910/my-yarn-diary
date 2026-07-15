@@ -104,43 +104,7 @@ public class Project {
     @Builder.Default
     private List<Pattern> patternEntities = new ArrayList<>();
 
-    @Transient
-    public List<String> getProductPhotos() {
-        if (photoEntities == null) return new ArrayList<>();
-        return photoEntities.stream()
-                .map(Photo::getPhotoBase64)
-                .collect(Collectors.toList());
-    }
 
-    @Transient
-    public void setProductPhotos(List<String> photos) {
-        if (this.photoEntities == null) {
-            this.photoEntities = new ArrayList<>();
-        }
-        if (photos == null || photos.isEmpty()) {
-            this.photoEntities.clear();
-            return;
-        }
-
-        // 1. Remove photo entities that are no longer in the new photos list
-        this.photoEntities.removeIf(pe -> !photos.contains(pe.getPhotoBase64()));
-
-        // 2. Add new photos that are not already in the entities list
-        for (String base64 : photos) {
-            if (base64 == null || base64.isBlank()) continue;
-
-            boolean exists = this.photoEntities.stream()
-                    .anyMatch(pe -> base64.equals(pe.getPhotoBase64()));
-
-            if (!exists) {
-                this.photoEntities.add(Photo.builder()
-                        .project(this)
-                        .photoBase64(base64)
-                        .createdAt(LocalDateTime.now())
-                        .build());
-            }
-        }
-    }
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

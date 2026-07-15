@@ -30,7 +30,7 @@ export function HookManager({ projectId, initialHooks, isNewProject, fetchWithTo
     if (isNewProject) {
       setHooks([]);
       setIsLoading(false);
-    } else if (initialHooks && initialHooks.length > 0) {
+    } else if (initialHooks !== undefined) {
       setHooks(initialHooks);
       setIsLoading(false);
     } else {

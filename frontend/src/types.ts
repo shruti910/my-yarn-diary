@@ -67,7 +67,6 @@ export interface Project {
   notes?: string;
   startDate?: string;
   endDate?: string;
-  productPhotos?: string[];
   careInstructions?: string;
   totalTime?: string;
   isFavorite?: boolean;
@@ -75,6 +74,7 @@ export interface Project {
   updatedAt?: string;
   patterns?: Pattern[];
   photos?: PhotoResponse[];
+  base64CoverPhoto?: string;
   isNewProject?: boolean;
 }
 

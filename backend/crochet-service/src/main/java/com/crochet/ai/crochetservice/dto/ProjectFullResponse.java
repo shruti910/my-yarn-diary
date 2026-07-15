@@ -23,7 +23,6 @@ public record ProjectFullResponse(
     List<HookResponse> hooks,
     List<PhotoResponse> photos,
     List<PatternResponse> patterns,
-    List<String> productPhotos,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {}

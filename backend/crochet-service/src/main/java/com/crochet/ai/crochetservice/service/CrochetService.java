@@ -224,7 +224,7 @@ public class CrochetService {
     }
 
     private ProjectSummaryResponse mapToSummaryResponse(Project project) {
-        List<String> productPhotos = new ArrayList<>();
+        String base64CoverPhoto = null;
         if (project.getPhotoEntities() != null && !project.getPhotoEntities().isEmpty()) {
             Photo cover = null;
             for (Photo p : project.getPhotoEntities()) {
@@ -234,9 +234,9 @@ public class CrochetService {
                 }
             }
             if (cover != null) {
-                productPhotos.add(cover.getPhotoBase64());
+                base64CoverPhoto = cover.getPhotoBase64();
             } else {
-                productPhotos.add(project.getPhotoEntities().get(0).getPhotoBase64());
+                base64CoverPhoto = project.getPhotoEntities().get(0).getPhotoBase64();
             }
         }
         return new ProjectSummaryResponse(
@@ -253,7 +253,7 @@ public class CrochetService {
                 project.getEndDate(),
                 project.isFavorite(),
                 project.isArchive(),
-                productPhotos,
+                base64CoverPhoto,
                 project.getCreatedAt(),
                 project.getUpdatedAt()
         );
@@ -498,8 +498,6 @@ public class CrochetService {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        project.getPatternEntities().add(pattern);
-        projectRepository.save(project);
         return mapToPatternResponse(patternRepository.save(pattern));
     }
 
@@ -1003,7 +1001,6 @@ public class CrochetService {
             project.getHookEntities().stream().map(this::mapToHookResponse).collect(Collectors.toList()),
             project.getPhotoEntities().stream().map(this::mapToPhotoResponse).collect(Collectors.toList()),
             project.getPatternEntities().stream().map(this::mapToPatternResponse).collect(Collectors.toList()),
-            project.getProductPhotos(),
             project.getCreatedAt(),
             project.getUpdatedAt()
         );

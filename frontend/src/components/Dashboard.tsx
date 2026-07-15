@@ -30,13 +30,13 @@ const isValidName = (str: string): boolean => {
 };
 
 const getProjectCoverPhoto = (project: Project): string | undefined => {
+  if (project.base64CoverPhoto) {
+    return project.base64CoverPhoto;
+  }
   if (project.photos && project.photos.length > 0) {
     const cover = project.photos.find(ph => ph.isCover);
     if (cover) return cover.photoBase64;
     return project.photos[0].photoBase64;
-  }
-  if (project.productPhotos && project.productPhotos.length > 0) {
-    return project.productPhotos[0];
   }
   return undefined;
 };

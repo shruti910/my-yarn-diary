@@ -86,7 +86,7 @@ export function ProjectDetail({
   const [targetCategoryId, setTargetCategoryId] = useState(project.categoryId);
   const [startDate, setStartDate] = useState(project.startDate || '');
   const [endDate, setEndDate] = useState(project.endDate || '');
-  const [productPhotos, setProductPhotos] = useState<string[]>(project.productPhotos || []);
+  const [productPhotos, setProductPhotos] = useState<string[]>((project.photos || []).map(p => p.photoBase64));
   const initialCoverPhotoId = project.photos?.find(p => p.isCover)?.id;
   const [coverPhoto, setCoverPhoto] = useState<string | null>(initialCoverPhotoId ? String(initialCoverPhotoId) : null);
   const [careInstructions, setCareInstructions] = useState(project.careInstructions || '');
@@ -102,6 +102,7 @@ export function ProjectDetail({
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const autoSaveTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFetchedLogsRef = React.useRef<{ projectId: string; page: number; size: number } | null>(null);
   const [activeTab, setActiveTab] = useState<'journal' | 'pattern'>('journal');
 
   const isDateRangeInvalid = !!(startDate && endDate && startDate > endDate);
@@ -115,7 +116,7 @@ export function ProjectDetail({
     setTargetCategoryId(project.categoryId);
     setStartDate(project.startDate || '');
     setEndDate(project.endDate || '');
-    setProductPhotos(project.productPhotos || []);
+    setProductPhotos((project.photos || []).map(p => p.photoBase64));
     setCareInstructions(project.careInstructions || '');
     setTotalTime(project.totalTime || '');
     const coverId = project.photos?.find(p => p.isCover)?.id;
@@ -131,7 +132,7 @@ export function ProjectDetail({
     project.yarns?.map(y => `${y.brand}:${y.lineName}:${y.colorway}:${y.quantityUsed}`).join(','),
     project.hooks?.map(h => `${h.sizeMm}:${h.sizeUs}:${h.material}`).join(','),
     project.photos?.map(p => `${p.id}:${p.isCover}`).join(','),
-    project.productPhotos?.join(',')
+    project.photos?.map(p => p.photoBase64).join(',')
   ]);
 
   const fetchWithToken = async (url: string, options: RequestInit = {}) => {
@@ -191,7 +192,17 @@ export function ProjectDetail({
     }
   };
 
-  const loadLogs = async (targetPage = logsPage, targetSize = logsPageSize) => {
+  const loadLogs = async (targetPage = logsPage, targetSize = logsPageSize, forceReload = false) => {
+    if (
+      !forceReload &&
+      lastFetchedLogsRef.current &&
+      lastFetchedLogsRef.current.projectId === project.projectId &&
+      lastFetchedLogsRef.current.page === targetPage &&
+      lastFetchedLogsRef.current.size === targetSize
+    ) {
+      return;
+    }
+    lastFetchedLogsRef.current = { projectId: project.projectId, page: targetPage, size: targetSize };
     try {
       const data = await fetchWithToken(`/api/v1/projects/${project.projectId}/logs?page=${targetPage}&size=${targetSize}&sort=createdAt,desc`);
       if (data && data.content) {
@@ -212,8 +223,7 @@ export function ProjectDetail({
       if (photosData) {
         onUpdateProjectState({
           ...project,
-          photos: photosData,
-          productPhotos: photosData.map((p: any) => p.photoBase64)
+          photos: photosData
         });
         setProductPhotos(photosData.map((p: any) => p.photoBase64));
         const coverId = photosData.find(p => p.isCover)?.id;
@@ -231,7 +241,7 @@ export function ProjectDetail({
 
   useEffect(() => {
     if (!token || project.isNewProject) return;
-    if (project.photos && project.photos.length > 0) {
+    if (project.photos !== undefined) {
       setProductPhotos(project.photos.map(p => p.photoBase64));
       const coverId = project.photos.find(p => p.isCover)?.id;
       setCoverPhoto(coverId ? String(coverId) : null);
@@ -388,8 +398,7 @@ export function ProjectDetail({
           startDate,
           endDate,
           careInstructions,
-          totalTime,
-          productPhotos
+          totalTime
         },
         logs,
         activeCategory?.name || 'General',
@@ -499,8 +508,7 @@ export function ProjectDetail({
         if (photosData) {
           onUpdateProjectState({
             ...project,
-            photos: photosData,
-            productPhotos: photosData.map((p: any) => p.photoBase64)
+            photos: photosData
           });
           setProductPhotos(photosData.map((p: any) => p.photoBase64));
         }
@@ -532,8 +540,7 @@ export function ProjectDetail({
         if (photosData) {
           onUpdateProjectState({
             ...project,
-            photos: photosData,
-            productPhotos: photosData.map((p: any) => p.photoBase64)
+            photos: photosData
           });
           setProductPhotos(photosData.map((p: any) => p.photoBase64));
         }
@@ -650,7 +657,7 @@ export function ProjectDetail({
         setTextEntry('');
         setLogImage(null);
         setLogImageBase64(null);
-        loadLogs(0);
+        loadLogs(0, logsPageSize, true);
       }
     } catch (err) {
       console.error('Failed to append progress log:', err);
@@ -665,7 +672,7 @@ export function ProjectDetail({
     try {
       await fetchWithToken(`/api/v1/logs/${logId}`, { method: 'DELETE' });
       setLogs(prev => prev.filter(l => l.logId !== logId));
-      loadLogs(0);
+      loadLogs(0, logsPageSize, true);
     } catch (err) {
       console.error('Failed to delete log entry:', err);
     }

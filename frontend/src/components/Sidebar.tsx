@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Folder, Plus, Trash2, Edit2, Check, X, LogOut, Scissors, ChevronLeft, Archive, Heart, Settings, CircleUserRound, Camera, Lock } from 'lucide-react';
+import { Folder, Plus, Trash2, Edit2, Check, X, LogOut, Scissors, PanelRightOpen, Archive, Heart, Settings, CircleUserRound, Camera, Lock } from 'lucide-react';
 import { Category } from '../types';
 import { useDialog } from './DialogProvider';
 import { motion, AnimatePresence } from 'motion/react';
@@ -390,7 +390,7 @@ export function Sidebar({
               className="p-2 bg-white border border-[#E8E2D9] text-[#7C7167] hover:text-[#F28482] hover:border-[#F28482]/30 rounded-xl shadow-xs transition-all duration-200 cursor-pointer flex items-center justify-center hover:scale-105 active:scale-95"
               title="Collapse Sidebar"
             >
-              <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
+              <PanelRightOpen className="w-5 h-5 stroke-[2.5]" />
             </button>
           </div>
         </div>

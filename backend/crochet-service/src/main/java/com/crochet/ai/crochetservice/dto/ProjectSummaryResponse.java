@@ -19,7 +19,7 @@ public record ProjectSummaryResponse(
     String endDate,
     boolean isFavorite,
     boolean isArchive,
-    List<String> productPhotos,
+    String base64CoverPhoto,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {}

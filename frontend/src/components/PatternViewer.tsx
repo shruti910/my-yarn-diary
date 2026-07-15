@@ -122,7 +122,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
         console.error('Failed to fetch patterns:', err);
       }
     };
-    if (project.patterns && project.patterns.length > 0) {
+    if (project.patterns !== undefined) {
       setPatterns(project.patterns);
       if (project.patterns.length > 0 && !selectedPatternId) {
         setSelectedPatternId(project.patterns[0].patternId);

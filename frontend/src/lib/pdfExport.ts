@@ -229,10 +229,7 @@ export async function exportProjectToPdf(
     }
   }
 
-  // Fallback to project.photos if productPhotos is empty
-  const allProductPhotos = project.productPhotos && project.productPhotos.length > 0
-    ? project.productPhotos
-    : (project.photos || []).map(p => p.photoBase64);
+  const allProductPhotos = (project.photos || []).map(p => p.photoBase64);
 
   // Preload all image assets to calculate dimensions
   const imageCache = await preloadImages(coverPhotoBase64, allProductPhotos, logs, project.patterns || []);

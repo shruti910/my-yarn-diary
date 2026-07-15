@@ -675,7 +675,6 @@ export default function App() {
       status: ProjectStatus.InProgress,
       rowCount: 0,
       notes: notes || '',
-      productPhotos: [],
       patterns: []
     };
 
