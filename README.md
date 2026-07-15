@@ -17,9 +17,9 @@ graph TD
         Gateway -->|HTTP + X-Forwarded-Identity| CrochetService[Crochet Service :8082]
         Gateway -->|HTTP + X-Forwarded-Identity| AiService[AI Service :8083]
         
-        UserService --> UserDb[(User Database PostgreSQL :5432)]
-        CrochetService --> CrochetDb[(Crochet Database PostgreSQL :5433)]
-        AiService --> AiDb[(AI Database PostgreSQL :5434)]
+        UserService --> UserDb[(user_db / user_service)]
+        CrochetService --> CrochetDb[(crochet_db / crochet_service)]
+        AiService --> AiDb[(ai_db / ai_service)]
         
         UserService -.->|OTLP Traces & Logs| OTelCollector[Grafana Cloud OTLP Ingest]
         CrochetService -.->|OTLP Traces & Logs| OTelCollector
@@ -73,7 +73,7 @@ The [AI Service](file:///Users/shrutiprajapati/Documents/PROJECTS/PERSONAL%20PRO
 | **Frontend UI** | [React 19](file:///Users/shrutiprajapati/Documents/PROJECTS/PERSONAL%20PROJECTS/GITHUB%20PROJECTS/crochet-ai/frontend), TypeScript, Vite, Tailwind CSS v4, Motion (Framer Motion), Sentry React, Lucide Icons |
 | **Edge Ingress Gateway** | [Gateway Service](file:///Users/shrutiprajapati/Documents/PROJECTS/PERSONAL%20PROJECTS/GITHUB%20PROJECTS/crochet-ai/backend/gateway) (Java 21, Spring Boot, Spring Cloud Gateway, Firebase Admin SDK, JJWT) |
 | **Backend Services** | [User Service](file:///Users/shrutiprajapati/Documents/PROJECTS/PERSONAL%20PROJECTS/GITHUB%20PROJECTS/crochet-ai/backend/user-service), [Crochet Service](file:///Users/shrutiprajapati/Documents/PROJECTS/PERSONAL%20PROJECTS/GITHUB%20PROJECTS/crochet-ai/backend/crochet-service), [AI Service](file:///Users/shrutiprajapati/Documents/PROJECTS/PERSONAL%20PROJECTS/GITHUB%20PROJECTS/crochet-ai/backend/ai-service) (Java 21, Spring Boot, Spring Data JPA, Hibernate, Lombok) |
-| **Databases** | PostgreSQL 15 (Isolated instances: user-db, crochet-db, ai-db), Flyway (Database Migrations) |
+| **Databases** | PostgreSQL 15 (one server with isolated service databases, roles, and schemas), Flyway (Database Migrations) |
 | **AI Integration** | Google Gemini API (AI assistant, Pattern Decoding), OpenAiProvider, PollinationsImageProvider |
 | **Ops & Observability** | Docker Compose, OpenTelemetry (OTLP) Protobuf, Grafana Cloud, Sentry |
 
@@ -89,7 +89,8 @@ The [AI Service](file:///Users/shrutiprajapati/Documents/PROJECTS/PERSONAL%20PRO
 │   └── gateway             # Java/Spring Cloud Gateway: Reverse Proxy & Firebase Token Verification
 ├── frontend                # Vite/React 19 Client Web App
 ├── secrets                 # Local Firebase Admin service accounts config
-├── docker-compose.yml      # Orchestrates all PostgreSQL databases and Java microservices
+├── docker-compose.yml      # Orchestrates PostgreSQL and Java microservices
+├── docker/postgres         # PostgreSQL service database/schema initialization
 ├── security_spec.md        # Detailed Security Specification
 └── README.md
 ```

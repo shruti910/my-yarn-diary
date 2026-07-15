@@ -27,7 +27,7 @@ graph TD
 ### 1.1 Port & Boundary Summary
 * **Perimeter Gateway**: Exposed externally on port `3000`. Routes to downstream microservices based on request path mappings.
 * **Internal Services**: Expose ports `8081` (user-service), `8082` (crochet-service), and `8083` (ai-service) internally. Downstream services do not bind public ports.
-* **Database Isolation**: PostgreSQL databases bind only to internal container ports on `crochet-network` (and map to host ports `5432`, `5433`, and `5434` strictly on localhost for developer diagnostics). Direct external access is blocked.
+* **Database Isolation**: One PostgreSQL container binds only to the internal `crochet-network` (and maps port `5432` to localhost only for developer diagnostics). Each microservice has its own PostgreSQL database, login role, and schema; direct external access is blocked.
 
 ---
 

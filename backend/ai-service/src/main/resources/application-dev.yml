@@ -3,7 +3,7 @@ server:
 
 spring:
   datasource:
-    url: jdbc:postgresql://postgres-db:5432/crochet_db
+    url: jdbc:postgresql://postgres:5432/crochet_db?currentSchema=ai_service
     username: crochet_admin
     password: SecretPassword123
     driver-class-name: org.postgresql.Driver
@@ -11,6 +11,10 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    create-schemas: true
+    default-schema: ai_service
+    schemas: ai_service
 
 llm:
   active-provider: ${LLM_PROVIDER:gemini}
@@ -21,5 +25,3 @@ gemini:
     base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
     text-model: ${GEMINI_TEXT_MODEL:gemini-3.5-flash}
     image-model: ${GEMINI_IMAGE_MODEL:gemini-3.1-flash-image}
-
-
