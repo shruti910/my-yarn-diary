@@ -1,6 +1,6 @@
 # My Yarn Diary - AI-Powered Crochet Companion
 
-My Yarn Diary is an enterprise-grade, multi-service, AI-powered platform for crochet project tracking, pattern decoding, stitch count estimation, and community galleries. Built with a modern Spring Boot microservices architecture, Spring Cloud Gateway edge ingress, cryptographically isolated datastores, database column-level encryption, and distributed OpenTelemetry tracing.
+My Yarn Diary is an enterprise-grade, multi-service, AI-powered platform for crochet and fibre arts project tracking, journaling, AI assistance and lots more. Built with a modern Spring Boot microservices architecture, Spring Cloud Gateway edge ingress, and distributed OpenTelemetry tracing.
 
 ---
 
@@ -39,29 +39,30 @@ The platform is partitioned into three core backend microservices:
 
 ### 1. User Service
 The [User Service](file:///Users/shrutiprajapati/Documents/PROJECTS/PERSONAL%20PROJECTS/GITHUB%20PROJECTS/crochet-ai/backend/user-service) manages identity synchronization, accounts, and application-wide user configuration preferences:
-* **Profile Synchronization**: Synchronizes user details (display name, email, avatar/profile picture) from Firebase gateway headers on user signup or sign-in.
+* **Profile Synchronization**: Synchronizes user details (display name, email, profile picture) from Firebase gateway headers on user signup or sign-in.
 * **Crochet Terminology Settings**: Allows users to configure and toggle their preferred crochet terminology (US versus UK terms) globally.
 * **Account Management**: Supports account profile modifications and deletions, which execute soft deletions to preserve database consistency.
 * **Password Management**: Handles user password updates securely via Firebase Admin integration, automatically revokes active refresh tokens across all devices, and logs event trails to the audit log.
 
 ### 2. Crochet Service
 The [Crochet Service](file:///Users/shrutiprajapati/Documents/PROJECTS/PERSONAL%20PROJECTS/GITHUB%20PROJECTS/crochet-ai/backend/crochet-service) acts as the system database coordinator for crochet journaling, inventory, and tracking:
-* **Directories & Categories**: Organizes projects into categories. Includes system-level directories like Default and Favourites.
+* **Directories & Categories**: Organizes projects into categories.
 * **Project Tracker**: Tracks title, description, status (Planning, In Progress, Completed, On Hold), row count trackers, care instructions, total time, start/end dates, favorites status, and cover photos.
 * **Yarn & Hook Inventory**: Tracks inventory details allocated per project:
   * *Yarn details*: brand, color, colorway, weight, yardage, dye lot, quantity, and notes.
   * *Hook details*: size in mm, letter size, material, brand, and notes.
-* **Journal Logs**: Implements granular project tracking with date-stamped text logs, base64-encoded image attachments, and row count snapshots.
+* **Journal Logs**: Implements granular project tracking with date-stamped text logs, image attachments.
 * **Pattern Document Manager**: Manages crochet pattern documents uploaded to individual projects.
-* **Project Duplication**: Allows users to copy a project along with its categories, hooks, and yarns for repeating patterns.
-
+* **Project Duplication**: Allows users to copy a project along with its categories, hooks, and yarns for repeating patterns. 
+* **Project Gallery & Photo Management**: Allows users to upload project-specific photos, manage a project photo gallery.
 ### 3. AI Service
 The [AI Service](file:///Users/shrutiprajapati/Documents/PROJECTS/PERSONAL%20PROJECTS/GITHUB%20PROJECTS/crochet-ai/backend/ai-service) integrates artificial intelligence and computer vision models into the crochet workflow:
 * **Conversational AI Buddy**: A chat interface that operates with multiple underlying providers (Google Gemini API via GeminiProvider, OpenAI API via OpenAiProvider, or routing based on models via RoutingLlmProvider). Supports multimodal query contexts (attaching pattern images or project photos to chat messages).
 * **Pattern Decoder**: Decodes crochet pattern documents or images using vision models, providing structure, difficulty level, stitches required, and row-by-row instructions.
-* **Stitch Count Estimator**: Estimates stitches and rows based on text descriptions or image snapshots of crochet work.
+* **AI Image Generator**: Generates visual designs, stitch inspiration, and crochet project layouts from text prompts using image generation models (such as Pollinations.ai, Gemini, or OpenAI).
+* **AI Crochet Tutor**: Acts as an interactive tutor providing technique guides, step-by-step stitch instructions, and fiber arts advice.
 * **Terminology Translation**: Dynamically translates crochet instructions between US and UK terminologies.
-* **Daily Token Budgets**: Tracks prompt, completion, and reasoning tokens consumed per user, enforcing daily rate-limiting budgets (defaulting to 50,000 tokens) to manage provider resource consumption.
+* **Daily Token Budgets**: Tracks prompt, completion, and reasoning tokens consumed per user, enforcing daily rate-limiting budgets to manage provider resource consumption.
 
 ---
 
