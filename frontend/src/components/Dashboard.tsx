@@ -26,7 +26,7 @@ const capitalizeWords = (str: string): string => {
 };
 
 const isValidName = (str: string): boolean => {
-  return /^[ \p{L}\p{N}\-_()#.]+$/u.test(str) && /[\p{L}\p{N}]/u.test(str);
+  return /^[ \p{L}\p{N}\-_()#.\p{Emoji}\p{Extended_Pictographic}\p{M}\p{Cf}]+$/u.test(str) && /[\p{L}\p{N}\p{Emoji}\p{Extended_Pictographic}]/u.test(str);
 };
 
 const getProjectCoverPhoto = (project: Project): string | undefined => {
@@ -144,10 +144,7 @@ export function Dashboard({
   }, [localSearchQuery]);
 
   const activeCategory = categories.find(c => c.categoryId === categoryId);
-  const isFavouritesCategory = activeCategory && (
-    activeCategory.name.trim().toLowerCase() === 'favourites ❤️' ||
-    activeCategory.name.trim().toLowerCase() === 'favourites'
-  );
+  const isFavouritesCategory = activeCategory && activeCategory.name === 'Favourites ❤️';
 
   // The backend already handles all filters, searches and sorts.
   const filteredProjects = projects;
@@ -159,7 +156,7 @@ export function Dashboard({
 
     const capitalized = capitalizeWords(trimmed);
     if (!isValidName(capitalized)) {
-      await showAlert('Project title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, and brackets.');
+      await showAlert('Project title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, parentheses, and emojis.');
       return;
     }
 

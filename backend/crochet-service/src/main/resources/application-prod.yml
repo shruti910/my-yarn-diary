@@ -3,9 +3,8 @@ server:
 
 spring:
   
-  # 💡 Merged Datasource parameters directly under the unified spring block
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://crochet-db:5432/crochet_db}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/crochet_db?currentSchema=crochet_service}
     username: ${SPRING_DATASOURCE_USERNAME:crochet_admin}
     password: ${SPRING_DATASOURCE_PASSWORD:CrochetPassword123}
     driver-class-name: org.postgresql.Driver
@@ -22,6 +21,9 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+    create-schemas: true
+    default-schema: crochet_service
+    schemas: crochet_service
 
 internal:
   jwt:

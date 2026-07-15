@@ -230,12 +230,14 @@ public class AiService {
             throw new BadRequestException("Session title cannot be empty");
         }
         String trimmed = title.trim();
-        boolean hasLetterOrDigit = java.util.regex.Pattern.compile("[\\p{L}\\p{N}]").matcher(trimmed).find();
-        boolean onlyAllowedChars = java.util.regex.Pattern.compile("^[ \\p{L}\\p{N}\\-_()#.]+$").matcher(trimmed)
+        boolean hasLetterOrDigit = java.util.regex.Pattern.compile("[\\p{L}\\p{N}\\p{IsEmoji}]").matcher(trimmed)
+                .find();
+        boolean onlyAllowedChars = java.util.regex.Pattern.compile("^[ \\p{L}\\p{N}\\-_()#.\\p{IsEmoji}\\p{M}\\p{Cf}]+$")
+                .matcher(trimmed)
                 .matches();
         if (!hasLetterOrDigit || !onlyAllowedChars) {
             throw new BadRequestException(
-                    "Session title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, and brackets");
+                    "Session title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, parentheses, and emojis");
         }
     }
 

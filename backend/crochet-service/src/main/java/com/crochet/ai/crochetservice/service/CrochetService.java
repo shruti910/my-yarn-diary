@@ -30,12 +30,12 @@ public class CrochetService {
 
     @Autowired
     public CrochetService(CategoryRepository categoryRepository,
-                          ProjectRepository projectRepository,
-                          JournalLogRepository journalLogRepository,
-                          PatternRepository patternRepository,
-                          YarnRepository yarnRepository,
-                          HookRepository hookRepository,
-                          PhotoRepository photoRepository) {
+            ProjectRepository projectRepository,
+            JournalLogRepository journalLogRepository,
+            PatternRepository patternRepository,
+            YarnRepository yarnRepository,
+            HookRepository hookRepository,
+            PhotoRepository photoRepository) {
         this.categoryRepository = categoryRepository;
         this.projectRepository = projectRepository;
         this.journalLogRepository = journalLogRepository;
@@ -49,18 +49,18 @@ public class CrochetService {
     public List<CategoryResponse> getCategories(String userId) {
         UUID userUuid = UUID.fromString(userId);
         List<Category> categories = categoryRepository.findByUserId(userUuid);
-        
+
         boolean hasDefault = false;
         boolean hasFavourites = false;
         for (Category cat : categories) {
             String norm = cat.getName().trim().toLowerCase();
             if (norm.equals("default")) {
                 hasDefault = true;
-            } else if (norm.equals("favourites ❤️") || norm.equals("favourites")) {
+            } else if (cat.getName().equals("Favourites ❤️")) {
                 hasFavourites = true;
             }
         }
-        
+
         boolean updated = false;
         if (!hasDefault) {
             Category defaultCat = Category.builder()
@@ -71,7 +71,7 @@ public class CrochetService {
             categoryRepository.save(defaultCat);
             updated = true;
         }
-        
+
         if (!hasFavourites) {
             Category favCat = Category.builder()
                     .categoryId(UUID.randomUUID())
@@ -81,18 +81,19 @@ public class CrochetService {
             categoryRepository.save(favCat);
             updated = true;
         }
-        
+
         if (updated) {
             categories = categoryRepository.findByUserId(userUuid);
         }
-        
+
         return categories.stream().map(this::mapToCategoryResponse).collect(Collectors.toList());
     }
 
     @Transactional
     public CategoryResponse createCategory(String userId, CategoryRequest request) {
+        validateName(request.getName(), "Category");
         UUID userUuid = UUID.fromString(userId);
-        
+
         // Validation check for duplicates
         List<Category> existing = categoryRepository.findByUserId(userUuid);
         for (Category cat : existing) {
@@ -100,32 +101,32 @@ public class CrochetService {
                 throw new ConflictException("Category name already exists: " + request.getName());
             }
         }
-        
+
         Category category = Category.builder()
                 .categoryId(UUID.randomUUID())
                 .userId(userUuid)
                 .name(request.getName())
                 .build();
-        
+
         return mapToCategoryResponse(categoryRepository.save(category));
     }
 
     @Transactional
     public CategoryResponse updateCategory(String userId, String categoryId, CategoryRequest request) {
+        validateName(request.getName(), "Category");
         UUID userUuid = UUID.fromString(userId);
         UUID categoryUuid = UUID.fromString(categoryId);
         Category category = categoryRepository.findByCategoryId(categoryUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found: " + categoryId));
-        
+
         if (!category.getUserId().equals(userUuid)) {
             throw new ForbiddenException("Forbidden access attempt");
         }
-        
-        String normName = category.getName().trim().toLowerCase();
-        if (normName.equals("default") || normName.equals("favourites ❤️") || normName.equals("favourites")) {
-            throw new BadRequestException("System categories 'Default' and 'Favourites' cannot be renamed.");
+
+        if (category.getName().equals("Default") || category.getName().equals("Favourites ❤️")) {
+            throw new BadRequestException("System categories 'Default' and 'Favourites ❤️' cannot be renamed.");
         }
-        
+
         // Duplicate check
         List<Category> existing = categoryRepository.findByUserId(userUuid);
         for (Category cat : existing) {
@@ -133,7 +134,7 @@ public class CrochetService {
                 throw new ConflictException("Another category already has this name: " + request.getName());
             }
         }
-        
+
         category.setName(request.getName());
         return mapToCategoryResponse(categoryRepository.save(category));
     }
@@ -144,14 +145,13 @@ public class CrochetService {
         UUID categoryUuid = UUID.fromString(categoryId);
         Category category = categoryRepository.findByCategoryId(categoryUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found: " + categoryId));
-        
+
         if (!category.getUserId().equals(userUuid)) {
             throw new ForbiddenException("Forbidden access attempt");
         }
-        
-        String normName = category.getName().trim().toLowerCase();
-        if (normName.equals("default") || normName.equals("favourites ❤️") || normName.equals("favourites")) {
-            throw new BadRequestException("System categories 'Default' and 'Favourites' cannot be deleted.");
+
+        if (category.getName().equals("Default") || category.getName().equals("Favourites ❤️")) {
+            throw new BadRequestException("System categories 'Default' and 'Favourites ❤️' cannot be deleted.");
         }
 
         // Delete cascaded subprojects and logs
@@ -159,23 +159,23 @@ public class CrochetService {
         for (Project project : projectsInCategory) {
             journalLogRepository.deleteByProjectId(project.getProjectId());
         }
-        
+
         projectRepository.deleteByCategoryId(categoryUuid);
         categoryRepository.delete(category);
     }
 
     // --- TRACKED PROJECTS ---
     public Page<ProjectSummaryResponse> getProjects(
-            String userId, 
-            String categoryId, 
-            Boolean favorite, 
-            Boolean archive, 
-            String statusStr, 
-            String search, 
+            String userId,
+            String categoryId,
+            Boolean favorite,
+            Boolean archive,
+            String statusStr,
+            String search,
             Pageable pageable) {
         UUID userUuid = UUID.fromString(userId);
         boolean isArchive = Boolean.TRUE.equals(archive);
-        
+
         UUID categoryUuid = null;
         Boolean isFavorite = favorite;
 
@@ -190,7 +190,7 @@ public class CrochetService {
                         throw new ForbiddenException("Forbidden access attempt");
                     }
                     String normName = category.getName().trim().toLowerCase();
-                    if (normName.equals("favourites ❤️") || normName.equals("favourites")) {
+                    if (category.getName().equals("Favourites ❤️")) {
                         isFavorite = true;
                     } else {
                         categoryUuid = parsedCategoryUuid;
@@ -212,12 +212,12 @@ public class CrochetService {
         }
 
         Page<Project> projectsPage = projectRepository.findProjectsForUser(
-                userUuid, 
-                categoryUuid, 
-                isFavorite, 
-                isArchive, 
-                status, 
-                searchPattern, 
+                userUuid,
+                categoryUuid,
+                isFavorite,
+                isArchive,
+                status,
+                searchPattern,
                 pageable);
 
         return projectsPage.map(this::mapToSummaryResponse);
@@ -255,8 +255,7 @@ public class CrochetService {
                 project.isArchive(),
                 base64CoverPhoto,
                 project.getCreatedAt(),
-                project.getUpdatedAt()
-        );
+                project.getUpdatedAt());
     }
 
     public Project getProjectDetails(String userId, String projectId) {
@@ -281,29 +280,31 @@ public class CrochetService {
     @Transactional
     public ProjectResponse createProject(String userId, ProjectRequest request) {
         validateProjectDates(request);
+        validateName(request.getTitle(), "Project");
         UUID userUuid = UUID.fromString(userId);
         UUID categoryUuid = UUID.fromString(request.getCategoryId());
-        
+
         Category category = categoryRepository.findByCategoryId(categoryUuid)
-                .orElseThrow(() -> new ResourceNotFoundException("Category directory not found: " + request.getCategoryId()));
-        
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Category directory not found: " + request.getCategoryId()));
+
         if (!category.getUserId().equals(userUuid)) {
             throw new ForbiddenException("Forbidden access attempt");
         }
-        
-        String checkName = category.getName().trim().toLowerCase();
-        if (checkName.equals("favourites ❤️") || checkName.equals("favourites")) {
-            throw new BadRequestException("Projects cannot be created directly inside the Favourites category.");
+
+        if (category.getName().equals("Favourites ❤️")) {
+            throw new BadRequestException("Projects cannot be created directly inside the Favourites ❤️ category.");
         }
-        
+
         // Duplicate check
         List<Project> existing = projectRepository.findByUserIdAndCategoryId(userUuid, categoryUuid);
         for (Project proj : existing) {
             if (proj.getTitle().equalsIgnoreCase(request.getTitle())) {
-                throw new ConflictException("Project with title '" + request.getTitle() + "' already exists in this category.");
+                throw new ConflictException(
+                        "Project with title '" + request.getTitle() + "' already exists in this category.");
             }
         }
-        
+
         Project project = Project.builder()
                 .projectId(UUID.randomUUID())
                 .userId(userUuid)
@@ -320,7 +321,7 @@ public class CrochetService {
                 .isFavorite(false)
                 .isArchive(request.getIsArchive() != null ? request.getIsArchive() : false)
                 .build();
-        
+
         project = projectRepository.save(project);
         return mapToProjectResponse(project);
     }
@@ -328,8 +329,12 @@ public class CrochetService {
     @Transactional
     public ProjectResponse updateProject(String userId, String projectId, ProjectRequest request) {
         validateProjectDates(request);
-
         Project project = getProjectDetails(userId, projectId);
+
+        if (request.getTitle() != null) {
+            validateName(request.getTitle(), "Project");
+            project.setTitle(request.getTitle());
+        }
 
         if (request.getCategoryId() != null) {
             UUID categoryUuid = UUID.fromString(request.getCategoryId());
@@ -338,27 +343,31 @@ public class CrochetService {
             if (!category.getUserId().equals(UUID.fromString(userId))) {
                 throw new ForbiddenException("Forbidden access attempt");
             }
-            String checkName = category.getName().trim().toLowerCase();
-            if (checkName.equals("favourites ❤️") || checkName.equals("favourites")) {
-                throw new BadRequestException("Projects cannot be moved directly into the Favourites category.");
+            if (category.getName().equals("Favourites ❤️")) {
+                throw new BadRequestException("Projects cannot be moved directly into the Favourites ❤️ category.");
             }
             project.setCategory(category);
             project.setCategoryId(categoryUuid);
         }
- 
-        project.setTitle(request.getTitle());
-        
-        if (request.getStatus() != null) project.setStatus(request.getStatus());
-        
+
+        if (request.getStatus() != null)
+            project.setStatus(request.getStatus());
+
         project.setRowCount(request.getRowCount());
-        
-        if (request.getNotes() != null) project.setNotes(request.getNotes());
-        if (request.getCareInstructions() != null) project.setCareInstructions(request.getCareInstructions());
-        if (request.getTotalTime() != null) project.setTotalTime(request.getTotalTime());
-        if (request.getStartDate() != null) project.setStartDate(request.getStartDate());
-        if (request.getEndDate() != null) project.setEndDate(request.getEndDate());
-        if (request.getIsArchive() != null) project.setArchive(request.getIsArchive());
- 
+
+        if (request.getNotes() != null)
+            project.setNotes(request.getNotes());
+        if (request.getCareInstructions() != null)
+            project.setCareInstructions(request.getCareInstructions());
+        if (request.getTotalTime() != null)
+            project.setTotalTime(request.getTotalTime());
+        if (request.getStartDate() != null)
+            project.setStartDate(request.getStartDate());
+        if (request.getEndDate() != null)
+            project.setEndDate(request.getEndDate());
+        if (request.getIsArchive() != null)
+            project.setArchive(request.getIsArchive());
+
         return mapToProjectResponse(projectRepository.save(project));
     }
 
@@ -403,7 +412,8 @@ public class CrochetService {
                 .userId(UUID.fromString(userId))
                 .textEntry(request.getTextEntry())
                 .imageBase64(request.getImageBase64())
-                .rowCountSnapshot(request.getRowCountSnapshot() != null ? request.getRowCountSnapshot() : project.getRowCount())
+                .rowCountSnapshot(
+                        request.getRowCountSnapshot() != null ? request.getRowCountSnapshot() : project.getRowCount())
                 .createdAt(LocalDateTime.now())
                 .build();
 
@@ -453,8 +463,7 @@ public class CrochetService {
                             proj.getTitle(),
                             proj.getProjectId().toString(),
                             photo.getCreatedAt().toString(),
-                            "End Product Photo"
-                    ));
+                            "End Product Photo"));
                 }
             }
 
@@ -468,8 +477,7 @@ public class CrochetService {
                             proj.getTitle(),
                             proj.getProjectId().toString(),
                             log.getCreatedAt().toString(),
-                            log.getTextEntry()
-                    ));
+                            log.getTextEntry()));
                 }
             }
         }
@@ -633,8 +641,6 @@ public class CrochetService {
         return mapToYarnResponse(yarnRepository.save(yarn));
     }
 
-
-
     @Transactional
     public void deleteYarn(String userId, Long yarnId) {
         Yarn yarn = getValidatedYarn(userId, yarnId);
@@ -677,8 +683,6 @@ public class CrochetService {
         return mapToHookResponse(hookRepository.save(hook));
     }
 
-
-
     @Transactional
     public void deleteHook(String userId, Long hookId) {
         Hook hook = getValidatedHook(userId, hookId);
@@ -709,7 +713,7 @@ public class CrochetService {
     public PhotoResponse updatePhoto(String userId, String projectId, PhotoUpdateRequest request) {
         Project project = getProjectDetails(userId, projectId);
         Photo photo = getValidatedPhoto(userId, request.id());
-        
+
         if (request.isCover()) {
             syncCoverPhotoPreference(project, String.valueOf(request.id()));
         } else {
@@ -717,7 +721,7 @@ public class CrochetService {
             photoRepository.save(photo);
             syncCoverPhotoPreference(project, null);
         }
-        
+
         projectRepository.save(project);
         return mapToPhotoResponse(photoRepository.findById(request.id()).orElse(photo));
     }
@@ -787,7 +791,8 @@ public class CrochetService {
                 p.setCover(p == matchedPhoto);
             }
         } else {
-            // If no match was found (or coverPhotoVal is null), ensure EXACTLY one photo is the cover
+            // If no match was found (or coverPhotoVal is null), ensure EXACTLY one photo is
+            // the cover
             Photo currentCover = null;
             for (Photo p : project.getPhotoEntities()) {
                 if (p.isCover()) {
@@ -908,101 +913,116 @@ public class CrochetService {
 
     private YarnResponse mapToYarnResponse(Yarn yarn) {
         return new YarnResponse(
-            yarn.getId(),
-            yarn.getBrand() != null ? yarn.getBrand() : "",
-            yarn.getLineName() != null ? yarn.getLineName() : "",
-            yarn.getColorway() != null ? yarn.getColorway() : "",
-            yarn.getDyeLot() != null ? yarn.getDyeLot() : "",
-            yarn.getWeight() != null ? yarn.getWeight() : "",
-            yarn.getFiberContent() != null ? yarn.getFiberContent() : "",
-            yarn.getQuantityUsed(),
-            yarn.getUnit() != null ? yarn.getUnit() : "meters"
-        );
+                yarn.getId(),
+                yarn.getBrand() != null ? yarn.getBrand() : "",
+                yarn.getLineName() != null ? yarn.getLineName() : "",
+                yarn.getColorway() != null ? yarn.getColorway() : "",
+                yarn.getDyeLot() != null ? yarn.getDyeLot() : "",
+                yarn.getWeight() != null ? yarn.getWeight() : "",
+                yarn.getFiberContent() != null ? yarn.getFiberContent() : "",
+                yarn.getQuantityUsed(),
+                yarn.getUnit() != null ? yarn.getUnit() : "meters");
     }
 
     private HookResponse mapToHookResponse(Hook hook) {
         return new HookResponse(
-            hook.getId(),
-            hook.getSizeMm(),
-            hook.getSizeUs() != null ? hook.getSizeUs() : "",
-            hook.getMaterial() != null ? hook.getMaterial() : "",
-            hook.getBrand() != null ? hook.getBrand() : ""
-        );
+                hook.getId(),
+                hook.getSizeMm(),
+                hook.getSizeUs() != null ? hook.getSizeUs() : "",
+                hook.getMaterial() != null ? hook.getMaterial() : "",
+                hook.getBrand() != null ? hook.getBrand() : "");
     }
 
     private PhotoResponse mapToPhotoResponse(Photo photo) {
         return new PhotoResponse(
-            photo.getId(),
-            photo.getPhotoBase64(),
-            photo.isCover(),
-            photo.getCreatedAt()
-        );
+                photo.getId(),
+                photo.getPhotoBase64(),
+                photo.isCover(),
+                photo.getCreatedAt());
     }
 
     private JournalLogResponse mapToJournalLogResponse(JournalLog log) {
         return new JournalLogResponse(
-            log.getLogId(),
-            log.getProjectId(),
-            log.getUserId(),
-            log.getTextEntry(),
-            log.getImageBase64(),
-            log.getRowCountSnapshot(),
-            log.getCreatedAt()
-        );
+                log.getLogId(),
+                log.getProjectId(),
+                log.getUserId(),
+                log.getTextEntry(),
+                log.getImageBase64(),
+                log.getRowCountSnapshot(),
+                log.getCreatedAt());
     }
 
     private PatternResponse mapToPatternResponse(Pattern pattern) {
         return new PatternResponse(
-            pattern.getPatternId(),
-            pattern.getProject() != null ? pattern.getProject().getProjectId() : null,
-            pattern.getPatternType(),
-            pattern.getPatternContent(),
-            pattern.getFileName(),
-            pattern.getCreatedAt()
-        );
+                pattern.getPatternId(),
+                pattern.getProject() != null ? pattern.getProject().getProjectId() : null,
+                pattern.getPatternType(),
+                pattern.getPatternContent(),
+                pattern.getFileName(),
+                pattern.getCreatedAt());
     }
 
     private ProjectResponse mapToProjectResponse(Project project) {
         return new ProjectResponse(
-            project.getProjectId(),
-            project.getUserId(),
-            project.getCategoryId(),
-            project.getTitle(),
-            project.getStatus(),
-            project.getRowCount(),
-            project.getNotes(),
-            project.getCareInstructions(),
-            project.getTotalTime(),
-            project.getStartDate(),
-            project.getEndDate(),
-            project.isFavorite(),
-            project.isArchive(),
-            project.getCreatedAt(),
-            project.getUpdatedAt()
-        );
+                project.getProjectId(),
+                project.getUserId(),
+                project.getCategoryId(),
+                project.getTitle(),
+                project.getStatus(),
+                project.getRowCount(),
+                project.getNotes(),
+                project.getCareInstructions(),
+                project.getTotalTime(),
+                project.getStartDate(),
+                project.getEndDate(),
+                project.isFavorite(),
+                project.isArchive(),
+                project.getCreatedAt(),
+                project.getUpdatedAt());
     }
 
     private ProjectFullResponse mapToProjectFullResponse(Project project) {
         return new ProjectFullResponse(
-            project.getProjectId(),
-            project.getUserId(),
-            project.getCategoryId(),
-            project.getTitle(),
-            project.getStatus(),
-            project.getRowCount(),
-            project.getNotes(),
-            project.getCareInstructions(),
-            project.getTotalTime(),
-            project.getStartDate(),
-            project.getEndDate(),
-            project.isFavorite(),
-            project.isArchive(),
-            project.getYarnEntities().stream().map(this::mapToYarnResponse).collect(Collectors.toList()),
-            project.getHookEntities().stream().map(this::mapToHookResponse).collect(Collectors.toList()),
-            project.getPhotoEntities().stream().map(this::mapToPhotoResponse).collect(Collectors.toList()),
-            project.getPatternEntities().stream().map(this::mapToPatternResponse).collect(Collectors.toList()),
-            project.getCreatedAt(),
-            project.getUpdatedAt()
-        );
+                project.getProjectId(),
+                project.getUserId(),
+                project.getCategoryId(),
+                project.getTitle(),
+                project.getStatus(),
+                project.getRowCount(),
+                project.getNotes(),
+                project.getCareInstructions(),
+                project.getTotalTime(),
+                project.getStartDate(),
+                project.getEndDate(),
+                project.isFavorite(),
+                project.isArchive(),
+                project.getYarnEntities().stream().map(this::mapToYarnResponse).collect(Collectors.toList()),
+                project.getHookEntities().stream().map(this::mapToHookResponse).collect(Collectors.toList()),
+                project.getPhotoEntities().stream().map(this::mapToPhotoResponse).collect(Collectors.toList()),
+                project.getPatternEntities().stream().map(this::mapToPatternResponse).collect(Collectors.toList()),
+                project.getCreatedAt(),
+                project.getUpdatedAt());
+    }
+
+    private void validateName(String name, String type) {
+        if (name == null || name.trim().isEmpty()) {
+            throw new BadRequestException(type + " name cannot be empty");
+        }
+        String trimmed = name.trim();
+        if ("Category".equals(type)) {
+            String norm = trimmed.toLowerCase();
+            if (norm.equals("default") || norm.equals("favourites ❤️")) {
+                throw new BadRequestException("'" + name + "' is a reserved category name.");
+            }
+        }
+        boolean hasLetterOrDigitOrEmoji = java.util.regex.Pattern.compile("[\\p{L}\\p{N}\\p{IsEmoji}]").matcher(trimmed)
+                .find();
+        boolean onlyAllowedChars = java.util.regex.Pattern.compile("^[ \\p{L}\\p{N}\\-_()#.\\p{IsEmoji}\\p{M}\\p{Cf}]+$")
+                .matcher(trimmed)
+                .matches();
+        if (!hasLetterOrDigitOrEmoji || !onlyAllowedChars) {
+            throw new BadRequestException(
+                    type + " name can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, parentheses, and emojis");
+        }
     }
 }

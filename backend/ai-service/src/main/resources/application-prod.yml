@@ -3,9 +3,9 @@ server:
 
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://ai-db:5432/ai_db}
-    username: ${SPRING_DATASOURCE_USERNAME:ai_admin}
-    password: ${SPRING_DATASOURCE_PASSWORD:AiPassword123}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/crochet_db?currentSchema=ai_service}
+    username: ${SPRING_DATASOURCE_USERNAME:crochet_admin}
+    password: ${SPRING_DATASOURCE_PASSWORD:CrochetPassword123}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -20,6 +20,9 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+    create-schemas: true
+    default-schema: ai_service
+    schemas: ai_service
 
 internal:
   jwt:
@@ -52,4 +55,3 @@ gemini:
     base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
     text-model: ${GEMINI_TEXT_MODEL:gemini-3.5-flash}
     image-model: ${GEMINI_IMAGE_MODEL:gemini-3.1-flash-image}
-

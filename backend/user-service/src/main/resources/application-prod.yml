@@ -4,9 +4,9 @@ server:
 spring:
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://user-db:5432/user_db}
-    username: ${SPRING_DATASOURCE_USERNAME:user_admin}
-    password: ${SPRING_DATASOURCE_PASSWORD:UserPassword123}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/crochet_db?currentSchema=user_service}
+    username: ${SPRING_DATASOURCE_USERNAME:crochet_admin}
+    password: ${SPRING_DATASOURCE_PASSWORD:CrochetPassword123}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -21,6 +21,9 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+    create-schemas: true
+    default-schema: user_service
+    schemas: user_service
 
 internal:
   jwt:

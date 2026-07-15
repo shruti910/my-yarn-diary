@@ -1,1 +1,0 @@
-ALTER TABLE project_hooks ALTER COLUMN size_mm DROP NOT NULL;
