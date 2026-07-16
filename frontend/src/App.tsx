@@ -453,7 +453,7 @@ export default function App() {
     if (!token || !user) return;
     try {
       const response = await fetch(`/api/v1/users/${user.userId}`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -899,7 +899,7 @@ export default function App() {
   const handleUpdateProfile = async (displayName: string, profilePicture: string) => {
     try {
       const res = await fetchWithToken(`/api/v1/users/${user.userId}`, {
-        method: 'PATCH',
+        method: 'PUT',
         body: JSON.stringify({ displayName, profilePicture })
       });
       if (res) {

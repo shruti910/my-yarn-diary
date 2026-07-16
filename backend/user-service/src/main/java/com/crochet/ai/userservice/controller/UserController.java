@@ -52,16 +52,6 @@ public class UserController {
         return ResponseEntity.ok(userService.updateProfile(userId, request));
     }
 
-    @PatchMapping("/{id}")
-    public ResponseEntity<UserResponse> patchProfile(
-            @RequestHeader("X-User-Id") String authenticatedUserId,
-            @PathVariable("id") String userId,
-            @RequestBody UserPatchRequest request) {
-        log.info("Patching profile details for userId: {} (authenticated: {})", userId, authenticatedUserId);
-        validateUserOwnership(authenticatedUserId, userId);
-        return ResponseEntity.ok(userService.patchProfile(userId, request));
-    }
-
     @PutMapping("/{id}/membership")
     public ResponseEntity<UserResponse> updateMembership(
             @RequestHeader("X-User-Id") String authenticatedUserId,

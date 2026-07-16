@@ -125,36 +125,18 @@ public class UserService {
         User user = userRepository.findByUserId(uuid)
                 .orElseThrow(() -> new ResourceNotFoundException("User profile not found with ID: " + userId));
 
-        user.setDisplayName(updateRequest.getDisplayName());
+        if (updateRequest.getDisplayName() != null) {
+            user.setDisplayName(updateRequest.getDisplayName());
+        }
+        if (updateRequest.getEmail() != null) {
+            user.setEmail(updateRequest.getEmail());
+        }
         if (updateRequest.getProfilePicture() != null) {
             validateProfilePicture(updateRequest.getProfilePicture());
             user.setProfilePicture(updateRequest.getProfilePicture());
         }
         if (updateRequest.getCrochetTerminology() != null) {
             user.setCrochetTerminology(updateRequest.getCrochetTerminology());
-        }
-
-        User updatedUser = userRepository.save(user);
-        return mapToResponse(updatedUser);
-    }
-
-    @Transactional
-    public UserResponse patchProfile(String userId, UserPatchRequest patchRequest) {
-        UUID uuid = UUID.fromString(userId);
-        User user = userRepository.findByUserId(uuid)
-                .orElseThrow(() -> new ResourceNotFoundException("User profile not found with ID: " + userId));
-
-        if (patchRequest.getDisplayName() != null) {
-            user.setDisplayName(patchRequest.getDisplayName());
-        }
-        if (patchRequest.getEmail() != null) {
-            user.setEmail(patchRequest.getEmail());
-        }
-        if (patchRequest.getProfilePicture() != null) {
-            user.setProfilePicture(patchRequest.getProfilePicture());
-        }
-        if (patchRequest.getCrochetTerminology() != null) {
-            user.setCrochetTerminology(patchRequest.getCrochetTerminology());
         }
 
         User updatedUser = userRepository.save(user);
