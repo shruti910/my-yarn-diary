@@ -4,6 +4,33 @@ import * as Sentry from "@sentry/react";
 import App from './App.tsx';
 import './index.css';
 
+// Automatically redirect relative /api/ requests to the production gateway if configured
+const originalFetch = window.fetch;
+window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+  const gatewayUrl = import.meta.env.VITE_GATEWAY_URL;
+  if (gatewayUrl) {
+    const baseUrl = gatewayUrl.endsWith('/') ? gatewayUrl.slice(0, -1) : gatewayUrl;
+    
+    if (typeof input === 'string') {
+      if (input.startsWith('/api/')) {
+        input = `${baseUrl}${input}`;
+      }
+    } else if (input instanceof URL) {
+      if (input.pathname.startsWith('/api/')) {
+        return originalFetch(new URL(`${baseUrl}${input.pathname}${input.search}`), init);
+      }
+    } else if (input && typeof input === 'object' && 'url' in input) {
+      const requestUrl = input.url;
+      const localApiPrefix = window.location.origin + '/api/';
+      if (requestUrl.startsWith(localApiPrefix)) {
+        const newUrl = requestUrl.replace(window.location.origin, baseUrl);
+        return originalFetch(new Request(newUrl, input), init);
+      }
+    }
+  }
+  return originalFetch(input, init);
+};
+
 // Resolve your secure production DSN target dynamically from Vite's environment context
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN || '';
 
