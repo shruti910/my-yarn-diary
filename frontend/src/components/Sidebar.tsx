@@ -225,7 +225,7 @@ export function Sidebar({
 
       // 2. Submit display name and profile picture to backend
       const response = await fetch(`/api/v1/users/${currentUser?.userId}`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Authorization': `Bearer ${activeToken}`,
           'Content-Type': 'application/json'

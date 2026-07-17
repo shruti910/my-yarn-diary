@@ -3,7 +3,7 @@ import { auth } from './firebase';
 
 // Create a configured Axios instance pointing to the Edge Gateway API root
 const api = axios.create({
-  baseURL: '', // The gateway handles relative routing in Vite, or we can resolve baseURL dynamically
+  baseURL: import.meta.env.VITE_GATEWAY_URL || '',
   headers: {
     'Content-Type': 'application/json',
   },

@@ -1,0 +1,9 @@
+{
+    # Use Let's Encrypt for automatic HTTPS
+    email your-email@example.com
+}
+
+# The domain will be passed as an environment variable in AWS
+{$DOMAIN:localhost} {
+    reverse_proxy gateway:3000
+}

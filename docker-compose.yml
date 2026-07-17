@@ -37,7 +37,6 @@ services:
       - INTERNAL_JWT_SECRET=${INTERNAL_JWT_SECRET}
       - OTEL_SERVICE_NAME=gateway
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
-      - OTEL_EXPORTER_OTLP_HEADERS=${OTEL_EXPORTER_OTLP_HEADERS}
       - OTEL_EXPORTER_OTLP_PROTOCOL=${OTEL_EXPORTER_OTLP_PROTOCOL}
     depends_on:
       - user-service
@@ -66,7 +65,6 @@ services:
       - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
       - OTEL_SERVICE_NAME=user-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
-      - OTEL_EXPORTER_OTLP_HEADERS=${OTEL_EXPORTER_OTLP_HEADERS}
       - OTEL_EXPORTER_OTLP_PROTOCOL=${OTEL_EXPORTER_OTLP_PROTOCOL}
     depends_on:
       # Do not start Spring Boot until PostgreSQL accepts connections.
@@ -92,7 +90,6 @@ services:
       - DB_ENCRYPTION_SECRET=${DB_ENCRYPTION_SECRET}
       - OTEL_SERVICE_NAME=crochet-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
-      - OTEL_EXPORTER_OTLP_HEADERS=${OTEL_EXPORTER_OTLP_HEADERS}
       - OTEL_EXPORTER_OTLP_PROTOCOL=${OTEL_EXPORTER_OTLP_PROTOCOL}
     depends_on:
       # Do not start Spring Boot until PostgreSQL accepts connections.
@@ -127,12 +124,29 @@ services:
       - DB_ENCRYPTION_SECRET=${DB_ENCRYPTION_SECRET}
       - OTEL_SERVICE_NAME=ai-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
-      - OTEL_EXPORTER_OTLP_HEADERS=${OTEL_EXPORTER_OTLP_HEADERS}
       - OTEL_EXPORTER_OTLP_PROTOCOL=${OTEL_EXPORTER_OTLP_PROTOCOL}
     depends_on:
       # Do not start Spring Boot until PostgreSQL accepts connections.
       postgres:
         condition: service_healthy
+    networks:
+      - crochet-network
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.95.0
+    container_name: otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./docker/otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
+      - /proc:/hostfs/proc:ro
+      - /sys:/hostfs/sys:ro
+      - /:/hostfs:ro
+    environment:
+      - GRAFANA_USER_ID=${GRAFANA_USER_ID}
+      - GRAFANA_API_TOKEN=${GRAFANA_API_TOKEN}
+      - GRAFANA_OTLP_ENDPOINT=${GRAFANA_OTLP_ENDPOINT}
+      - GRAFANA_HOST_NAME=${GRAFANA_HOST_NAME}
     networks:
       - crochet-network
 

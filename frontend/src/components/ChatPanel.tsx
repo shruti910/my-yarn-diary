@@ -1023,7 +1023,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
 
                   <div className="space-y-1">
                     {/* Message payload cards */}
-                    {msg.imageData ? (
+                    {msg.imageData && (
                       <div className="flex flex-col gap-3">
                         {msg.imageData.split('|||').map((imgUrl, i) => (
                           <div key={i} className="flex flex-col max-w-sm rounded-2xl overflow-hidden shadow-md border border-neutral-200 bg-white">
@@ -1072,7 +1072,9 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
                           </div>
                         ))}
                       </div>
-                    ) : (
+                    )}
+                    
+                    {msg.text && (
                       <div className={`p-4 rounded-3xl md:p-5 warm-shadow ${isUser
                         ? 'bg-[#F28482]/10 text-[#2D231B] rounded-tr-none border border-[#F28482]/20'
                         : 'bg-white text-[#2D231B] rounded-tl-none border border-[#E8E2D9]'
@@ -1125,7 +1127,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
                       <span className="text-[9px] font-mono font-bold text-[#A89F94]">
                         {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
-                      {!msg.imageData && (
+                      {msg.text && (
                         <button
                           type="button"
                           onClick={() => handleCopyMessage(msg.id, msg.text)}

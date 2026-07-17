@@ -2,6 +2,7 @@
 # CRITICAL SYSTEM SECRETS
 # =========================================================================
 .env
+.env.prod
 .env.local
 .env.production
 .env.development

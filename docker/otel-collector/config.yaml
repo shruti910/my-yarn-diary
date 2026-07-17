@@ -1,0 +1,60 @@
+extensions:
+  basicauth/grafana_cloud:
+    client_auth:
+      username: ${GRAFANA_USER_ID}
+      password: ${GRAFANA_API_TOKEN}
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  hostmetrics:
+    root_path: /hostfs
+    scrapers:
+      cpu:
+      memory:
+      disk:
+      network:
+      load:
+      filesystem:
+
+processors:
+  batch:
+  resourcedetection:
+    detectors: [env, system]
+    timeout: 2s
+    override: false
+  resource:
+    attributes:
+      - key: host.name
+        value: ${GRAFANA_HOST_NAME}
+        action: upsert
+      - key: grafana.host.id
+        value: ${GRAFANA_HOST_NAME}
+        action: upsert
+
+exporters:
+  otlphttp/grafana_cloud:
+    endpoint: ${GRAFANA_OTLP_ENDPOINT}
+    auth:
+      authenticator: basicauth/grafana_cloud
+
+service:
+  extensions: [basicauth/grafana_cloud]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [resourcedetection, resource, batch]
+      exporters: [otlphttp/grafana_cloud]
+    metrics:
+      receivers: [otlp, hostmetrics]
+      processors: [resourcedetection, resource, batch]
+      exporters: [otlphttp/grafana_cloud]
+    logs:
+      receivers: [otlp]
+      processors: [resourcedetection, resource, batch]
+      exporters: [otlphttp/grafana_cloud]
