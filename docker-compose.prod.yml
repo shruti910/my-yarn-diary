@@ -1,0 +1,72 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - crochet-network
+    depends_on:
+      - gateway
+
+  gateway:
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_OPTS=-XX:+UseG1GC -Xms256m -Xmx512m
+
+  user-service:
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_OPTS=-XX:+UseG1GC -Xms256m -Xmx512m
+
+  crochet-service:
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_OPTS=-XX:+UseG1GC -Xms256m -Xmx512m
+
+  ai-service:
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_OPTS=-XX:+UseG1GC -Xms512m -Xmx1024m
+
+  postgres:
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+
+  otel-collector:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    environment:
+      - OTEL_RESOURCE_ATTRIBUTES=deployment.environment=production
+
+volumes:
+  caddy_data:
+  caddy_config:
