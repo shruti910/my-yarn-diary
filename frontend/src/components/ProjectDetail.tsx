@@ -709,7 +709,7 @@ export function ProjectDetail({
     setCameraTarget(null);
   };
 
-  const captureSnap = () => {
+  const captureSnap = async () => {
     if (!videoRef.current || !cameraStream) return;
 
     const video = videoRef.current;
@@ -724,20 +724,35 @@ export function ProjectDetail({
 
       if (cameraTarget === 'product') {
         if (productPhotos.length >= 6) {
-          showAlert("You have already uploaded the maximum limit of 6 photos.");
+          await showAlert("You have already uploaded the maximum limit of 6 photos.");
         } else {
-          setProductPhotos(prev => {
-            const updated = [...prev, capturedBase64];
-            setIsSaved(false);
-            return updated;
-          });
-          if (status !== ProjectStatus.Completed) {
-            showConfirm('Do you want to move this project to the "Completed" stage?').then(confirmed => {
+          setIsUploadingPhoto(true);
+          try {
+            await fetchWithToken(`/api/v1/projects/${project.projectId}/photos`, {
+              method: 'POST',
+              body: capturedBase64
+            });
+            
+            const photosData = await fetchWithToken(`/api/v1/projects/${project.projectId}/photos`);
+            if (photosData) {
+              onUpdateProjectState({
+                ...project,
+                photos: photosData
+              });
+              setProductPhotos(photosData.map((p: any) => p.photoBase64));
+            }
+            
+            if (status !== ProjectStatus.Completed) {
+              const confirmed = await showConfirm('Do you want to move this project to the "Completed" stage?');
               if (confirmed) {
                 setStatus(ProjectStatus.Completed);
-                setIsSaved(false);
+                onUpdateProject({ status: ProjectStatus.Completed });
               }
-            });
+            }
+          } catch (err) {
+            console.error("Failed to process captured photo:", err);
+          } finally {
+            setIsUploadingPhoto(false);
           }
         }
       } else if (cameraTarget === 'log') {

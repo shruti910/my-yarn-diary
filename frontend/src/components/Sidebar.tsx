@@ -148,7 +148,7 @@ export function Sidebar({
         try {
           const data = await response.json();
           if (data && data.message) errMsg = data.message;
-        } catch (_) {}
+        } catch (_) { }
         throw new Error(errMsg);
       }
 
@@ -156,7 +156,7 @@ export function Sidebar({
       setCurrentPassword('');
       setNewPassword('');
       setConfirmNewPassword('');
-      
+
       await showAlert('Password updated successfully! For security, you will now be logged out.', 'Success');
       onLogout();
 
@@ -842,15 +842,15 @@ export function Sidebar({
                   </p>
                   <div className="flex items-center justify-between bg-white border border-[#E8E2D9]/60 px-3.5 py-2.5 rounded-xl mt-1">
                     <a
-                      href="mailto:shrujith8320@gmail.com?subject=Delete%20My%20Yarn%20Diary%20Account"
+                      href="mailto:support.myyarndiary@gmail.com?subject=Delete%20My%20Yarn%20Diary%20Account"
                       className="text-xs font-bold text-[#84A59D] hover:underline transition-all"
                     >
-                      shrujith8320@gmail.com
+                      support.myyarndiary@gmail.com
                     </a>
                     <button
                       type="button"
                       onClick={() => {
-                        navigator.clipboard.writeText('shrujith8320@gmail.com');
+                        navigator.clipboard.writeText('support.myyarndiary@gmail.com');
                         showAlert('Email copied to clipboard!', 'Copied');
                       }}
                       className="text-[10px] font-bold text-[#7C7167] bg-[#F9F6F2] hover:bg-[#E8E2D9]/60 px-2 py-1 rounded-md border border-[#E8E2D9]/30 transition-all cursor-pointer"
