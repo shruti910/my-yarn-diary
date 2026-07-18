@@ -30,6 +30,10 @@ rsync -avz -e "ssh -i $PEM_FILE -o StrictHostKeyChecking=no" \
   --exclude '.env' \
   --exclude '.env.prod' \
   --exclude 'secrets/firebase-credentials-dev.json' \
+  --exclude '*.md' \
+  --exclude '.gitignore' \
+  --exclude '.env.example' \
+  --exclude '**/.DS_Store' \
   ./ $AWS_USER@$AWS_IP:~/backend/
 
 if [ $? -ne 0 ]; then
