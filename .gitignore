@@ -67,3 +67,5 @@ ehthumbs.db
 Thumbs.db
 
 docker-compose.override.yml
+deploy.sh
+RECREATION_PLAYBOOK.md

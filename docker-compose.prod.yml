@@ -54,6 +54,8 @@ services:
       - JAVA_OPTS=-XX:+UseG1GC -Xms512m -Xmx1024m
 
   postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
     deploy:
       resources:
         limits:

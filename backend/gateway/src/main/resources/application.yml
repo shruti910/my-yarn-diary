@@ -22,6 +22,8 @@ spring:
               - OPTIONS
             allowedHeaders: "*"
             allowCredentials: true
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
       routes:
         - id: user_service_routes
           uri: ${USER_SERVICE_URL}

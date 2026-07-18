@@ -1,5 +1,4 @@
 services:
-  # One shared PostgreSQL database and login. Flyway creates one schema per service.
   postgres:
     image: postgres:15-alpine
     container_name: crochet-postgres
@@ -13,7 +12,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${CROCHET_DB_USER} -d ${CROCHET_DB_NAME}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${CROCHET_DB_USER} -d ${CROCHET_DB_NAME}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -35,9 +34,12 @@ services:
       - AI_SERVICE_URL=http://ai-service:8083
       - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
       - INTERNAL_JWT_SECRET=${INTERNAL_JWT_SECRET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-credentials.json
       - OTEL_SERVICE_NAME=gateway
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
       - OTEL_EXPORTER_OTLP_PROTOCOL=${OTEL_EXPORTER_OTLP_PROTOCOL}
+    volumes:
+      - ${FIREBASE_CREDENTIALS_PATH:-./secrets/firebase-credentials-dev.json}:/app/firebase-credentials.json:ro
     depends_on:
       - user-service
       - crochet-service
@@ -54,7 +56,7 @@ services:
     expose:
       - "8081"
     volumes:
-      - ./secrets/firebase-credentials-prod.json:/app/firebase-credentials.json:ro
+      - ${FIREBASE_CREDENTIALS_PATH:-./secrets/firebase-credentials-dev.json}:/app/firebase-credentials.json:ro
     environment:
       - SPRING_PROFILES_ACTIVE=${APP_PROFILE}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${CROCHET_DB_NAME}?currentSchema=user_service
@@ -67,7 +69,6 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
       - OTEL_EXPORTER_OTLP_PROTOCOL=${OTEL_EXPORTER_OTLP_PROTOCOL}
     depends_on:
-      # Do not start Spring Boot until PostgreSQL accepts connections.
       postgres:
         condition: service_healthy
     networks:
@@ -92,7 +93,6 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
       - OTEL_EXPORTER_OTLP_PROTOCOL=${OTEL_EXPORTER_OTLP_PROTOCOL}
     depends_on:
-      # Do not start Spring Boot until PostgreSQL accepts connections.
       postgres:
         condition: service_healthy
     networks:
@@ -126,7 +126,6 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
       - OTEL_EXPORTER_OTLP_PROTOCOL=${OTEL_EXPORTER_OTLP_PROTOCOL}
     depends_on:
-      # Do not start Spring Boot until PostgreSQL accepts connections.
       postgres:
         condition: service_healthy
     networks:
@@ -136,7 +135,7 @@ services:
     image: otel/opentelemetry-collector-contrib:0.95.0
     container_name: otel-collector
     restart: unless-stopped
-    command: ["--config=/etc/otelcol/config.yaml"]
+    command: [ "--config=/etc/otelcol/config.yaml" ]
     volumes:
       - ./docker/otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
       - /proc:/hostfs/proc:ro
