@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Project } from '../types';
+import { CustomDropdown } from './CustomDropdown';
+import { YarnSpinner } from './YarnSpinner';
 import { Image, Filter, Calendar, BookOpen, Sparkles, X, ChevronLeft, ChevronRight, Projector, CircleCheckBig, ImageIcon, ChevronDown } from 'lucide-react';
 
 interface ProjectGalleryProps {
@@ -17,11 +19,12 @@ interface GalleryItem {
   description: string;
 }
 
-export function ProjectGallery({ projects, token }: ProjectGalleryProps) {
+export function ProjectGallery({ projects: initialProjects, token }: ProjectGalleryProps) {
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<'all' | 'endProduct' | 'journal'>('all');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
+  const [allProjects, setAllProjects] = useState<Project[]>(initialProjects);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,7 +48,27 @@ export function ProjectGallery({ projects, token }: ProjectGalleryProps) {
         setLoading(false);
       }
     };
+
+    const fetchAllProjectsList = async () => {
+      try {
+        // Use the global URL from env
+        const baseUrl = import.meta.env.VITE_GATEWAY_URL || '';
+        const res = await fetch(`${baseUrl}/api/v1/projects?size=1000`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.content) {
+            setAllProjects(data.content);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load full projects list for gallery dropdown:', err);
+      }
+    };
+
     fetchGallery();
+    fetchAllProjectsList();
   }, [token]);
 
   // Filter based on state parameters
@@ -77,76 +100,79 @@ export function ProjectGallery({ projects, token }: ProjectGalleryProps) {
   const currentLightboxItem = lightboxIndex !== null ? filteredItems[lightboxIndex] : null;
 
   return (
-    <div id="project-media-gallery-hub" className="space-y-6">
+    <div id="project-media-gallery-hub" className="max-w-6xl mx-auto p-2.5 md:p-6 space-y-3 md:space-y-5">
       {/* Header and filters card */}
-      <div className="bg-white rounded-3xl p-6 border border-[#E8E2D9] warm-shadow space-y-4">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xl flex items-center justify-center text-[#84A59D] bg-[#84A59D]/10 rounded-xl w-10 h-10"><ImageIcon className="w-5 h-5" /></span>
-            <div>
-              <h2 className="text-lg font-extrabold font-serif text-[#2D231B]">Project Media Gallery</h2>
-              <p className="text-[10px] text-[#A89F94] font-bold uppercase tracking-widest block font-mono">
-                Beautiful memories of your handiwork progress {galleryItems.length > 0 ? `(${galleryItems.length} photos)` : ''}
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-2.5 md:p-5 border border-subtle warm-shadow w-full">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 lg:gap-4 w-full min-w-0">
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xl flex items-center justify-center text-accent bg-accent/10 rounded-xl w-8 h-8 md:w-10 md:h-10"><ImageIcon className="w-4 h-4 md:w-5 md:h-5" /></span>
+            <div className="min-w-0">
+              <h2 className="text-sm md:text-lg font-extrabold font-serif text-heading leading-tight">Photo Gallery</h2>
+              {/* The full line wraps to two rows on a 412px phone, so the flourish is
+                  desktop-only and small screens keep just the useful count. */}
+              <p className="text-[11px] text-muted font-bold tracking-wide">
+                <span className="hidden md:inline">Beautiful memories of your handiwork · </span>
+                {galleryItems.length} {galleryItems.length === 1 ? 'photo' : 'photos'}
               </p>
             </div>
           </div>
 
           {/* Quick Filters */}
-          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-center gap-3 shrink min-w-0 w-full lg:w-auto justify-end">
             {/* Category selection */}
-            <div className="flex bg-[#FDFCFB] border border-[#E8E2D9] rounded-xl p-0.5">
+            <div className="flex bg-white border border-subtle rounded-xl p-1 shadow-sm overflow-x-auto scrollbar-none touch-pan-x shrink min-w-0 max-w-full w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => { setActiveCategoryFilter('all'); setLightboxIndex(null); }}
-                className={`px-3 py-1.5 text-[10px] uppercase font-extrabold tracking-wider rounded-lg transition-all cursor-pointer ${
-                  activeCategoryFilter === 'all'
-                    ? 'bg-[#F28482] text-white'
-                    : 'text-[#7C7167] hover:text-[#2D231B]'
-                }`}
+                className={`shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 text-[11px] font-extrabold tracking-wide rounded-lg transition-all cursor-pointer ${activeCategoryFilter === 'all'
+                    ? 'bg-brand text-white shadow-sm'
+                    : 'text-muted hover:text-heading'
+                  }`}
               >
                 All
               </button>
               <button
                 type="button"
                 onClick={() => { setActiveCategoryFilter('endProduct'); setLightboxIndex(null); }}
-                className={`px-3 py-1.5 text-[10px] uppercase font-extrabold tracking-wider rounded-lg transition-all cursor-pointer ${
-                  activeCategoryFilter === 'endProduct'
-                    ? 'bg-[#84A59D] text-white'
-                    : 'text-[#7C7167] hover:text-[#2D231B]'
-                }`}
+                title="Finished items"
+                aria-label="Finished items"
+                className={`shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 text-[11px] font-extrabold tracking-wide rounded-lg transition-all cursor-pointer ${activeCategoryFilter === 'endProduct'
+                    ? 'bg-brand text-white shadow-sm'
+                    : 'text-muted hover:text-heading'
+                  }`}
               >
-                <span className="flex items-center gap-1.5 justify-center"><CircleCheckBig className="w-3 h-3" /> Finished items</span>
+                <span className="flex items-center gap-1.5 justify-center">
+                  <CircleCheckBig className="w-3.5 h-3.5 shrink-0" />
+                  <span className={activeCategoryFilter === 'endProduct' ? 'inline' : 'hidden sm:inline'}>Finished</span>
+                </span>
               </button>
               <button
                 type="button"
                 onClick={() => { setActiveCategoryFilter('journal'); setLightboxIndex(null); }}
-                className={`px-3 py-1.5 text-[10px] uppercase font-extrabold tracking-wider rounded-lg transition-all cursor-pointer ${
-                  activeCategoryFilter === 'journal'
-                    ? 'bg-[#F5CAC3] text-[#2D231B]'
-                    : 'text-[#7C7167] hover:text-[#2D231B]'
-                }`}
+                title="Journal updates"
+                aria-label="Journal updates"
+                className={`shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 text-[11px] font-extrabold tracking-wide rounded-lg transition-all cursor-pointer ${activeCategoryFilter === 'journal'
+                    ? 'bg-brand text-white shadow-sm'
+                    : 'text-muted hover:text-heading'
+                  }`}
               >
-                <span className="flex items-center gap-1.5 justify-center"><BookOpen className="w-3 h-3" /> Journal updates</span>
+                <span className="flex items-center gap-1.5 justify-center">
+                  <BookOpen className="w-3.5 h-3.5 shrink-0" />
+                  <span className={activeCategoryFilter === 'journal' ? 'inline' : 'hidden sm:inline'}>Journal</span>
+                </span>
               </button>
             </div>
 
             {/* Project dropdown filter */}
-            <div className="relative w-full sm:w-48">
-              <select
+            <div className="relative shrink-0 w-full sm:w-48 lg:w-64">
+              <CustomDropdown
                 value={selectedProjectId}
-                onChange={(e) => { setSelectedProjectId(e.target.value); setLightboxIndex(null); }}
-                className="w-full bg-[#FDFCFB] border border-[#E8E2D9] text-[11px] font-bold py-2 px-3 pr-8 rounded-xl text-[#2D231B] appearance-none focus:outline-none focus:ring-1 focus:ring-[#F28482] focus:border-[#F28482]"
-              >
-                <option value="all">All Projects</option>
-                {projects.map((p) => (
-                  <option key={p.projectId} value={p.projectId}>
-                    {p.title}
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-[#7C7167]">
-                <ChevronDown className="w-3.5 h-3.5" />
-              </div>
+                onChange={(val) => { setSelectedProjectId(val); setLightboxIndex(null); }}
+                options={[
+                  { value: 'all', label: 'All Projects' },
+                  ...allProjects.map(p => ({ value: p.projectId, label: p.title }))
+                ]}
+              />
             </div>
           </div>
         </div>
@@ -154,44 +180,44 @@ export function ProjectGallery({ projects, token }: ProjectGalleryProps) {
 
       {/* Grid workspace */}
       {loading ? (
-        <div className="flex justify-center items-center py-24 bg-white rounded-3xl border border-[#E8E2D9] warm-shadow-lg">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#F28482]" />
+        <div className="flex justify-center items-center py-24 bg-white rounded-3xl border border-subtle warm-shadow-lg">
+          <YarnSpinner className="h-8 w-8 text-brand" />
         </div>
       ) : filteredItems.length === 0 ? (
-        <div className="p-12 text-center bg-white rounded-3xl border border-[#E8E2D9] warm-shadow-lg max-w-lg mx-auto space-y-3">
-          <div className="text-4xl animate-pulse flex justify-center text-[#A89F94]"><ImageIcon className="w-12 h-12" /></div>
-          <h3 className="font-serif font-extrabold text-[#2D231B] text-base">No Photos Found</h3>
-          <p className="text-xs text-[#7C7167] font-semibold">
+        <div className="p-8 sm:p-12 text-center bg-white rounded-3xl border border-subtle warm-shadow-lg max-w-lg mx-auto space-y-3">
+          <div className="text-4xl animate-pulse flex justify-center text-muted"><ImageIcon className="w-12 h-12" /></div>
+          <h3 className="font-serif font-extrabold text-heading text-base">No Photos Found</h3>
+          <p className="text-xs text-muted font-semibold">
             {galleryItems.length === 0
               ? 'Start adding photos into your end product showpiece cards or within your Journal entries to see them listed in here!'
               : 'Try adjusting your chosen category filters or selection dropdown.'}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 animate-fade-in">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 animate-fade-in">
           {filteredItems.map((item, index) => (
             <div
               key={item.id}
               onClick={() => setLightboxIndex(index)}
-              className="bg-white rounded-2xl overflow-hidden border border-[#E8E2D9] hover:border-[#F28482]/40 hover:scale-[1.02] active:scale-[0.99] warm-shadow hover:warm-shadow-md transition-all duration-200 cursor-pointer group flex flex-col justify-between"
+              className="bg-white rounded-2xl overflow-hidden border border-subtle hover:border-brand/40 hover:scale-[1.02] active:scale-[0.99] warm-shadow hover:warm-shadow-md transition-all duration-200 cursor-pointer group flex flex-col justify-between"
             >
               {/* Photo Area */}
-              <div className="aspect-square w-full bg-[#FDFCFB] overflow-hidden relative">
+              <div className="aspect-square w-full bg-surface overflow-hidden relative">
                 <img
                   src={item.src}
                   alt={item.projectName}
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
-                
+
                 {/* Badge label */}
                 <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
                   {item.type === 'endProduct' ? (
-                    <span className="text-[9px] bg-[#84A59D] text-white px-2 py-0.5 rounded-full font-bold shadow-xs flex items-center gap-1">
+                    <span className="text-[11px] bg-accent text-white px-2 py-0.5 rounded-full font-bold shadow-xs flex items-center gap-1">
                       <CircleCheckBig className="w-2.5 h-2.5" /> End Product
                     </span>
                   ) : (
-                    <span className="text-[9px] bg-[#F5CAC3] text-[#2D231B] px-2 py-0.5 rounded-full font-bold shadow-xs flex items-center gap-1">
+                    <span className="text-[11px] bg-brand-light text-heading px-2 py-0.5 rounded-full font-bold shadow-xs flex items-center gap-1">
                       <BookOpen className="w-2.5 h-2.5" /> Journal Log
                     </span>
                   )}
@@ -199,18 +225,18 @@ export function ProjectGallery({ projects, token }: ProjectGalleryProps) {
               </div>
 
               {/* Text Meta Area */}
-              <div className="p-3.5 space-y-2 bg-[#FDFCFB] border-t border-[#F1EFEA]">
+              <div className="p-2.5 sm:p-3.5 space-y-1 sm:space-y-1.5 bg-surface border-t border-subtle">
                 <div className="space-y-0.5">
-                  <h4 className="text-[11px] font-extrabold text-[#2D231B] line-clamp-1 group-hover:text-[#F28482] transition-colors">
+                  <h4 className="text-[11px] font-extrabold text-heading line-clamp-1 group-hover:text-brand transition-colors">
                     {item.projectName}
                   </h4>
-                  <div className="flex items-center gap-1 text-[9px] text-[#A89F94] font-mono">
+                  <div className="flex items-center gap-1 text-[11px] text-muted">
                     <Calendar className="w-3 h-3 shrink-0" />
                     <span>{new Date(item.date).toLocaleDateString()}</span>
                   </div>
                 </div>
                 {item.description && (
-                  <p className="text-[10px] text-[#7C7167] line-clamp-2 italic leading-relaxed">
+                  <p className="text-[11px] text-muted line-clamp-2 italic leading-relaxed">
                     "{item.description}"
                   </p>
                 )}
@@ -228,11 +254,13 @@ export function ProjectGallery({ projects, token }: ProjectGalleryProps) {
         >
           {/* Main frame */}
           <div
-            className="bg-white rounded-3xl overflow-hidden max-w-4xl w-full flex flex-col md:flex-row border border-[#E8E2D9] shadow-2xl relative animate-scale-up"
+            className="bg-white rounded-3xl overflow-hidden max-w-4xl w-full max-h-[90dvh] flex flex-col md:flex-row border border-subtle shadow-2xl relative animate-scale-up"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Image Canvas Panel */}
-            <div className="bg-black/5 dark:bg-black/20 flex-1 flex items-center justify-center relative aspect-square md:aspect-auto md:h-[500px]">
+            {/* min-h-0 lets this shrink inside the capped flex column instead of
+                overflowing; no aspect-square, which blew past the viewport in landscape. */}
+            <div className="bg-black/5 dark:bg-black/20 flex-1 min-h-0 flex items-center justify-center relative md:h-[500px]">
               <img
                 src={currentLightboxItem.src}
                 alt={currentLightboxItem.projectName}
@@ -274,47 +302,47 @@ export function ProjectGallery({ projects, token }: ProjectGalleryProps) {
             </div>
 
             {/* Sidebar information card */}
-            <div className="w-full md:w-80 p-6 flex flex-col justify-between bg-white border-t md:border-t-0 md:border-l border-[#E8E2D9] max-h-[250px] md:max-h-[500px] overflow-y-auto">
+            <div className="w-full md:w-80 shrink-0 p-4 sm:p-6 flex flex-col justify-between bg-white border-t md:border-t-0 md:border-l border-subtle max-h-[40dvh] md:max-h-[500px] overflow-y-auto">
               {/* Top part */}
               <div className="space-y-4">
-                <div className="space-y-1.5 border-b border-[#F9F6F2] pb-3">
+                <div className="space-y-1.5 border-b border-subtle pb-3">
                   <div className="flex items-center gap-1.5">
                     {currentLightboxItem.type === 'endProduct' ? (
-                      <span className="text-[9px] uppercase bg-[#84A59D] text-white px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                      <span className="text-[11px] uppercase bg-accent text-white px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
                         <CircleCheckBig className="w-2.5 h-2.5 text-white" /> End Product
                       </span>
                     ) : (
-                      <span className="text-[9px] uppercase bg-[#F5CAC3] text-[#2D231B] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                        <BookOpen className="w-2.5 h-2.5 text-[#2D231B]" /> Journal Log
+                      <span className="text-[11px] uppercase bg-brand-light text-heading px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                        <BookOpen className="w-2.5 h-2.5 text-heading" /> Journal Log
                       </span>
                     )}
                   </div>
-                  <h3 className="font-serif font-extrabold text-[#2D231B] text-base leading-tight">
+                  <h3 className="font-serif font-extrabold text-heading text-base leading-tight">
                     {currentLightboxItem.projectName}
                   </h3>
-                  <div className="flex items-center gap-1 text-[10px] text-[#A89F94] font-mono">
+                  <div className="flex items-center gap-1 text-[11px] text-muted">
                     <Calendar className="w-3.5 h-3.5" />
-                    <span>Uploaded {new Date(currentLightboxItem.date).toLocaleDateString()} at {new Date(currentLightboxItem.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                    <span>Uploaded {new Date(currentLightboxItem.date).toLocaleDateString()} at {new Date(currentLightboxItem.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <span className="text-[9px] uppercase font-bold tracking-widest text-[#A89F94] block">
+                  <span className="text-[11px] uppercase font-bold tracking-widest text-muted block">
                     Comment
                   </span>
-                  <p className="text-[11px] text-[#7C7167] italic font-semibold leading-relaxed bg-[#F9F6F2] p-3 rounded-xl border border-[#E8E2D9]/60">
+                  <p className="text-[11px] text-muted italic font-semibold leading-relaxed bg-page p-3 rounded-xl border border-subtle/60">
                     "{currentLightboxItem.description}"
                   </p>
                 </div>
               </div>
 
               {/* Bottom part close trigger */}
-              <div className="pt-4 border-t border-[#FDFCFB] flex justify-between items-center text-[10px] font-semibold text-[#A89F94] font-mono">
+              <div className="pt-4 border-t border-subtle flex justify-between items-center text-[11px] font-semibold text-muted">
                 <span>{lightboxIndex !== null ? `${lightboxIndex + 1} of ${filteredItems.length}` : ''}</span>
                 <button
                   type="button"
                   onClick={() => setLightboxIndex(null)}
-                  className="text-xs text-[#F28482] hover:underline font-bold font-sans cursor-pointer"
+                  className="text-xs text-brand hover:underline font-bold font-sans cursor-pointer"
                 >
                   Dismiss
                 </button>
