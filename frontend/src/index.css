@@ -1,11 +1,18 @@
-@import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;500;600;700&family=Nunito:wght@300;400;500;600;700;800&family=Quicksand:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Every family here is referenced by a token below — keep them in sync.
+   Inter -> body/UI (--font-family-sans)
+   Quicksand -> headings (--font-family-display, used via font-serif/font-display)
+   JetBrains Mono -> numerals & meta labels (--font-family-mono)
+   Grand Hotel -> brand logotype (.grand-hotel-regular) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Quicksand:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Grand+Hotel&display=swap');
 @import "tailwindcss";
 
 @theme {
  /* LEGACY ALIASES TO PREVENT BREAKING EXISTING UI */
- --font-display: var(--font-family-sans);
- --font-serif: var(--font-family-sans);
+ /* font-display / font-serif are used on headings throughout the JSX.
+    They previously aliased to sans, making every such class a no-op. */
+ --font-display: var(--font-family-display);
+ --font-serif: var(--font-family-display);
  --color-brand: var(--brand-default);
  --color-brand-dark: var(--brand-dark);
  --color-brand-light: var(--brand-light);
@@ -169,7 +176,7 @@
  /* LAYOUT TOKENS */
  --container-width: 1280px;
  --section-padding: 80px;
- --card-padding: 24px;
+ --card-padding: 16px;
 }
 
 :root {
@@ -256,7 +263,8 @@
 
  /* TYPOGRAPHY */
  --font-family-sans: Inter, system-ui, -apple-system, sans-serif;
- --font-family-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+ --font-family-display: Quicksand, Inter, system-ui, sans-serif;
+ --font-family-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
  --font-size-xs: 12px;
  --font-size-sm: 14px;
  --font-size-base: 16px;
@@ -338,6 +346,40 @@
  .bg-elevated { background-color: var(--color-bg-elevated); }
  .bg-sunken { background-color: var(--color-bg-sunken); }
  .shadow-brand { box-shadow: var(--shadow-brand); }
+
+ /* Respect the notch / home indicator (paired with viewport-fit=cover). */
+ .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+ .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+}
+
+/* --- Touch accessibility ---------------------------------------------------
+   Expands the *hit area* of small icon buttons to the 44px WCAG/HIG minimum
+   without changing their visual size, so the UI stays visually compact while
+   remaining reliably tappable. Do NOT put this on .sewing-button — that class
+   already uses ::after to draw its button hole. */
+@media (pointer: coarse) {
+ .tap-safe { position: relative; }
+ .tap-safe::after {
+ content: '';
+ position: absolute;
+ top: 50%;
+ left: 50%;
+ transform: translate(-50%, -50%);
+ width: 100%;
+ height: 100%;
+ min-width: 44px;
+ min-height: 44px;
+ }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+ *, *::before, *::after {
+ animation-duration: 0.01ms !important;
+ animation-iteration-count: 1 !important;
+ transition-duration: 0.01ms !important;
+ scroll-behavior: auto !important;
+ }
 }
 
 /* Custom gorgeous animations & card effects */
@@ -352,22 +394,12 @@
  50% { transform: translateY(-4px); }
 }
 
-@keyframes spinYarn {
- 0% { transform: rotate(0deg) scale(1); }
- 50% { transform: rotate(180deg) scale(1.1); }
- 100% { transform: rotate(360deg) scale(1); }
-}
-
 .animate-shake {
  animation: shake 0.2s ease-in-out infinite;
 }
 
 .animate-float {
  animation: float 3s ease-in-out infinite;
-}
-
-.animate-spin-yarn {
- animation: spinYarn 1.5s ease-in-out infinite;
 }
 
 /* Custom glassmorphisms & warm subtle shadows for Vibrant Palette */
@@ -416,7 +448,11 @@
  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-/* Add the 2 holes for the sewing button aesthetic */
+/* Add the 2 holes for the sewing button aesthetic.
+   NOTE: the holes are drawn 12px in from each edge and are 6px wide, so any
+   .sewing-button containing TEXT needs at least px-7 (28px) of horizontal
+   padding or the label will overlap them. Use .sewing-button-no-holes for
+   tight buttons. Fixed-size circular icon buttons are unaffected. */
 .sewing-button::before,
 .sewing-button::after {
  content: '';
@@ -486,6 +522,9 @@
 .markdown-body {
  font-family: var(--font-sans);
  line-height: 1.6;
+ /* AI replies can contain long URLs or unbroken pattern shorthand; without this
+    they push the chat bubble past the viewport on narrow screens. */
+ overflow-wrap: anywhere;
 }
 
 .markdown-body h1 {
@@ -556,7 +595,7 @@
 .markdown-body pre code {
  background-color: transparent;
  padding: 0;
- color: var(--color-vibrant-dark);
+ color: var(--color-text-heading);
 }
 
 /* Round color picker styles */

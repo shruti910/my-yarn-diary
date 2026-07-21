@@ -43,7 +43,7 @@ export function CustomDropdown({ options, value, onChange, placeholder = "Select
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        className={`w-full px-2 sm:px-4 py-1.5 sm:py-2.5 bg-white border-2 border-subtle rounded-xl text-[10px] sm:text-xs font-bold flex items-center justify-between gap-1 sm:gap-3 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-brand/30 ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-brand hover:bg-page/50'} ${isOpen ? 'border-brand bg-page/50' : ''}`}
+        className={`w-full px-2 sm:px-3.5 py-1 sm:py-2 bg-white border-2 border-subtle rounded-xl text-[11px] sm:text-xs font-bold flex items-center justify-between gap-1 sm:gap-3 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-brand/30 ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-brand hover:bg-page/50'} ${isOpen ? 'border-brand bg-page/50' : ''}`}
       >
         <div className="flex items-center gap-1.5 text-heading truncate">
           {selectedOption ? (

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Save, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Save } from 'lucide-react';
+import { YarnSpinner } from './YarnSpinner';
 import { CustomDropdown } from './CustomDropdown';
 import { Yarn } from '../types';
 
@@ -88,12 +89,12 @@ export function YarnManager({ projectId, initialYarns, isNewProject, fetchWithTo
  return (
  <div className="space-y-4">
  <div className="flex justify-between items-center">
- <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">Yarns Used</label>
+ <label className="text-[11px] font-extrabold text-muted uppercase tracking-wider">Yarns Used</label>
  <button
  type="button"
  onClick={addYarn}
  disabled={disabled}
- className="text-[10px] font-extrabold text-brand flex items-center gap-1 hover:text-error disabled:opacity-50"
+ className="text-[11px] font-extrabold text-brand flex items-center gap-1 hover:text-error disabled:opacity-50"
  >
  <Plus className="w-3 h-3" /> Add Yarn
  </button>
@@ -112,7 +113,7 @@ export function YarnManager({ projectId, initialYarns, isNewProject, fetchWithTo
  disabled={disabled || savingId === yarn.yarnId}
  className="text-muted hover:text-muted disabled:opacity-50 flex items-center"
  >
- {savingId === yarn.yarnId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+ {savingId === yarn.yarnId ? <YarnSpinner className="w-4 h-4" /> : <Save className="w-4 h-4" />}
  </button>
  <button
  type="button"
@@ -124,33 +125,33 @@ export function YarnManager({ projectId, initialYarns, isNewProject, fetchWithTo
  </button>
  </div>
  
- <div className="grid grid-cols-2 gap-3 pr-16">
+ <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pr-14 sm:pr-16">
  <div>
- <label className="text-[9px] font-bold text-muted uppercase">Brand</label>
+ <label className="text-[11px] font-bold text-muted uppercase">Brand</label>
  <input
  type="text"
  value={yarn.brand || ''}
  disabled={disabled}
  onChange={(e) => updateYarnState(yarnIdx, 'brand', e.target.value)}
  onBlur={() => saveYarn(yarn)}
- className="w-full bg-transparent border-b border-subtle text-xs py-1 focus:outline-none focus:border-brand"
+ className="w-full bg-transparent border-b border-subtle text-xs py-2 sm:py-1 focus:outline-none focus:border-brand"
  placeholder="e.g. Red Heart"
  />
  </div>
  <div>
- <label className="text-[9px] font-bold text-muted uppercase">Line Name</label>
+ <label className="text-[11px] font-bold text-muted uppercase">Line Name</label>
  <input
  type="text"
  value={yarn.lineName || ''}
  disabled={disabled}
  onChange={(e) => updateYarnState(yarnIdx, 'lineName', e.target.value)}
  onBlur={() => saveYarn(yarn)}
- className="w-full bg-transparent border-b border-subtle text-xs py-1 focus:outline-none focus:border-brand"
+ className="w-full bg-transparent border-b border-subtle text-xs py-2 sm:py-1 focus:outline-none focus:border-brand"
  placeholder="e.g. Super Saver"
  />
  </div>
  <div className="col-span-2 sm:col-span-1">
- <label className="text-[9px] font-bold text-muted uppercase block">Colorway</label>
+ <label className="text-[11px] font-bold text-muted uppercase block">Colorway</label>
  <div className="flex gap-2 items-center mt-1">
  <input
  type="color"
@@ -166,49 +167,49 @@ export function YarnManager({ projectId, initialYarns, isNewProject, fetchWithTo
  disabled={disabled}
  onChange={(e) => updateYarnState(yarnIdx, 'colorway', e.target.value)}
  onBlur={() => saveYarn(yarn)}
- className="flex-1 min-w-0 bg-transparent border-b border-subtle text-xs py-1 focus:outline-none focus:border-brand"
+ className="flex-1 min-w-0 bg-transparent border-b border-subtle text-xs py-2 sm:py-1 focus:outline-none focus:border-brand"
  placeholder="Name or Hex"
  />
  </div>
  </div>
  <div>
- <label className="text-[9px] font-bold text-muted uppercase">Dye Lot</label>
+ <label className="text-[11px] font-bold text-muted uppercase">Dye Lot</label>
  <input
  type="text"
  value={yarn.dyeLot || ''}
  disabled={disabled}
  onChange={(e) => updateYarnState(yarnIdx, 'dyeLot', e.target.value)}
  onBlur={() => saveYarn(yarn)}
- className="w-full bg-transparent border-b border-subtle text-xs py-1 focus:outline-none focus:border-brand mt-1"
+ className="w-full bg-transparent border-b border-subtle text-xs py-2 sm:py-1 focus:outline-none focus:border-brand mt-1"
  placeholder="e.g. 12345"
  />
  </div>
  <div>
- <label className="text-[9px] font-bold text-muted uppercase">Weight</label>
+ <label className="text-[11px] font-bold text-muted uppercase">Weight</label>
  <input
  type="text"
  value={yarn.weight || ''}
  disabled={disabled}
  onChange={(e) => updateYarnState(yarnIdx, 'weight', e.target.value)}
  onBlur={() => saveYarn(yarn)}
- className="w-full bg-transparent border-b border-subtle text-xs py-1 focus:outline-none focus:border-brand"
+ className="w-full bg-transparent border-b border-subtle text-xs py-2 sm:py-1 focus:outline-none focus:border-brand"
  placeholder="e.g. 4 / Worsted"
  />
  </div>
  <div>
- <label className="text-[9px] font-bold text-muted uppercase">Fiber</label>
+ <label className="text-[11px] font-bold text-muted uppercase">Fiber</label>
  <input
  type="text"
  value={yarn.fiberContent || ''}
  disabled={disabled}
  onChange={(e) => updateYarnState(yarnIdx, 'fiberContent', e.target.value)}
  onBlur={() => saveYarn(yarn)}
- className="w-full bg-transparent border-b border-subtle text-xs py-1 focus:outline-none focus:border-brand"
+ className="w-full bg-transparent border-b border-subtle text-xs py-2 sm:py-1 focus:outline-none focus:border-brand"
  placeholder="e.g. 100% Acrylic"
  />
  </div>
  <div className="col-span-2">
- <label className="text-[9px] font-bold text-muted uppercase block">Quantity Used</label>
+ <label className="text-[11px] font-bold text-muted uppercase block">Quantity Used</label>
  <div className="flex gap-3 items-center mt-1">
  <input
  type="number"
@@ -218,7 +219,7 @@ export function YarnManager({ projectId, initialYarns, isNewProject, fetchWithTo
  step="0.5"
  onChange={(e) => updateYarnState(yarnIdx, 'quantityUsed', e.target.value ? parseFloat(e.target.value) : 0)}
  onBlur={() => saveYarn(yarn)}
- className="w-24 bg-transparent border-b border-subtle text-xs py-1 focus:outline-none focus:border-brand"
+ className="w-24 bg-transparent border-b border-subtle text-xs py-2 sm:py-1 focus:outline-none focus:border-brand"
  placeholder="0"
  />
  <div className="relative min-w-[100px]">

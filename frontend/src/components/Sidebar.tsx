@@ -6,6 +6,8 @@
 import React, { useState } from 'react';
 import { ImageIcon, Folder, Plus, Trash2, Edit2, Check, X, LogOut, Scissors, PanelRightOpen, Archive, Heart, Settings, CircleUserRound, Camera, Lock } from 'lucide-react';
 import { Category } from '../types';
+import { TerminologyToggle } from './TerminologyToggle';
+import { YarnSpinner } from './YarnSpinner';
 import { useDialog } from './DialogProvider';
 import { motion, AnimatePresence } from 'motion/react';
 import { updateProfile, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
@@ -66,6 +68,7 @@ interface SidebarProps {
     onUpdateToken?: (token: string) => void;
     activeTab?: string;
     onSelectTab?: (tab: 'dashboard' | 'gallery' | 'aitools') => void;
+    onUpdateCrochetTerminology?: (pref: 'US' | 'UK') => Promise<void>;
 }
 
 export function Sidebar({
@@ -83,7 +86,8 @@ export function Sidebar({
     token,
     onUpdateToken,
     activeTab,
-    onSelectTab
+    onSelectTab,
+    onUpdateCrochetTerminology
 }: SidebarProps) {
     const [newCategoryName, setNewCategoryName] = useState('');
     const [isAdding, setIsAdding] = useState(false);
@@ -387,19 +391,25 @@ export function Sidebar({
                 : 'fixed lg:relative inset-y-0 left-0 w-[85vw] max-w-[320px] lg:w-80 border-r-2 border-subtle shadow-2xl lg:shadow-none'
                 }`}
         >
-            <div className="w-[85vw] max-w-[320px] lg:w-80 h-full flex flex-col shrink-0">
+            {/* w-full, NOT a repeat of the parent's w-80: the parent's width includes
+                its 2px right border (border-box), so a same-width child overflows by
+                2px and paints over that border wherever it has an opaque background. */}
+            <div className="w-full h-full flex flex-col shrink-0">
                 {/* Brand area */}
-                <div className="p-6 border-b-2 border-subtle bg-page flex items-center justify-between">
+                {/* No bottom border, and no bg-page: the page-coloured background used
+                    to blend with the main header, hiding the sidebar's right border at
+                    the top of the screen. Surface white keeps the divider visible. */}
+                <div className="px-4 py-3 bg-surface flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div>
-                            <h2 className="grand-hotel-regular text-4xl tracking-tight leading-tight">
+                            <h2 className="grand-hotel-regular text-3xl tracking-tight leading-none">
                                 My Yarn Diary
                             </h2>
-                            <span className="text-[10px] uppercase font-extrabold tracking-widest text-accent">Crafter Companion</span>
+                            <span className="text-[11px] uppercase font-extrabold tracking-widest text-accent">Crafter Companion</span>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        <span className="text-muted text-[10px] font-mono">v{packageJson.version}</span>
+                        <span className="text-muted text-[11px]">v{packageJson.version}</span>
                         <button
                             onClick={onToggleCollapse}
                             className="p-2 bg-white border border-subtle text-muted hover:text-brand hover:border-brand/30 rounded-xl shadow-xs transition-all duration-200 cursor-pointer flex items-center justify-center hover:scale-105 active:scale-95"
@@ -411,13 +421,13 @@ export function Sidebar({
                 </div>
 
                 {/* New Project Button */}
-                <div className="px-8 pt-4 pb-2">
+                <div className="px-4 pt-2 pb-1.5">
                     <button
                         onClick={() => {
                             window.dispatchEvent(new CustomEvent('open-new-project-modal', { detail: { fromSidebar: true } }));
                             if (window.innerWidth < 1024) onToggleCollapse();
                         }}
-                        className="sewing-button w-full px-8 py-3 flex items-center justify-center font-bold tracking-widest text-xs uppercase shadow-brand/30"
+                        className="sewing-button w-full px-8 py-2.5 flex items-center justify-center font-bold tracking-wider text-[11px] uppercase shadow-brand/30"
                     >
                         <Plus className="w-4 h-4 mr-1" />
                         New Project
@@ -431,24 +441,24 @@ export function Sidebar({
                             onSelectTab?.('gallery');
                             if (window.innerWidth < 1024) onToggleCollapse();
                         }}
-                        className={`group flex items-center justify-between p-3 rounded-2xl transition-all duration-200 cursor-pointer border-2 ${activeTab === 'gallery'
+                        className={`group flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-200 cursor-pointer border ${activeTab === 'gallery'
                             ? 'fabric-card text-brand font-bold'
-                            : 'bg-transparent border-transparent hover:bg-white/40 text-muted hover:text-heading'
+                            : 'bg-transparent border-transparent hover:bg-brand/5 hover:border-brand/20 text-muted hover:text-brand'
                             }`}
                     >
                         <div className="flex items-center gap-3 w-full">
-                            <ImageIcon className={`w-4 h-4 shrink-0 ${activeTab === 'gallery' ? 'text-brand' : 'text-accent'}`} />
-                            <span className="text-sm truncate font-semibold">Photo Gallery</span>
+                            <ImageIcon className={`w-4 h-4 shrink-0 ${activeTab === 'gallery' ? 'text-brand fill-brand-light/20' : 'text-accent group-hover:text-brand group-hover:fill-brand-light/30'}`} />
+                            <span className="text-[13px] truncate font-semibold">Photo Gallery</span>
                         </div>
                     </div>
                 </div>
 
                 {/* Categories List Title */}
-                <div className="px-6 py-2 flex items-center justify-between mt-2">
+                <div className="px-4 py-1.5 flex items-center justify-between mt-1">
                     <span className="text-[11px] font-bold text-muted uppercase tracking-widest">categories</span>
                     <button
                         onClick={() => setIsAdding(!isAdding)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 hover:bg-brand/20 text-brand text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 hover:bg-brand/20 text-brand text-[11px] font-bold uppercase tracking-wider transition-colors cursor-pointer"
                         title="New Category"
                     >
                         <Plus className="w-3.5 h-3.5" />
@@ -475,10 +485,7 @@ export function Sidebar({
                                 className="p-1 bg-brand text-white rounded-lg hover:bg-brand/80 transition-colors disabled:opacity-60"
                             >
                                 {isSubmitting ? (
-                                    <svg className="animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
+                                    <YarnSpinner className="h-3.5 w-3.5" onBrand />
                                 ) : (
                                     <Check className="w-3.5 h-3.5" />
                                 )}
@@ -496,31 +503,31 @@ export function Sidebar({
                 )}
 
                 {/* Categories scroll panel */}
-                <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1.5">
+                <div className="flex-1 min-h-0 overflow-y-auto px-3 py-1.5 space-y-0.5 scrollbar-thin">
                     {/* All Projects Option */}
                     <div
                         onClick={() => { onSelectCategory('all'); if (window.innerWidth < 1024) onToggleCollapse(); }}
-                        className={`group flex items-center justify-between p-3 rounded-2xl transition-all duration-200 cursor-pointer border-2 ${activeCategoryId === 'all'
+                        className={`group flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-200 cursor-pointer border ${activeCategoryId === 'all'
                             ? 'fabric-card text-brand font-bold'
-                            : 'bg-transparent border-transparent hover:bg-white/40 text-muted hover:text-heading'
+                            : 'bg-transparent border-transparent hover:bg-brand/5 hover:border-brand/20 text-muted hover:text-brand'
                             }`}
                     >
                         <div className="flex items-center gap-3 w-full">
-                            <Folder className={`w-4 h-4 shrink-0 ${activeCategoryId === 'all' ? 'text-brand fill-brand-light/20' : 'text-accent'}`} />
-                            <span className="text-sm truncate font-semibold">All Projects</span>
+                            <Folder className={`w-4 h-4 shrink-0 ${activeCategoryId === 'all' ? 'text-brand fill-brand-light/20' : 'text-accent group-hover:text-brand group-hover:fill-brand-light/30'}`} />
+                            <span className="text-[13px] truncate font-semibold">All Projects</span>
                         </div>
                     </div>
 
                     <div
                         onClick={() => { onSelectCategory('archived'); if (window.innerWidth < 1024) onToggleCollapse(); }}
-                        className={`group flex items-center justify-between p-3 rounded-2xl transition-all duration-200 cursor-pointer border-2 ${activeCategoryId === 'archived'
+                        className={`group flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-200 cursor-pointer border ${activeCategoryId === 'archived'
                             ? 'fabric-card text-brand font-bold'
-                            : 'bg-transparent border-transparent hover:bg-white/40 text-muted hover:text-heading'
+                            : 'bg-transparent border-transparent hover:bg-brand/5 hover:border-brand/20 text-muted hover:text-brand'
                             }`}
                     >
                         <div className="flex items-center gap-3 w-full">
-                            <Archive className={`w-4 h-4 shrink-0 ${activeCategoryId === 'archived' ? 'text-brand fill-brand-light/20' : 'text-accent'}`} />
-                            <span className="text-sm truncate font-semibold">Archived Projects</span>
+                            <Archive className={`w-4 h-4 shrink-0 ${activeCategoryId === 'archived' ? 'text-brand fill-brand-light/20' : 'text-accent group-hover:text-brand group-hover:fill-brand-light/30'}`} />
+                            <span className="text-[13px] truncate font-semibold">Archived Projects</span>
                         </div>
                     </div>
 
@@ -537,13 +544,13 @@ export function Sidebar({
                             <div
                                 key={catId}
                                 onClick={() => { if (!isEditing) { onSelectCategory(catId); if (window.innerWidth < 1024) onToggleCollapse(); } }}
-                                className={`group flex items-center justify-between p-3 rounded-2xl transition-all duration-200 cursor-pointer border-2 ${isActive
+                                className={`group flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-200 cursor-pointer border ${isActive
                                     ? 'fabric-card text-brand font-bold'
-                                    : 'bg-transparent border-transparent hover:bg-white/40 text-muted hover:text-heading'
+                                    : 'bg-transparent border-transparent hover:bg-brand/5 hover:border-brand/20 text-muted hover:text-brand'
                                     }`}
                             >
                                 <div className="flex items-center gap-3 w-full">
-                                    <Folder className={`w-4 h-4 shrink-0 ${isActive ? 'text-brand fill-brand-light/20' : 'text-accent'}`} />
+                                    <Folder className={`w-4 h-4 shrink-0 ${isActive ? 'text-brand fill-brand-light/20' : 'text-accent group-hover:text-brand group-hover:fill-brand-light/30'}`} />
                                     {isEditing ? (
                                         <input
                                             type="text"
@@ -554,7 +561,7 @@ export function Sidebar({
                                             className="w-full bg-white border border-subtle rounded-lg text-xs p-1 focus:outline-none text-heading disabled:opacity-60"
                                         />
                                     ) : (
-                                        <span className="text-sm truncate font-semibold">{cat.name}</span>
+                                        <span className="text-[13px] truncate font-semibold">{cat.name}</span>
                                     )}
                                 </div>
 
@@ -568,10 +575,7 @@ export function Sidebar({
                                                 className="p-1 rounded text-green-600 hover:bg-green-50 disabled:opacity-40"
                                             >
                                                 {isSubmitting ? (
-                                                    <svg className="animate-spin h-3 w-3 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                    </svg>
+                                                    <YarnSpinner className="h-3 w-3 text-green-600" />
                                                 ) : (
                                                     <Check className="w-3 h-3" />
                                                 )}
@@ -610,8 +614,20 @@ export function Sidebar({
                     })}
                 </div>
 
+                {/* Terminology switch — the header copy is hidden below sm:, so this is
+                    the only way mobile users can reach it. Hidden on lg+ to avoid
+                    duplicating the header control. */}
+                {onUpdateCrochetTerminology && (
+                    <div className="lg:hidden mx-4 mt-auto mb-2 flex justify-center shrink-0">
+                        <TerminologyToggle
+                            value={currentUser?.crochetTerminology || 'US'}
+                            onChange={onUpdateCrochetTerminology}
+                        />
+                    </div>
+                )}
+
                 {/* User profile segment */}
-                <div className="p-4 mx-4 mt-auto mb-3 bg-white border border-subtle rounded-2xl flex flex-col gap-3.5 shadow-xs shrink-0">
+                <div className="p-3 mx-3 mt-auto lg:mt-0 mb-2 bg-white border border-subtle rounded-xl flex flex-col gap-2.5 shadow-xs shrink-0">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             {!isStockOrEmptyAvatar(currentUser?.profilePicture) ? (
@@ -619,16 +635,16 @@ export function Sidebar({
                                     src={currentUser.profilePicture}
                                     alt="User avatar"
                                     referrerPolicy="no-referrer"
-                                    className="w-10 h-10 rounded-xl object-cover border border-subtle"
+                                    className="w-9 h-9 rounded-lg object-cover border border-subtle"
                                 />
                             ) : (
-                                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold text-white bg-gradient-to-br from-brand to-brand-light border border-subtle select-none shadow-xs">
+                                <div className="w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-bold text-white bg-gradient-to-br from-brand to-brand-light border border-subtle select-none shadow-xs">
                                     {getInitials(currentUser?.displayName || currentUser?.email)}
                                 </div>
                             )}
                             <div className="max-w-[120px]">
                                 <h4 className="font-sans text-xs font-bold text-heading truncate">{currentUser?.displayName}</h4>
-                                <p className="text-[10px] text-brand font-semibold truncate uppercase tracking-wider">{currentUser?.email.split('@')[0]}</p>
+                                <p className="text-[11px] text-brand font-semibold truncate uppercase tracking-wider">{currentUser?.email.split('@')[0]}</p>
                             </div>
                         </div>
                         <button
@@ -645,27 +661,27 @@ export function Sidebar({
 
                     <div className="flex gap-2 border-t border-subtle pt-2.5">
                         <button
-                            className="flex-1 py-1.5 px-2 rounded-lg bg-white border border-subtle hover:bg-surface text-muted hover:text-heading text-[10px] font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm cursor-pointer"
+                            className="group flex-1 py-2 px-2 rounded-lg bg-white border border-subtle hover:bg-brand/5 hover:border-brand/30 text-muted hover:text-brand text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm cursor-pointer"
                             title="User Profile"
                             onClick={openProfileModal}
                         >
-                            <CircleUserRound className="w-3.5 h-3.5" />
+                            <CircleUserRound className="w-3.5 h-3.5 transition-colors group-hover:text-brand group-hover:fill-brand-light/30" />
                             Profile
                         </button>
                         <button
-                            className="flex-1 py-1.5 px-2 rounded-lg bg-white border border-subtle hover:bg-surface text-muted hover:text-heading text-[10px] font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm cursor-pointer"
+                            className="group flex-1 py-2 px-2 rounded-lg bg-white border border-subtle hover:bg-brand/5 hover:border-brand/30 text-muted hover:text-brand text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm cursor-pointer"
                             title="Account Settings"
                             onClick={() => setIsSettingsOpen(true)}
                         >
-                            <Settings className="w-3.5 h-3.5" />
+                            <Settings className="w-3.5 h-3.5 transition-colors group-hover:text-brand" />
                             Settings
                         </button>
                     </div>
                 </div>
 
                 {/* Sidebar decorative footer badge */}
-                <div className="p-4 border-t border-subtle bg-page text-center space-y-1">
-                    <p className="text-[10px] font-bold text-muted uppercase tracking-widest flex items-center justify-center gap-1">
+                <div className="py-2 px-3 border-t border-subtle bg-page text-center">
+                    <p className="text-[11px] font-bold text-muted uppercase tracking-widest flex items-center justify-center gap-1">
                         <span className="flex items-center gap-1.5 justify-center">Stitched with Love <Heart className="w-3.5 h-3.5 text-brand fill-current" /></span>
                     </p>
                 </div>
@@ -680,7 +696,7 @@ export function Sidebar({
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 15 }}
                             transition={{ duration: 0.2, ease: 'easeOut' }}
-                            className="bg-white rounded-[2rem] border border-subtle max-w-md w-full p-6 space-y-5 shadow-2xl relative text-left max-h-[90vh] overflow-y-auto scrollbar-hide"
+                            className="bg-white rounded-[2rem] border border-subtle max-w-md w-full p-6 space-y-5 shadow-2xl relative text-left max-h-[90dvh] overflow-y-auto scrollbar-hide"
                         >
                             {/* Header */}
                             <div className="flex justify-between items-center pb-2 border-b border-subtle">
@@ -717,7 +733,7 @@ export function Sidebar({
                                         {/* Hover Overlay */}
                                         <label className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white">
                                             <Camera className="w-5 h-5" />
-                                            <span className="text-[9px] font-bold uppercase tracking-wider">Upload</span>
+                                            <span className="text-[11px] font-bold uppercase tracking-wider">Upload</span>
                                             <input
                                                 type="file"
                                                 accept="image/*"
@@ -751,7 +767,7 @@ export function Sidebar({
                                                 };
                                                 fileInput.click();
                                             }}
-                                            className="py-1 px-3 bg-page hover:bg-border/40 border border-subtle/60 rounded-lg text-[10px] font-bold text-muted transition-all cursor-pointer"
+                                            className="py-1 px-3 bg-page hover:bg-border/40 border border-subtle/60 rounded-lg text-[11px] font-bold text-muted transition-all cursor-pointer"
                                         >
                                             Choose Photo
                                         </button>
@@ -759,7 +775,7 @@ export function Sidebar({
                                             <button
                                                 type="button"
                                                 onClick={() => setTempProfilePicture('')}
-                                                className="py-1 px-3 bg-red-50 hover:bg-red-100/60 border border-red-200 rounded-lg text-[10px] font-bold text-red-500 transition-all cursor-pointer"
+                                                className="py-1 px-3 bg-red-50 hover:bg-red-100/60 border border-red-200 rounded-lg text-[11px] font-bold text-red-500 transition-all cursor-pointer"
                                             >
                                                 Remove Photo
                                             </button>
@@ -798,10 +814,7 @@ export function Sidebar({
                                 >
                                     {isSavingProfile ? (
                                         <>
-                                            <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
-                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                            </svg>
+                                            <YarnSpinner className="h-3.5 w-3.5" onBrand />
                                             Saving...
                                         </>
                                     ) : 'Save Changes'}
@@ -821,7 +834,7 @@ export function Sidebar({
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 15 }}
                             transition={{ duration: 0.2, ease: 'easeOut' }}
-                            className="bg-white rounded-[2rem] border border-subtle max-w-md w-full p-6 space-y-5 shadow-2xl relative text-left max-h-[90vh] overflow-y-auto scrollbar-hide"
+                            className="bg-white rounded-[2rem] border border-subtle max-w-md w-full p-6 space-y-5 shadow-2xl relative text-left max-h-[90dvh] overflow-y-auto scrollbar-hide"
                         >
                             {/* Header */}
                             <div className="flex justify-between items-center pb-2 border-b border-subtle">
@@ -892,7 +905,7 @@ export function Sidebar({
                                                 navigator.clipboard.writeText('support.myyarndiary@gmail.com');
                                                 showAlert('Email copied to clipboard!', 'Copied');
                                             }}
-                                            className="text-[10px] font-bold text-muted bg-page hover:bg-border/60 px-2 py-1 rounded-md border border-subtle/30 transition-all cursor-pointer"
+                                            className="text-[11px] font-bold text-muted bg-page hover:bg-border/60 px-2 py-1 rounded-md border border-subtle/30 transition-all cursor-pointer"
                                         >
                                             Copy
                                         </button>
@@ -924,7 +937,7 @@ export function Sidebar({
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 15 }}
                             transition={{ duration: 0.2, ease: 'easeOut' }}
-                            className="bg-white rounded-[2rem] border border-subtle max-w-md w-full p-6 space-y-5 shadow-2xl relative text-left max-h-[90vh] overflow-y-auto scrollbar-hide"
+                            className="bg-white rounded-[2rem] border border-subtle max-w-md w-full p-6 space-y-5 shadow-2xl relative text-left max-h-[90dvh] overflow-y-auto scrollbar-hide"
                         >
                             {/* Header */}
                             <div className="flex justify-between items-center pb-2 border-b border-subtle">
@@ -993,10 +1006,7 @@ export function Sidebar({
                                 >
                                     {isUpdatingPassword ? (
                                         <>
-                                            <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
-                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                            </svg>
+                                            <YarnSpinner className="h-3.5 w-3.5" onBrand />
                                             Updating...
                                         </>
                                     ) : 'Update Password'}

@@ -87,7 +87,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
  animate={{ opacity: 1, scale: 1, y: 0 }}
  exit={{ opacity: 0, scale: 0.95, y: 15 }}
  transition={{ duration: 0.2, ease: 'easeOut' }}
- className="bg-white rounded-[2rem] border border-subtle max-w-sm w-full p-6 space-y-5 shadow-2xl relative"
+ className="bg-white rounded-[2rem] border border-subtle max-w-sm w-full p-5 sm:p-6 space-y-4 sm:space-y-5 shadow-2xl relative max-h-[90dvh] overflow-y-auto"
  >
  {/* Header section with themed color icon */}
  {(() => {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Save, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Save } from 'lucide-react';
+import { YarnSpinner } from './YarnSpinner';
 import { Hook } from '../types';
 
 interface HookManagerProps {
@@ -87,12 +88,12 @@ export function HookManager({ projectId, initialHooks, isNewProject, fetchWithTo
  return (
  <div className="space-y-4">
  <div className="flex justify-between items-center">
- <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">Hooks Used</label>
+ <label className="text-[11px] font-extrabold text-muted uppercase tracking-wider">Hooks Used</label>
  <button
  type="button"
  onClick={addHook}
  disabled={disabled}
- className="text-[10px] font-extrabold text-brand flex items-center gap-1 hover:text-error disabled:opacity-50"
+ className="text-[11px] font-extrabold text-brand flex items-center gap-1 hover:text-error disabled:opacity-50"
  >
  <Plus className="w-3 h-3" /> Add Hook
  </button>
@@ -111,7 +112,7 @@ export function HookManager({ projectId, initialHooks, isNewProject, fetchWithTo
  disabled={disabled || savingId === hook.hookId}
  className="text-muted hover:text-muted disabled:opacity-50 flex items-center"
  >
- {savingId === hook.hookId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+ {savingId === hook.hookId ? <YarnSpinner className="w-4 h-4" /> : <Save className="w-4 h-4" />}
  </button>
  <button
  type="button"
@@ -123,9 +124,9 @@ export function HookManager({ projectId, initialHooks, isNewProject, fetchWithTo
  </button>
  </div>
  
- <div className="grid grid-cols-2 gap-3 pr-16">
+ <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pr-14 sm:pr-16">
  <div>
- <label className="text-[9px] font-bold text-muted uppercase">Size (mm)</label>
+ <label className="text-[11px] font-bold text-muted uppercase">Size (mm)</label>
  <input
  type="number"
  step="0.25"
@@ -137,43 +138,43 @@ export function HookManager({ projectId, initialHooks, isNewProject, fetchWithTo
  updateHookState(hookIdx, 'sizeMm', val ? parseFloat(val) : null);
  }}
  onBlur={() => saveHook(hook)}
- className="w-full bg-transparent border-b border-subtle text-xs py-1 focus:outline-none focus:border-brand"
+ className="w-full bg-transparent border-b border-subtle text-xs py-2 sm:py-1 focus:outline-none focus:border-brand"
  placeholder="e.g. 5.0"
  />
  </div>
  <div>
- <label className="text-[9px] font-bold text-muted uppercase">Size (US)</label>
+ <label className="text-[11px] font-bold text-muted uppercase">Size (US)</label>
  <input
  type="text"
  value={hook.sizeUs || ''}
  disabled={disabled}
  onChange={(e) => updateHookState(hookIdx, 'sizeUs', e.target.value)}
  onBlur={() => saveHook(hook)}
- className="w-full bg-transparent border-b border-subtle text-xs py-1 focus:outline-none focus:border-brand"
+ className="w-full bg-transparent border-b border-subtle text-xs py-2 sm:py-1 focus:outline-none focus:border-brand"
  placeholder="e.g. H/8"
  />
  </div>
  <div>
- <label className="text-[9px] font-bold text-muted uppercase">Material</label>
+ <label className="text-[11px] font-bold text-muted uppercase">Material</label>
  <input
  type="text"
  value={hook.material || ''}
  disabled={disabled}
  onChange={(e) => updateHookState(hookIdx, 'material', e.target.value)}
  onBlur={() => saveHook(hook)}
- className="w-full bg-transparent border-b border-subtle text-xs py-1 focus:outline-none focus:border-brand"
+ className="w-full bg-transparent border-b border-subtle text-xs py-2 sm:py-1 focus:outline-none focus:border-brand"
  placeholder="e.g. Aluminum"
  />
  </div>
  <div>
- <label className="text-[9px] font-bold text-muted uppercase">Brand</label>
+ <label className="text-[11px] font-bold text-muted uppercase">Brand</label>
  <input
  type="text"
  value={hook.brand || ''}
  disabled={disabled}
  onChange={(e) => updateHookState(hookIdx, 'brand', e.target.value)}
  onBlur={() => saveHook(hook)}
- className="w-full bg-transparent border-b border-subtle text-xs py-1 focus:outline-none focus:border-brand"
+ className="w-full bg-transparent border-b border-subtle text-xs py-2 sm:py-1 focus:outline-none focus:border-brand"
  placeholder="e.g. Clover"
  />
  </div>

@@ -11,6 +11,7 @@ import { useDialog } from './DialogProvider';
 import { YarnManager } from './YarnManager';
 import { HookManager } from './HookManager';
 import { PatternViewer } from './PatternViewer';
+import { YarnSpinner } from './YarnSpinner';
 import { exportProjectToPdf } from '../lib/pdfExport';
 
 const capitalizeWords = (str: string): string => {
@@ -820,7 +821,7 @@ export function ProjectDetail({
  </button>
  <div>
  <div className="flex items-center gap-2">
- <span className="text-[8px] lg:text-[10px] font-bold text-brand bg-brand/10 border border-brand/20 px-1.5 lg:px-2 py-0.5 rounded-md flex items-center gap-1">
+ <span className="text-[11px] font-bold text-brand bg-brand/10 border border-brand/20 px-1.5 lg:px-2 py-0.5 rounded-md flex items-center gap-1">
  <FolderOpen className="w-2.5 h-2.5 lg:w-3 lg:h-3" />
  {activeCategory?.name || 'My Projects'}
  </span>
@@ -847,7 +848,7 @@ export function ProjectDetail({
  </button>
  <button onClick={handleExportPdf} disabled={isExporting} className="p-1 bg-white text-muted border border-subtle rounded-lg cursor-pointer flex items-center justify-center">
  {isExporting ? (
- <svg className="animate-spin h-3.5 w-3.5 text-accent" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+ <YarnSpinner className="h-3.5 w-3.5 text-accent" />
  ) : <Download className="w-3.5 h-3.5" />}
  </button>
  <button onClick={handleArchive} className={`p-1 bg-white border rounded-lg cursor-pointer transition-colors ${project.isArchive ? 'text-accent border-emerald-100' : 'text-muted border-subtle'}`}>
@@ -893,10 +894,7 @@ export function ProjectDetail({
  title="Export PDF"
  >
  {isExporting ? (
- <svg className="animate-spin h-4 w-4 text-accent" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
- <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
- <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
- </svg>
+ <YarnSpinner className="h-4 w-4 text-accent" />
  ) : (
  <Download className="w-4 h-4" />
  )}
@@ -939,7 +937,7 @@ export function ProjectDetail({
  type="button"
  disabled={isSubmitting}
  onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
- className="px-3 lg:px-4 py-1.5 lg:py-2.5 bg-white border-2 border-subtle hover:border-brand hover:bg-page/50 rounded-xl text-[10px] lg:text-xs font-bold text-heading focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand disabled:opacity-60 flex items-center gap-2 cursor-pointer min-w-[120px] lg:min-w-[140px] justify-between transition-all w-full"
+ className="px-3 lg:px-4 py-1.5 lg:py-2 bg-white border-2 border-subtle hover:border-brand hover:bg-page/50 rounded-xl text-[11px] lg:text-xs font-bold text-heading focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand disabled:opacity-60 flex items-center gap-2 cursor-pointer min-w-[120px] lg:min-w-[140px] justify-between transition-all w-full"
  >
  <span className="flex items-center gap-1.5">
  {status === ProjectStatus.Planning && <ClipboardList className="w-3 lg:w-3.5 h-3 lg:h-3.5 text-warning" />}
@@ -998,16 +996,13 @@ export function ProjectDetail({
  <button
  onClick={handleSaveFields}
  disabled={isSaved || isSubmitting || isDateRangeInvalid}
- className={`px-3 lg:px-4 py-1.5 lg:py-2.5 rounded-xl font-bold text-[10px] lg:text-xs flex items-center gap-1.5 lg:gap-2 shadow-xs transition-all ${isSaved
+ className={`px-3 lg:px-4 py-1.5 lg:py-2 rounded-xl font-bold text-[11px] lg:text-xs flex items-center gap-1.5 lg:gap-2 shadow-xs transition-all ${isSaved
  ? 'bg-page text-muted border border-subtle cursor-not-allowed'
  : 'bg-accent hover:bg-accent/85 text-white shadow-md transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer disabled:opacity-60'
  }`}
  >
  {isSubmitting ? (
- <svg className="animate-spin h-3 lg:h-4 w-3 lg:w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
- <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
- <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
- </svg>
+ <YarnSpinner className="h-3 lg:h-4 w-3 lg:w-4" onBrand />
  ) : (
  <Save className="w-3 lg:w-4 h-3 lg:h-4" />
  )}
@@ -1023,15 +1018,15 @@ export function ProjectDetail({
  <div className="lg:col-span-4 space-y-6">
 
  {/* TAP COUNTERS COMPONENT */}
- <div className="fabric-card p-6 text-center space-y-4">
- <span className="text-xs uppercase font-extrabold tracking-widest text-brand block font-mono">Row Tracker</span>
+ <div className="fabric-card p-4 sm:p-5 text-center space-y-3">
+ <span className="text-xs uppercase font-extrabold tracking-widest text-brand block">Row Tracker</span>
 
- <div className="flex items-center justify-center gap-4 sm:gap-6 py-4">
+ <div className="flex items-center justify-center gap-4 sm:gap-6 py-3">
  {/* Symmetrical Decrease Row Button */}
  <button
  onClick={() => incrementRow(-1)}
  disabled={project.rowCount === 0 || isSubmitting}
- className="sewing-button w-12 h-12 rounded-full text-white transition-transform duration-200 active:scale-95 flex items-center justify-center shadow-lg cursor-pointer disabled:opacity-40 disabled:pointer-events-none shrink-0"
+ className="sewing-button w-11 h-11 rounded-full text-white transition-transform duration-200 active:scale-95 flex items-center justify-center shadow-lg cursor-pointer disabled:opacity-40 disabled:pointer-events-none shrink-0"
  title="Decrease row count"
  >
  <Minus className="w-5 h-5" />
@@ -1041,37 +1036,36 @@ export function ProjectDetail({
  <button
  onClick={() => incrementRow(1)}
  disabled={isSubmitting}
- className="sewing-button w-36 h-36 flex flex-col items-center justify-center rounded-full text-white transform transition-transform duration-200 shadow-lg cursor-pointer shrink-0"
+ className="sewing-button w-32 h-32 flex flex-col items-center justify-center rounded-full text-white transform transition-transform duration-200 shadow-lg cursor-pointer shrink-0"
  title="Tap to increase row count"
  >
- <span className="text-5xl sm:text-6xl font-black tabular-nums tracking-tighter drop-shadow-sm leading-none pt-2">{project.rowCount}</span>
- <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest mt-2 opacity-90">Tap to Count</span>
+ <span className="text-4xl sm:text-5xl font-black tabular-nums tracking-tighter drop-shadow-sm leading-none pt-2">{project.rowCount}</span>
+ <span className="text-[11px] font-bold uppercase tracking-widest mt-1.5 opacity-90">Tap to Count</span>
  </button>
 
  {/* Symmetrical Increase Row Button */}
  <button
  onClick={() => incrementRow(1)}
  disabled={isSubmitting}
- className="sewing-button four-hole-button w-12 h-12 rounded-full text-white transition-transform duration-200 active:scale-95 flex items-center justify-center shadow-lg cursor-pointer disabled:opacity-40 disabled:pointer-events-none shrink-0"
- title="Increase row count"
+ className="sewing-button four-hole-button w-11 h-11 rounded-full text-white transition-transform duration-200 active:scale-95 flex items-center justify-center shadow-lg cursor-pointer disabled:opacity-40 disabled:pointer-events-none shrink-0"
  >
  <Plus className="w-5 h-5" />
  </button>
  </div>
 
  {/* Quick offset buttons */}
- <div className="flex gap-2 w-full justify-center mt-2">
+ <div className="flex gap-2 w-full justify-center mt-1.5">
  <button
  onClick={() => incrementRow(5)}
  disabled={isSubmitting}
- className="flex-1 py-2 bg-surface border border-subtle text-[10px] font-extrabold text-brand rounded-xl hover:bg-brand/5 transition-colors cursor-pointer"
+ className="flex-1 py-1.5 bg-surface border border-subtle text-[11px] font-extrabold text-brand rounded-xl hover:bg-brand/5 transition-colors cursor-pointer"
  >
  +5 Rows
  </button>
  <button
  onClick={() => incrementRow(10)}
  disabled={isSubmitting}
- className="flex-1 py-2 bg-surface border border-subtle text-[10px] font-extrabold text-brand rounded-xl hover:bg-brand/5 transition-colors cursor-pointer"
+ className="flex-1 py-1.5 bg-surface border border-subtle text-[11px] font-extrabold text-brand rounded-xl hover:bg-brand/5 transition-colors cursor-pointer"
  >
  +10 Rows
  </button>
@@ -1081,7 +1075,7 @@ export function ProjectDetail({
  if (confirmed) onUpdateProject({ rowCount: 0 });
  }}
  disabled={isSubmitting}
- className="px-4 py-1.5 bg-transparent border-none text-[10px] font-bold text-muted underline hover:text-brand disabled:opacity-60 cursor-pointer mt-2"
+ className="px-4 py-1 bg-transparent border-none text-[11px] font-bold text-muted underline hover:text-brand disabled:opacity-60 cursor-pointer mt-1"
  >
  Reset to Zero
  </button>
@@ -1089,12 +1083,12 @@ export function ProjectDetail({
  </div>
 
  {/* PROJECT INFO FORM SPECIFICATIONS */}
- <div className="fabric-card p-6 space-y-4 animate-fade-in">
- <span className="text-[10px] uppercase font-extrabold tracking-widest text-brand pb-1 border-b border-subtle flex items-center gap-1.5"><ReceiptText className="w-3.5 h-3.5" /> Details</span>
+ <div className="fabric-card p-4 space-y-3 animate-fade-in">
+ <span className="text-[11px] uppercase font-extrabold tracking-widest text-brand pb-1 border-b border-subtle flex items-center gap-1.5"><ReceiptText className="w-3.5 h-3.5" /> Details</span>
 
- <div className="space-y-3.5">
+ <div className="space-y-3">
  <div className="space-y-1">
- <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider block">Project Name</label>
+ <label className="text-[11px] font-extrabold text-muted uppercase tracking-wider block">Project Name</label>
  <input
  type="text"
  value={title}
@@ -1105,7 +1099,7 @@ export function ProjectDetail({
  </div>
 
  <div className="space-y-1">
- <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider block">Journal Category / List</label>
+ <label className="text-[11px] font-extrabold text-muted uppercase tracking-wider block">Journal Category / List</label>
  <CustomDropdown
  value={targetCategoryId}
  disabled={isSubmitting}
@@ -1118,7 +1112,7 @@ export function ProjectDetail({
  </div>
 
  <div className="space-y-1">
- <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider block"> Notes</label>
+ <label className="text-[11px] font-extrabold text-muted uppercase tracking-wider block"> Notes</label>
  <textarea
  rows={2}
  value={notes}
@@ -1130,7 +1124,7 @@ export function ProjectDetail({
  </div>
 
  <div className="space-y-1">
- <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider block">Care Instructions</label>
+ <label className="text-[11px] font-extrabold text-muted uppercase tracking-wider block">Care Instructions</label>
  <textarea
  rows={2}
  value={careInstructions}
@@ -1144,23 +1138,23 @@ export function ProjectDetail({
  </div>
 
  {/* PROJECT TIMELINE */}
- <div className="bg-white rounded-3xl p-6 border border-subtle warm-shadow-lg space-y-4 animate-fade-in">
- <span className="text-[10px] uppercase font-extrabold tracking-widest text-brand pb-1 border-b border-subtle flex items-center gap-1.5">
+ <div className="bg-white rounded-2xl p-4 border border-subtle warm-shadow-lg space-y-3 animate-fade-in">
+ <span className="text-[11px] uppercase font-extrabold tracking-widest text-brand pb-1 border-b border-subtle flex items-center gap-1.5">
  <Calendar className="w-3.5 h-3.5 text-brand" /> Project Duration
  </span>
- <div className="grid grid-cols-2 gap-4">
+ <div className="grid grid-cols-2 gap-3">
  <div className="space-y-1">
- <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider block">Date Started</label>
+ <label className="text-[11px] font-extrabold text-muted uppercase tracking-wider block">Date Started</label>
  <input
  type="date"
  value={startDate}
  disabled={isSubmitting}
  onChange={(e) => { setStartDate(e.target.value); handleFieldChange(); }}
- className="w-full bg-surface border border-subtle text-xs p-2.5 rounded-xl text-heading focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand font-semibold disabled:opacity-60"
+ className="w-full bg-surface border border-subtle text-xs p-2 rounded-xl text-heading focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand font-semibold disabled:opacity-60"
  />
  </div>
  <div className="space-y-1">
- <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider block">Date Ended</label>
+ <label className="text-[11px] font-extrabold text-muted uppercase tracking-wider block">Date Ended</label>
  <input
  type="date"
  value={endDate}
@@ -1176,33 +1170,33 @@ export function ProjectDetail({
  }
  }
  }}
- className="w-full bg-surface border border-subtle text-xs p-2.5 rounded-xl text-heading focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand font-semibold disabled:opacity-60"
+ className="w-full bg-surface border border-subtle text-xs p-2 rounded-xl text-heading focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand font-semibold disabled:opacity-60"
  />
  </div>
  </div>
  {isDateRangeInvalid && (
- <p className="text-[10px] text-red-500 font-semibold mt-1 animate-fade-in">Start date cannot be after end date.</p>
+ <p className="text-[11px] text-red-500 font-semibold mt-1 animate-fade-in">Start date cannot be after end date.</p>
  )}
- <div className="space-y-1 mt-4">
- <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider block">Total Time Taken</label>
+ <div className="space-y-1 mt-3">
+ <label className="text-[11px] font-extrabold text-muted uppercase tracking-wider block">Total Time Taken</label>
  <input
  type="text"
  value={totalTime}
  disabled={isSubmitting}
  placeholder="e.g. 5 days, 12 hours"
  onChange={(e) => { setTotalTime(e.target.value); handleFieldChange(); }}
- className="w-full bg-surface border border-subtle text-xs p-2.5 rounded-xl text-heading focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand font-semibold disabled:opacity-60"
+ className="w-full bg-surface border border-subtle text-xs p-2 rounded-xl text-heading focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand font-semibold disabled:opacity-60"
  />
  </div>
  </div>
 
  {/* YARNS SPECIFICATIONS */}
- <div className="bg-white rounded-3xl p-6 border border-subtle warm-shadow-lg space-y-4 animate-fade-in">
+ <div className="bg-white rounded-2xl p-4 border border-subtle warm-shadow-lg space-y-3 animate-fade-in">
  <button
  onClick={() => setIsYarnsOpen(!isYarnsOpen)}
  className="w-full flex items-center justify-between text-left focus:outline-none cursor-pointer"
  >
- <span className="text-[10px] uppercase font-extrabold tracking-widest text-brand flex items-center gap-1.5">
+ <span className="text-[11px] uppercase font-extrabold tracking-widest text-brand flex items-center gap-1.5">
  <Scissors className="w-3.5 h-3.5 text-brand" /> Yarns Used
  </span>
  <ChevronDown className={`w-4 h-4 text-brand transition-transform duration-300 ${isYarnsOpen ? 'rotate-180' : ''}`} />
@@ -1221,12 +1215,12 @@ export function ProjectDetail({
  </div>
 
  {/* HOOKS SPECIFICATIONS */}
- <div className="bg-white rounded-3xl p-6 border border-subtle warm-shadow-lg space-y-4 animate-fade-in">
+ <div className="bg-white rounded-2xl p-4 border border-subtle warm-shadow-lg space-y-3 animate-fade-in">
  <button
  onClick={() => setIsHooksOpen(!isHooksOpen)}
  className="w-full flex items-center justify-between text-left focus:outline-none cursor-pointer"
  >
- <span className="text-[10px] uppercase font-extrabold tracking-widest text-brand flex items-center gap-1.5">
+ <span className="text-[11px] uppercase font-extrabold tracking-widest text-brand flex items-center gap-1.5">
  <PenTool className="w-3.5 h-3.5 text-brand" /> Hooks Used
  </span>
  <ChevronDown className={`w-4 h-4 text-brand transition-transform duration-300 ${isHooksOpen ? 'rotate-180' : ''}`} />
@@ -1245,10 +1239,10 @@ export function ProjectDetail({
  </div>
 
  {/* END PRODUCT GALLERY */}
- <div className="bg-white rounded-3xl p-6 border border-subtle warm-shadow-lg space-y-4 animate-fade-in">
- <span className="text-[10px] uppercase font-extrabold tracking-widest text-brand block pb-1 border-b border-subtle flex items-center justify-between">
+ <div className="bg-white rounded-2xl p-4 border border-subtle warm-shadow-lg space-y-3 animate-fade-in">
+ <span className="text-[11px] uppercase font-extrabold tracking-widest text-brand block pb-1 border-b border-subtle flex items-center justify-between">
  <span className="flex items-center gap-1.5"><Camera className="w-3.5 h-3.5 text-brand" /> End product Gallery</span>
- <span className="text-[9px] text-muted font-mono font-normal">({productPhotos.length}/6)</span>
+ <span className="text-[11px] text-muted font-normal">({productPhotos.length}/6)</span>
  </span>
 
  {productPhotos.length === 0 ? (
@@ -1288,7 +1282,7 @@ export function ProjectDetail({
  }
  }
  }}
- className={`absolute bottom-1 left-1 p-1 rounded-lg text-[9px] font-extrabold transition-all flex items-center gap-0.5 shadow-xs cursor-pointer ${isCover
+ className={`absolute bottom-1 left-1 p-1 rounded-lg text-[11px] font-extrabold transition-all flex items-center gap-0.5 shadow-xs cursor-pointer ${isCover
  ? 'bg-accent text-white'
  : 'bg-white/95 text-muted hover:bg-white'
  }`}
@@ -1303,7 +1297,7 @@ export function ProjectDetail({
  type="button"
  onClick={() => removeProductPhoto(i)}
  disabled={isUploadingPhoto || isSubmitting}
- className="absolute top-1 right-1 w-5 h-5 bg-black/60 hover:bg-red-500 rounded-full text-white text-[10px] flex items-center justify-center font-bold transition-all opacity-0 group-hover:opacity-100 cursor-pointer disabled:opacity-40"
+ className="absolute top-1 right-1 w-5 h-5 bg-black/60 hover:bg-red-500 rounded-full text-white text-[11px] flex items-center justify-center font-bold transition-all opacity-0 group-hover:opacity-100 cursor-pointer disabled:opacity-40"
  title="Remove Photo"
  >
  ×
@@ -1332,10 +1326,7 @@ export function ProjectDetail({
  >
  {isUploadingPhoto ? (
  <span className="flex items-center justify-center gap-1">
- <svg className="animate-spin h-3.5 w-3.5 text-accent" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
- <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
- <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
- </svg>
+ <YarnSpinner className="h-3.5 w-3.5 text-accent" />
  Loading...
  </span>
  ) : (
@@ -1362,10 +1353,10 @@ export function ProjectDetail({
  <div className="lg:col-span-8 space-y-6">
 
  {/* Tab Switcher Headers */}
- <div className="flex border-b border-subtle gap-2 pb-1 bg-white p-3 rounded-2xl warm-shadow">
+ <div className="flex border-b border-subtle gap-1.5 sm:gap-2 pb-1 bg-white p-1.5 sm:p-3 rounded-2xl warm-shadow">
  <button
  onClick={() => setActiveTab('journal')}
- className={`flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all ${activeTab === 'journal'
+ className={`flex-1 md:flex-initial px-2.5 sm:px-5 py-2 sm:py-2.5 rounded-xl font-bold text-[11px] sm:text-xs flex items-center justify-center gap-2 cursor-pointer transition-all ${activeTab === 'journal'
  ? 'bg-brand text-white shadow-xs'
  : 'bg-white text-muted hover:bg-page border border-transparent'
  }`}
@@ -1376,7 +1367,7 @@ export function ProjectDetail({
 
  <button
  onClick={() => setActiveTab('pattern')}
- className={`flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all ${activeTab === 'pattern'
+ className={`flex-1 md:flex-initial px-2.5 sm:px-5 py-2 sm:py-2.5 rounded-xl font-bold text-[11px] sm:text-xs flex items-center justify-center gap-2 cursor-pointer transition-all ${activeTab === 'pattern'
  ? 'bg-brand text-white shadow-xs'
  : 'bg-white text-muted hover:bg-page border border-transparent'
  }`}
@@ -1384,7 +1375,7 @@ export function ProjectDetail({
  <FileText className="w-3.5 h-3.5" />
  Crochet Pattern
  {project.patterns && project.patterns.length > 0 && (
- <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-extrabold ${activeTab === 'pattern' ? 'bg-white text-brand' : 'bg-brand/10 text-brand'
+ <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-extrabold ${activeTab === 'pattern' ? 'bg-white text-brand' : 'bg-brand/10 text-brand'
  }`}>
  {project.patterns.length}
  </span>
@@ -1395,12 +1386,12 @@ export function ProjectDetail({
  {activeTab === 'journal' ? (
  <>
  {/* PROGRESS WRITING LOGGER BOX */}
- <div className="bg-white rounded-3xl p-6 border border-subtle warm-shadow-lg">
+ <div className="bg-white rounded-2xl p-3 sm:p-5 border border-subtle warm-shadow-lg">
  <h3 className="font-serif font-extrabold text-brand text-sm flex items-center gap-2">
  <NotebookPen className="w-4 h-4 text-brand" /> Log Today's Progress..
  </h3>
 
- <form onSubmit={handleAddLog} className="space-y-4 mt-4">
+ <form onSubmit={handleAddLog} className="space-y-3 mt-3">
  <div className="relative">
  <textarea
  value={textEntry}
@@ -1408,12 +1399,12 @@ export function ProjectDetail({
  onChange={(e) => setTextEntry(e.target.value)}
  required
  rows={3}
- className={`w-full p-4 bg-surface border rounded-2xl text-xs focus:outline-none placeholder-muted font-semibold text-heading resize-none ${textEntry.length > 1000
+ className={`w-full p-3 bg-surface border rounded-xl text-xs focus:outline-none placeholder-muted font-semibold text-heading resize-none ${textEntry.length > 1000
  ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
  : 'border-subtle focus:ring-1 focus:ring-brand focus:border-brand'
  }`}
  />
- <div className="flex justify-between items-center px-1 mt-1 text-[10px] font-semibold">
+ <div className="flex justify-between items-center px-1 mt-1 text-[11px] font-semibold">
  {textEntry.length > 1000 ? (
  <span className="text-red-500">Warning: Log entry exceeds character limit of 1000.</span>
  ) : (
@@ -1425,7 +1416,7 @@ export function ProjectDetail({
  </div>
  </div>
 
- <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+ <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
  {/* Photo attachment selector */}
  <div className="flex items-center gap-2.5">
  <input
@@ -1438,7 +1429,7 @@ export function ProjectDetail({
  <div className="flex gap-2">
  <label
  htmlFor="log-photo-file"
- className="px-3.5 py-2 bg-white border border-subtle hover:border-brand text-muted rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 transition-colors"
+ className="px-3 py-1.5 bg-white border border-subtle hover:border-brand text-muted rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 transition-colors"
  >
  <Camera className="w-3.5 h-3.5 text-brand" />
  Upload Image
@@ -1446,7 +1437,7 @@ export function ProjectDetail({
  <button
  type="button"
  onClick={() => startCamera('log')}
- className="px-3.5 py-2 bg-white border border-subtle hover:border-brand text-muted rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 transition-colors"
+ className="px-3 py-1.5 bg-white border border-subtle hover:border-brand text-muted rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 transition-colors"
  >
  <Camera className="w-3.5 h-3.5 text-brand" />
  Take Snap
@@ -1459,7 +1450,7 @@ export function ProjectDetail({
  <button
  type="button"
  onClick={() => { setLogImage(null); setLogImageBase64(null); }}
- className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 rounded-full text-white text-[9px] flex items-center justify-center font-bold"
+ className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 rounded-full text-white text-[11px] flex items-center justify-center font-bold"
  >
  ×
  </button>
@@ -1470,7 +1461,7 @@ export function ProjectDetail({
  <button
  type="submit"
  disabled={submittingLog || !textEntry.trim() || textEntry.length > 1000}
- className="px-5 py-2 bg-brand hover:bg-brand/85 text-white font-bold rounded-xl text-xs tracking-wide cursor-pointer disabled:opacity-40 shadow-md transform hover:-translate-y-0.5"
+ className="px-4 py-1.5 bg-brand hover:bg-brand/85 text-white font-bold rounded-xl text-xs tracking-wide cursor-pointer disabled:opacity-40 shadow-md transform hover:-translate-y-0.5"
  >
  Add Entry
  </button>
@@ -1479,29 +1470,29 @@ export function ProjectDetail({
  </div>
 
  {/* SNAPSHOT PHOTO JOURNAL HISTORY TIMELINE */}
- <div className="space-y-4">
- <span className="text-[10px] uppercase font-bold tracking-widest text-brand block px-1">Journal entries</span>
+ <div className="space-y-3">
+ <span className="text-[11px] uppercase font-bold tracking-widest text-brand block px-1">Journal entries</span>
 
  {logs.length === 0 ? (
- <div className="p-8 text-center bg-white rounded-3xl border border-subtle warm-shadow">
+ <div className="p-6 text-center bg-white rounded-2xl border border-subtle warm-shadow">
  <p className="text-xs text-muted font-semibold">No progress logs filed yet. Document row milestones and attach snaps to build a gorgeous pattern project history.</p>
  </div>
  ) : (
  <>
- <div className="space-y-4 animate-fade-in">
+ <div className="space-y-3 animate-fade-in">
  {logs.map((log) => (
  <div
  key={log.logId}
- className="bg-white rounded-3xl p-5 border border-subtle warm-shadow hover:border-accent/30 transition-all flex flex-col md:flex-row gap-5 items-start justify-between"
+ className="bg-white rounded-2xl p-4 border border-subtle warm-shadow hover:border-accent/30 transition-all flex flex-col md:flex-row gap-4 items-start justify-between"
  >
- <div className="space-y-2 flex-1">
- <div className="flex flex-wrap items-center gap-2.5">
- <span className="text-[9px] font-mono font-bold text-muted bg-page border border-subtle px-2 py-0.5 rounded-md flex items-center gap-1">
+ <div className="space-y-1.5 flex-1">
+ <div className="flex flex-wrap items-center gap-2">
+ <span className="text-[11px] font-bold text-muted bg-page border border-subtle px-2 py-0.5 rounded-md flex items-center gap-1">
  <Calendar className="w-3 h-3 text-accent" />
  {new Date(log.createdAt).toLocaleDateString()} at {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
  </span>
  {log.rowCountSnapshot !== undefined && (
- <span className="text-[9px] font-extrabold text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-md">Row {log.rowCountSnapshot} Milestone</span>
+ <span className="text-[11px] font-extrabold text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-md">Row {log.rowCountSnapshot} Milestone</span>
  )}
  </div>
  <p className="text-xs text-heading whitespace-pre-wrap leading-relaxed font-semibold">{log.textEntry}</p>

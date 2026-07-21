@@ -113,7 +113,7 @@ export function Celebration({ projectTitle, onClose }: CelebrationProps) {
  animate={{ opacity: 1, scale: 1, y: 0 }}
  exit={{ opacity: 0, scale: 0.9, y: 20 }}
  transition={{ type: 'spring', damping: 25, stiffness: 350 }}
- className="bg-white rounded-[2.5rem] border border-subtle max-w-md w-full p-8 text-center space-y-6 shadow-2xl relative overflow-hidden warm-shadow-lg"
+ className="bg-white rounded-[2.5rem] border border-subtle max-w-md w-full p-6 sm:p-8 text-center space-y-4 sm:space-y-6 shadow-2xl relative overflow-hidden max-h-[90dvh] overflow-y-auto warm-shadow-lg"
  >
  {/* Glow decoration */}
  <div className="absolute -top-10 -left-10 w-40 h-40 bg-brand-light/20 rounded-full blur-3xl" />

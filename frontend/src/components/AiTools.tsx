@@ -56,49 +56,56 @@ export function AiTools({ token, initialTab, user, onUpdateCrochetTerminology }:
 
  return (
  <div className="h-full flex flex-col overflow-hidden">
- {/* Tab bar header */}
- <div className={`px-4 md:px-6 bg-white border-b border-subtle flex flex-col md:flex-row justify-between shrink-0 shadow-xs transition-all duration-300 ${isHeaderCollapsed ? 'py-2 md:py-3 items-center' : 'py-3 md:py-4 items-start md:items-center gap-3 md:gap-4'}`}>
- <div className="flex justify-between items-center w-full md:w-auto">
- <div>
- <h2 className="text-base md:text-lg font-extrabold font-serif text-heading tracking-tight flex items-center gap-1.5">
- <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-brand animate-pulse" />
- AI Tools Studio
- </h2>
- {!isHeaderCollapsed && (
- <p className="text-[10px] text-muted font-bold uppercase tracking-wider mt-0.5">Empower your craft with personalized AI Tools</p>
- )}
- </div>
- <button
- onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
- className="p-1.5 md:hidden rounded-full hover:bg-surface text-muted transition-colors cursor-pointer"
- title={isHeaderCollapsed ? "Expand Tools" : "Collapse Tools"}
- >
- {isHeaderCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
- </button>
- </div>
+      {/* Tab bar header */}
+      <div className={`px-3 sm:px-6 bg-white border-b border-subtle flex flex-col lg:flex-row justify-between shrink-0 shadow-xs transition-all duration-300 ${isHeaderCollapsed ? 'py-2 items-center' : 'py-2.5 sm:py-3 items-start lg:items-center gap-2 lg:gap-4'}`}>
+        <div className="flex justify-between items-center w-full lg:w-auto shrink-0">
+          <div>
+            <h2 className="text-sm sm:text-lg font-extrabold font-serif text-heading tracking-tight flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-brand animate-pulse" />
+              AI Tools Studio
+            </h2>
+            {!isHeaderCollapsed && (
+              <p className="text-[11px] text-muted font-bold uppercase tracking-wider mt-0.5 hidden sm:block">Empower your craft with personalized AI Tools</p>
+            )}
+          </div>
+          <button
+            onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
+            className="p-1 sm:p-1.5 lg:hidden rounded-full hover:bg-surface text-muted transition-colors cursor-pointer"
+            title={isHeaderCollapsed ? "Expand Tools" : "Collapse Tools"}
+          >
+            {isHeaderCollapsed ? <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" /> : <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5" />}
+          </button>
+        </div>
 
- {/* 5 Sub buttons */}
- {!isHeaderCollapsed && (
- <div className="flex bg-white p-1 rounded-full border border-subtle w-full md:w-auto overflow-x-auto scrollbar-none shrink-0 gap-1.5 md:gap-2 shadow-sm animate-fade-in">
- {tabs.map((tab) => {
- const isActive = activeTab === tab.id;
- return (
- <button
- key={tab.id}
- onClick={() => setActiveTab(tab.id)}
- className={`px-3 md:px-5 py-1.5 md:py-2.5 text-[11px] md:text-sm font-bold rounded-full transition-all duration-200 whitespace-nowrap cursor-pointer flex items-center gap-1.5 justify-center shrink-0 ${isActive
- ? 'bg-brand text-white shadow-md transform scale-[1.02]'
- : 'text-muted hover:bg-surface hover:text-heading'
- }`}
- >
- <tab.icon className="w-4 h-4 md:w-4 md:h-4" />
- <span>{tab.name}</span>
- </button>
- );
- })}
- </div>
- )}
- </div>
+        {/* 5 Sub buttons */}
+        {!isHeaderCollapsed && (
+          <div className="w-full lg:w-auto min-w-0 max-w-full overflow-hidden flex justify-start lg:justify-end shrink-0">
+            <div className="flex bg-white p-1 rounded-full border border-subtle w-full max-w-full overflow-x-auto scrollbar-none gap-1 sm:gap-1.5 shadow-sm animate-fade-in touch-pan-x shrink-0">
+              {tabs.map((tab) => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    title={tab.name}
+                    aria-label={tab.name}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`tap-safe px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold rounded-full transition-all duration-200 whitespace-nowrap cursor-pointer flex items-center gap-1.5 justify-center shrink-0 ${isActive
+                      ? 'bg-brand text-white shadow-md transform scale-[1.02]'
+                      : 'text-muted hover:bg-brand/5 hover:text-brand'
+                      }`}
+                  >
+                    <tab.icon className="w-4 h-4 shrink-0" />
+                    {/* Below sm: only the selected tool keeps its label, so all five
+                        fit without horizontal scrolling. Names stay in title/aria. */}
+                    <span className={isActive ? 'inline' : 'hidden sm:inline'}>{tab.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
 
  {/* Main chat interface panel */}
  <div className="flex-1 overflow-hidden">

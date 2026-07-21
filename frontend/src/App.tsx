@@ -13,6 +13,7 @@ import { ProjectDetail } from './components/ProjectDetail';
 import { ProjectGallery } from './components/ProjectGallery';
 import { Celebration } from './components/Celebration';
 import { AuthScreen } from './components/AuthScreen';
+import { LandingPage } from './components/LandingPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { CrochetLoader } from './components/CrochetLoader';
 import { Category, Project, JournalLog, ProjectStatus, ChatCategory } from './types';
@@ -82,7 +83,7 @@ function ProfileModal({ isOpen, onClose, currentUser, onSave }: ProfileModalProp
  animate={{ opacity: 1, scale: 1, y: 0 }}
  exit={{ opacity: 0, scale: 0.95, y: 15 }}
  transition={{ duration: 0.2 }}
- className="bg-white rounded-[2rem] border border-subtle max-w-md w-full p-6 space-y-6 shadow-2xl relative max-h-[90vh] overflow-y-auto scrollbar-hide"
+ className="bg-white rounded-[2rem] border border-subtle max-w-md w-full p-6 space-y-6 shadow-2xl relative max-h-[90dvh] overflow-y-auto scrollbar-hide"
  >
  <button
  onClick={onClose}
@@ -120,12 +121,12 @@ function ProfileModal({ isOpen, onClose, currentUser, onSave }: ProfileModalProp
  </div>
  )}
  <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white rounded-xl opacity-0 group-hover:opacity-100 transition-opacity">
- <span className="text-[9px] font-bold uppercase">Upload</span>
+ <span className="text-[11px] font-bold uppercase">Upload</span>
  </div>
  </div>
 
  <div className="flex-1 space-y-1.5">
- <span className="text-[10px] font-bold text-muted uppercase tracking-wider block">Profile Image</span>
+ <span className="text-[11px] font-bold text-muted uppercase tracking-wider block">Profile Image</span>
  <input
  type="file"
  id="avatar-upload"
@@ -211,7 +212,7 @@ function SettingsModal({ isOpen, onClose, currentUser, onDeactivate }: SettingsM
  animate={{ opacity: 1, scale: 1, y: 0 }}
  exit={{ opacity: 0, scale: 0.95, y: 15 }}
  transition={{ duration: 0.2 }}
- className="bg-white rounded-[2rem] border border-subtle max-w-md w-full p-6 space-y-6 shadow-2xl relative max-h-[90vh] overflow-y-auto scrollbar-hide"
+ className="bg-white rounded-[2rem] border border-subtle max-w-md w-full p-6 space-y-6 shadow-2xl relative max-h-[90dvh] overflow-y-auto scrollbar-hide"
  >
  <button
  onClick={onClose}
@@ -220,7 +221,7 @@ function SettingsModal({ isOpen, onClose, currentUser, onDeactivate }: SettingsM
  <X className="w-5 h-5" />
  </button>
 
- <div className="flex items-center gap-3 border-b border-subtle pb-4">
+ <div className="flex items-center gap-3 border-b border-subtle pb-3">
  <div className="p-2.5 rounded-xl bg-accent/10 text-accent">
  <Settings className="w-6 h-6" />
  </div>
@@ -263,7 +264,7 @@ function SettingsModal({ isOpen, onClose, currentUser, onDeactivate }: SettingsM
  <Mail className="w-3.5 h-3.5" />
  Contact Support to Delete Account
  </a>
- <p className="text-[10px] text-center text-stone-500 font-semibold italic">
+ <p className="text-[11px] text-center text-stone-500 font-semibold italic">
  Opens your default mail app to email support at myyarndiary@gmail.com
  </p>
  </div>
@@ -280,6 +281,10 @@ export default function App() {
   const [shouldAutoOpenProjectModal, setShouldAutoOpenProjectModal] = useState(false);
   const [token, setToken] = useState<string | null>(localStorage.getItem('crochet_token'));
  const [user, setUser] = useState<any>(null);
+ // Landing page → auth flow: unauthenticated visitors see the landing page first;
+ // Sign in / Sign up flip to the AuthScreen (in the matching mode).
+ const [showAuth, setShowAuth] = useState(false);
+ const [authIsLogin, setAuthIsLogin] = useState(true);
  const [activeTab, setActiveTab] = useState<'dashboard' | 'aitools' | 'gallery'>('dashboard');
  const [aiToolsInitialTab, setAiToolsInitialTab] = useState<ChatCategory>('crochet-buddy');
  const [isFloatingBuddyDismissed, setIsFloatingBuddyDismissed] = useState<boolean>(() => {
@@ -588,6 +593,7 @@ export default function App() {
  setIsFloatingBuddyDismissed(false);
  setToken(null);
  setUser(null);
+ setShowAuth(false); // return to the landing page, not the bare auth screen
  setCategories([]);
  setProjects([]);
  setJournalLogs([]);
@@ -990,7 +996,21 @@ export default function App() {
   }, [selectedProject, activeTab]);
 
  if (!token || !user) {
- return <AuthScreen onAuthSuccess={handleAuthSuccess} />;
+ if (showAuth) {
+ return (
+ <AuthScreen
+ onAuthSuccess={handleAuthSuccess}
+ initialIsLogin={authIsLogin}
+ onBack={() => setShowAuth(false)}
+ />
+ );
+ }
+ return (
+ <LandingPage
+ onSignIn={() => { setAuthIsLogin(true); setShowAuth(true); }}
+ onGetStarted={() => { setAuthIsLogin(false); setShowAuth(true); }}
+ />
+ );
  }
 
  if (isInitialLoading) {
@@ -998,110 +1018,105 @@ export default function App() {
  }
 
  return (
- <div id="crochet-app-workspace" className="h-screen bg-page flex text-vibrant-charcoal overflow-hidden font-sans select-none selection:bg-brand-light/40 selection:text-heading">
+    <div id="crochet-app-workspace" className="h-dvh bg-page flex text-body overflow-hidden font-sans select-none selection:bg-brand-light/40 selection:text-heading">
 
- {/* Mobile Backdrop */}
- {!isSidebarCollapsed && (
- <div
- className="lg:hidden fixed inset-0 bg-heading/40 backdrop-blur-sm z-30 transition-opacity"
- onClick={() => setIsSidebarCollapsed(true)}
- />
- )}
+      {/* Mobile Backdrop */}
+      {!isSidebarCollapsed && (
+        <div
+          className="lg:hidden fixed inset-0 bg-heading/40 backdrop-blur-sm z-30 transition-opacity"
+          onClick={() => setIsSidebarCollapsed(true)}
+        />
+      )}
 
- {/* 1. Brand Side Navigation category Panel */}
- <Sidebar
- categories={categories}
- activeCategoryId={activeCategoryId}
- onSelectCategory={handleSelectCategory}
- onCreateCategory={handleCreateCategory}
- onRenameCategory={handleRenameCategory}
- onDeleteCategory={handleDeleteCategory}
- currentUser={user}
- onLogout={handleLogout}
- isCollapsed={isSidebarCollapsed}
- onToggleCollapse={toggleSidebar}
- onUpdateUser={setUser}
- token={token}
- onUpdateToken={setToken}
- activeTab={activeTab}
- onSelectTab={setActiveTab}
- />
+      {/* 1. Brand Side Navigation category Panel */}
+      <Sidebar
+        categories={categories}
+        activeCategoryId={activeCategoryId}
+        onSelectCategory={handleSelectCategory}
+        onCreateCategory={handleCreateCategory}
+        onRenameCategory={handleRenameCategory}
+        onDeleteCategory={handleDeleteCategory}
+        currentUser={user}
+        onLogout={handleLogout}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={toggleSidebar}
+        onUpdateUser={setUser}
+        token={token}
+        onUpdateToken={setToken}
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
+        onUpdateCrochetTerminology={updateCrochetTerminology}
+      />
 
- {/* 2. Main working content frame */}
- <div className="flex-grow flex flex-col h-full overflow-hidden">
-    <header className="px-2.5 md:px-8 py-2 md:py-4 bg-page/80 backdrop-blur-md border-b-2 border-subtle flex flex-col md:flex-row justify-between items-start md:items-center gap-2 md:gap-3 shrink-0 transition-all shadow-sm sticky top-0 z-10">
+      {/* 2. Main working content frame */}
+      <div className="flex-grow flex flex-col h-full overflow-hidden">
+        <header className="px-2 md:px-6 py-1.5 md:py-2 bg-page/80 backdrop-blur-md border-b-2 border-subtle flex flex-row items-center justify-between gap-2 shrink-0 transition-all shadow-sm sticky top-0 z-10">
 
-      {/* Welcome title indicator + Terminology Toggle Mobile */}
-      <div className="flex items-center justify-between gap-2 w-full md:w-auto">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          {isSidebarCollapsed && (
-            <button
-              onClick={toggleSidebar}
-              className="p-1 md:p-2 rounded-xl bg-white border border-subtle hover:bg-surface text-muted hover:text-heading transition-all cursor-pointer flex items-center justify-center animate-fadeIn shadow-sm shrink-0"
-              title="Expand Sidebar"
-            >
-              <Menu className="w-4 h-4 md:w-5 md:h-5" />
-            </button>
-          )}
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xs sm:text-sm md:text-lg font-extrabold text-heading font-display tracking-tight leading-tight">Happy Knitting, {user.displayName}! ✨</h1>
-            <p className="hidden sm:block text-[10px] md:text-xs text-brand font-bold uppercase tracking-widest truncate">Let's create something beautiful today</p>
+          {/* Welcome title indicator */}
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
+            {isSidebarCollapsed && (
+              <button
+                onClick={toggleSidebar}
+                className="tap-safe p-1 md:p-2 rounded-xl bg-white border border-subtle hover:bg-surface text-muted hover:text-heading transition-all cursor-pointer flex items-center justify-center animate-fadeIn shadow-sm shrink-0"
+                title="Expand Sidebar"
+              >
+                <Menu className="w-4 h-4 md:w-5 md:h-5" />
+              </button>
+            )}
+            <div className="min-w-0 flex-1">
+              {/* Small screens get just the first name so it never truncates
+                  mid-word; the full greeting returns once there's room. */}
+              <h1 className="text-xs sm:text-sm md:text-base font-extrabold text-heading font-display tracking-tight leading-tight truncate">
+                <span className="sm:hidden">Hi, {String(user.displayName || '').trim().split(/\s+/)[0]}! ✨</span>
+                <span className="hidden sm:inline">Happy Knitting, {user.displayName}! ✨</span>
+              </h1>
+              <p className="hidden md:block text-[11px] md:text-xs text-brand font-bold uppercase tracking-widest truncate">
+                Let's create something beautiful today
+              </p>
+            </div>
           </div>
-        </div>
-        
-        {/* Terminology Toggle for Mobile */}
-        <div className="flex md:hidden shrink-0">
-          {user && (
-            <TerminologyToggle
-              value={user.crochetTerminology || 'US'}
-              onChange={updateCrochetTerminology}
-            />
-          )}
-        </div>
-      </div>
 
-      {/* Interactive Navigation Triggers */}
-      <div className="flex flex-row items-center gap-2 md:gap-3 w-full md:w-auto justify-between sm:justify-start">
-        {/* Terminology Toggle for Desktop */}
-        <div className="hidden md:flex shrink-0">
-          {user && (
-            <TerminologyToggle
-              value={user.crochetTerminology || 'US'}
-              onChange={updateCrochetTerminology}
-            />
-          )}
-        </div>
+          {/* Interactive Navigation Triggers */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {user && (
+              <div className="hidden sm:flex shrink-0">
+                <TerminologyToggle
+                  value={user.crochetTerminology || 'US'}
+                  onChange={updateCrochetTerminology}
+                />
+              </div>
+            )}
 
-        <div className="flex bg-white p-0.5 sm:p-1 rounded-full border border-subtle w-full sm:w-max shadow-sm justify-between sm:justify-start">
-          <button
-            onClick={() => { setActiveTab('dashboard'); setSelectedProject(null); }}
-            className={`px-2.5 sm:px-6 py-1 sm:py-2 text-[10px] sm:text-xs md:text-sm font-bold rounded-full flex items-center gap-1 sm:gap-2 transition-all cursor-pointer flex-1 sm:flex-none justify-center ${activeTab === 'dashboard'
-            ? 'bg-brand text-white shadow-md transform scale-[1.02]'
-            : 'text-muted hover:bg-surface hover:text-heading'
-            }`}
-        >
-          <BookOpen className="w-3.5 h-3.5 md:w-4 md:h-4" />
-          <span>Project Journal</span>
-        </button>
+            <div className="flex bg-white p-0.5 sm:p-1 rounded-full border border-subtle shadow-sm shrink-0">
+              <button
+                onClick={() => { setActiveTab('dashboard'); setSelectedProject(null); }}
+                className={`tap-safe px-2.5 sm:px-4 py-1 text-[11px] sm:text-xs md:text-sm font-bold rounded-full flex items-center gap-1 transition-all cursor-pointer ${activeTab ==='dashboard'
+                  ? 'bg-brand text-white shadow-md'
+                  : 'text-muted hover:bg-surface hover:text-heading'
+                  }`}
+              >
+                <BookOpen className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                <span>Journal</span>
+              </button>
 
-        <button
-          onClick={() => {
-            setActiveTab('aitools');
-            setSelectedProject(null);
-            setIsSidebarCollapsed(true);
-            localStorage.setItem('crochet_sidebar_collapsed', 'true');
-          }}
-          className={`px-3 md:px-6 py-1.5 md:py-2 text-[11px] md:text-sm font-bold rounded-full flex items-center gap-1.5 md:gap-2 transition-all cursor-pointer flex-1 sm:flex-none justify-center ${activeTab === 'aitools'
-            ? 'bg-brand text-white shadow-md transform scale-[1.02]'
-            : 'text-muted hover:bg-surface hover:text-heading'
-            }`}
-        >
-          <Sparkles className="w-3.5 h-3.5 md:w-4 md:h-4" />
-          <span>AI Tools Studio</span>
-        </button>
-      </div>
-    </div>
-  </header>
+              <button
+                onClick={() => {
+                  setActiveTab('aitools');
+                  setSelectedProject(null);
+                  setIsSidebarCollapsed(true);
+                  localStorage.setItem('crochet_sidebar_collapsed', 'true');
+                }}
+                className={`tap-safe px-2.5 sm:px-4 py-1 text-[11px] sm:text-xs md:text-sm font-bold rounded-full flex items-center gap-1 transition-all cursor-pointer ${activeTab ==='aitools'
+                  ? 'bg-brand text-white shadow-md'
+                  : 'text-muted hover:bg-surface hover:text-heading'
+                  }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                <span>AI Studio</span>
+              </button>
+            </div>
+          </div>
+        </header>
 
  {/* Core Workspace Board with transition animations */}
  <main className="flex-1 overflow-hidden relative">

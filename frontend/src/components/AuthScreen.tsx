@@ -4,7 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import { Mail, Lock, User as UserIcon, Heart, Sparkles, AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Mail, Lock, User as UserIcon, Heart, Sparkles, AlertCircle, Eye, EyeOff, ChevronLeft } from 'lucide-react';
+import { YarnSpinner } from './YarnSpinner';
 import { motion } from 'motion/react';
 import { auth, googleProvider } from '../lib/firebase';
 import {
@@ -17,6 +18,10 @@ import {
 
 interface AuthScreenProps {
  onAuthSuccess: (token: string, user: any) => void;
+ /** When false, the form opens in "create account" mode (from the landing page's Sign up). */
+ initialIsLogin?: boolean;
+ /** Optional: render a back link that returns to the landing page. */
+ onBack?: () => void;
 }
 
 const parseMessage = (message: string, code: string = ''): string => {
@@ -79,8 +84,8 @@ const getFriendlyErrorMessage = (err: any): string => {
  return parseMessage(message, code);
 };
 
-export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
- const [isLogin, setIsLogin] = useState(true);
+export function AuthScreen({ onAuthSuccess, initialIsLogin = true, onBack }: AuthScreenProps) {
+ const [isLogin, setIsLogin] = useState(initialIsLogin);
  const [email, setEmail] = useState('');
  const [password, setPassword] = useState('');
  const [displayName, setDisplayName] = useState('');
@@ -278,8 +283,18 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
  initial={{ opacity: 0, y: -20 }}
  animate={{ opacity: 1, y: 0 }}
  transition={{ duration: 0.5 }}
- className="w-full max-w-md bg-white rounded-3xl p-8 border border-subtle warm-shadow-lg relative z-10"
+ className="w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 border border-subtle warm-shadow-lg relative z-10"
  >
+ {onBack && (
+ <button
+ type="button"
+ onClick={onBack}
+ className="absolute top-5 left-5 inline-flex items-center gap-1 text-xs font-bold text-muted hover:text-brand transition-colors cursor-pointer tap-safe"
+ aria-label="Back to home"
+ >
+ <ChevronLeft className="w-4 h-4" /> Home
+ </button>
+ )}
  <div className="flex flex-col items-center mb-8">
  <h1 className="grand-hotel-regular text-5xl tracking-tight text-center">
  My Yarn Diary
@@ -360,7 +375,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
  disabled={loading}
  className="w-full py-3 sewing-button flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
  >
- {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send Reset Link'}
+ {loading ? <YarnSpinner className="w-4 h-4" onBrand /> : 'Send Reset Link'}
  </button>
  </form>
  <div className="text-center pt-2">
@@ -512,7 +527,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
  disabled={loading}
  className="w-full py-3 sewing-button flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
  >
- {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (isLogin ? 'Sign In' : 'Create Account')}
+ {loading ? <YarnSpinner className="w-4 h-4" onBrand /> : (isLogin ? 'Sign In' : 'Create Account')}
  </button>
  </form>
 
@@ -529,7 +544,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
  className="w-full py-3 bg-white border border-subtle text-muted font-bold rounded-xl text-sm flex items-center justify-center gap-2.5 hover:bg-page transition-all cursor-pointer hover:border-accent"
  >
  {loading ? (
- <span className="inline-block w-4 h-4 border-2 border-stone-500 border-t-transparent rounded-full animate-spin"></span>
+ <YarnSpinner className="w-4 h-4 text-stone-500" />
  ) : (
  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />

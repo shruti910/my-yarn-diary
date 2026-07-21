@@ -109,7 +109,7 @@ export function FloatingAiBuddy({ onSelectTool, onDismiss }: FloatingAiBuddyProp
  setIsOpen((prev) => !prev);
  }}
  >
- <div className="flex flex-col items-center justify-center text-[10px] leading-tight font-extrabold uppercase tracking-wider text-center font-sans">
+ <div className="flex flex-col items-center justify-center text-[11px] leading-tight font-extrabold uppercase tracking-wider text-center font-sans">
  <span>AI</span>
  <span>Tools</span>
  </div>

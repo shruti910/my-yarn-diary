@@ -26,19 +26,27 @@ export class ErrorBoundary extends Component<Props, State> {
  public render() {
  if (this.state.hasError) {
  return (
- <div className="min-h-[400px] flex flex-col items-center justify-center p-8 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl text-center self-center my-6 max-w-lg mx-auto">
- <div className="w-16 h-16 rounded-full bg-red-950/50 border border-red-500/30 flex items-center justify-center text-red-400 text-2xl mb-4 font-mono font-bold">
- ⚠️
+ <div className="min-h-[280px] sm:min-h-[360px] flex flex-col items-center justify-center p-6 sm:p-8 bg-white border border-subtle rounded-3xl warm-shadow-lg text-center self-center my-6 max-w-lg mx-auto">
+ <div className="w-14 h-14 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-2xl mb-4">
+ 🧶
  </div>
- <h2 className="text-xl font-bold font-sans text-zinc-100 tracking-tight">Something went unexpected</h2>
- <p className="text-sm text-zinc-400 mt-2 font-mono">
- {this.state.error?.message || 'An unhandled JavaScript component error occurred.'}
+ <h2 className="text-lg sm:text-xl font-extrabold font-serif text-heading tracking-tight">
+ Oops — a dropped stitch!
+ </h2>
+ <p className="text-xs sm:text-sm text-muted mt-2 font-semibold max-w-[320px] leading-relaxed">
+ Something went wrong on this screen. Your projects and journal entries are safe —
+ reloading usually picks the stitch right back up.
  </p>
+ {this.state.error?.message && (
+ <p className="text-[11px] text-muted/80 mt-3 break-words max-w-full">
+ {this.state.error.message}
+ </p>
+ )}
  <button
  onClick={() => window.location.reload()}
- className="mt-6 px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-650 transition text-sm font-sans font-medium text-zinc-200 border border-zinc-700/50 rounded-lg cursor-pointer"
+ className="sewing-button mt-6 px-7 py-2.5 text-xs sm:text-sm"
  >
- Refresh Workbench
+ Reload the page
  </button>
  </div>
  );

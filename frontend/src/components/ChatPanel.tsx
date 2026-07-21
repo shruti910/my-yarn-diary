@@ -770,9 +770,9 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  onClick={() => setIsHistoryOpen(false)}
  />
  )}
- <div className={`${isHistoryOpen ? 'flex absolute md:relative inset-y-0 left-0 z-30 shadow-2xl md:shadow-none' : 'hidden'} w-72 border-r border-subtle bg-white flex-col h-full shrink-0 transition-all`}>
- <div className="p-4 border-b border-subtle flex justify-between items-center bg-white">
- <span className="text-[10px] uppercase font-bold tracking-wider text-muted">Chat History</span>
+ <div className={`${isHistoryOpen ? 'flex absolute md:relative inset-y-0 left-0 z-30 shadow-2xl md:shadow-none' : 'hidden'} w-72 max-w-[85vw] border-r border-subtle bg-white flex-col h-full shrink-0 transition-all`}>
+ <div className="p-3 border-b border-subtle flex justify-between items-center bg-white">
+ <span className="text-[11px] uppercase font-bold tracking-wider text-muted">Chat History</span>
  <button
  onClick={() => setActiveChatId(null)}
  className="p-1.5 rounded bg-brand/10 hover:bg-brand/20 text-brand text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
@@ -887,8 +887,8 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
 
  {/* AI Chats Pagination Controls */}
  {sessionsTotalPages > 1 && (
- <div className="mt-4 pt-4 border-t border-subtle flex items-center justify-between gap-2">
- <span className="text-[10px] text-muted font-semibold">
+ <div className="mt-3 pt-3 border-t border-subtle flex items-center justify-between gap-2">
+ <span className="text-[11px] text-muted font-semibold">
  Page {sessionsPage + 1} of {sessionsTotalPages}
  </span>
 
@@ -896,14 +896,14 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  <button
  disabled={sessionsPage === 0}
  onClick={() => setSessionsPage(sessionsPage - 1)}
- className="p-1 px-2 border border-subtle rounded-lg text-muted hover:text-heading hover:bg-page disabled:opacity-40 disabled:hover:bg-transparent transition-all text-[10px] font-bold cursor-pointer"
+ className="p-1 px-2 border border-subtle rounded-lg text-muted hover:text-heading hover:bg-page disabled:opacity-40 disabled:hover:bg-transparent transition-all text-[11px] font-bold cursor-pointer"
  >
  Prev
  </button>
  <button
  disabled={sessionsPage === sessionsTotalPages - 1}
  onClick={() => setSessionsPage(sessionsPage + 1)}
- className="p-1 px-2 border border-subtle rounded-lg text-muted hover:text-heading hover:bg-page disabled:opacity-40 disabled:hover:bg-transparent transition-all text-[10px] font-bold cursor-pointer"
+ className="p-1 px-2 border border-subtle rounded-lg text-muted hover:text-heading hover:bg-page disabled:opacity-40 disabled:hover:bg-transparent transition-all text-[11px] font-bold cursor-pointer"
  >
  Next
  </button>
@@ -916,29 +916,29 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  </div>
 
  {/* Main chat history section */}
- <div className="flex-1 bg-vibrant-cream texture-overlay flex flex-col h-full relative shadow-inner">
- <div className="px-6 py-4 border-b border-subtle bg-white flex justify-between items-center shadow-xs z-10 shrink-0">
- <div className="flex items-center gap-2 w-full">
+ <div className="flex-1 min-h-0 min-w-0 bg-page texture-overlay flex flex-col h-full relative shadow-inner">
+ <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-subtle bg-white flex justify-between items-center shadow-xs z-10 shrink-0">
+ <div className="flex items-center gap-2 w-full min-w-0">
  <button
  onClick={() => setIsHistoryOpen(!isHistoryOpen)}
- className="p-1.5 -ml-2 rounded text-muted hover:text-brand hover:bg-brand/10 transition-colors cursor-pointer"
+ className="p-1.5 -ml-2 rounded text-muted hover:text-brand hover:bg-brand/10 transition-colors cursor-pointer shrink-0"
  title="Toggle Chat History"
  >
  <Menu className="w-5 h-5" />
  </button>
  {activeChat ? (
  isHeaderEditing ? (
- <form onSubmit={(e) => { e.preventDefault(); saveHeaderRename(); }} className="flex items-center gap-2">
+ <form onSubmit={(e) => { e.preventDefault(); saveHeaderRename(); }} className="flex items-center gap-2 flex-1 min-w-0">
  <input
  type="text"
  value={headerEditTitle}
  onChange={(e) => setHeaderEditTitle(e.target.value)}
- className="bg-white border border-subtle rounded-lg text-xs p-1.5 focus:outline-none text-heading font-semibold w-64"
+ className="bg-white border border-subtle rounded-lg text-xs p-1.5 focus:outline-none text-heading font-semibold w-full max-w-xs"
  autoFocus
  />
  <button
  type="submit"
- className="p-1 rounded text-green-600 hover:bg-green-50"
+ className="p-1 rounded text-green-600 hover:bg-green-50 shrink-0"
  title="Save Title"
  >
  <Check className="w-4 h-4" />
@@ -946,15 +946,15 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  <button
  type="button"
  onClick={() => setIsHeaderEditing(false)}
- className="p-1 rounded text-muted hover:bg-stone-100"
+ className="p-1 rounded text-muted hover:bg-stone-100 shrink-0"
  title="Cancel"
  >
  <X className="w-4 h-4" />
  </button>
  </form>
  ) : (
- <div className="flex items-center gap-2">
- <h3 className="font-serif font-extrabold text-heading text-sm truncate max-w-md">
+ <div className="flex items-center gap-2 min-w-0 flex-1">
+ <h3 className="font-serif font-extrabold text-heading text-xs sm:text-sm truncate max-w-md">
  {activeChat.title}
  </h3>
  <button
@@ -963,14 +963,14 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  setIsHeaderEditing(true);
  setHeaderEditTitle(activeChat.title);
  }}
- className="p-1 rounded text-muted hover:text-brand hover:bg-brand/5"
+ className="p-1 rounded text-muted hover:text-brand hover:bg-brand/5 shrink-0"
  title="Rename Thread"
  >
  <Edit2 className="w-3.5 h-3.5" />
  </button>
  <button
  onClick={(e) => handleDeleteChat(activeChat.chatId, e)}
- className="p-1 rounded text-muted hover:text-red-500 hover:bg-red-50"
+ className="p-1 rounded text-muted hover:text-red-500 hover:bg-red-50 shrink-0"
  title="Delete Thread"
  >
  <Trash2 className="w-3.5 h-3.5" />
@@ -978,7 +978,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  </div>
  )
  ) : (
- <h3 className="font-serif font-extrabold text-heading text-sm">
+ <h3 className="font-serif font-extrabold text-heading text-xs sm:text-sm truncate">
  {category === 'crochet-buddy' ? 'New Crochet Buddy Thread' :
  category === 'pattern-decoder' ? 'New Pattern Decoder Thread' :
  category === 'reverse-engineer' ? 'New Reverse Engineer Thread' :
@@ -990,7 +990,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  </div>
 
  {/* Scroll Bubbles Area */}
- <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin">
+ <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-6 space-y-4 scrollbar-thin">
  {!activeChat || activeChat.messages.length === 0 ? (
  <div className="h-full flex flex-col items-center justify-center p-8 max-w-sm mx-auto text-center space-y-4">
  <div className="w-16 h-16 bg-brand/10 rounded-2xl flex items-center justify-center text-3xl border border-brand/20 shadow-inner">
@@ -1006,7 +1006,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  key={i}
  type="button"
  onClick={() => setInput(sug.input)}
- className="px-3 py-1.5 bg-white border border-subtle text-[10px] font-bold text-muted rounded-full hover:border-brand hover:text-brand transition-all cursor-pointer"
+ className="px-3 py-1.5 bg-white border border-subtle text-[11px] font-bold text-muted rounded-full hover:border-brand hover:text-brand transition-all cursor-pointer"
  >
  {sug.text}
  </button>
@@ -1027,7 +1027,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  return (
  <div
  key={msg.id}
- className={`flex gap-3 max-w-[80%] ${isUser ? 'ml-auto flex-row-reverse' : 'mr-auto'} animate-fade-in`}
+ className={`flex gap-2 sm:gap-3 max-w-[90%] sm:max-w-[80%] ${isUser ? 'ml-auto flex-row-reverse' : 'mr-auto'} animate-fade-in`}
  >
  {/* Avatar Bubble */}
  {!isUser && (
@@ -1095,7 +1095,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  : 'bg-white text-heading rounded-tl-none border border-subtle shadow-sm'
  }`}>
  {isUser ? (
- <p className="text-xs font-semibold whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+ <p className="text-xs font-semibold whitespace-pre-wrap break-words leading-relaxed">{msg.text}</p>
  ) : (
  <>
  <div className="markdown-body text-xs">
@@ -1139,14 +1139,14 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  )}
  {/* Timestamp & Copy Actions */}
  <div className={`flex items-center gap-2.5 mt-1.5 px-1.5 ${isUser ? 'justify-end' : 'justify-start'}`}>
- <span className="text-[9px] font-mono font-bold text-muted">
+ <span className="text-[11px] font-bold text-muted">
  {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
  </span>
  {msg.text && (
  <button
  type="button"
  onClick={() => handleCopyMessage(msg.id, msg.text)}
- className="text-[9px] font-bold text-muted hover:text-brand flex items-center gap-1 cursor-pointer transition-colors"
+ className="text-[11px] font-bold text-muted hover:text-brand flex items-center gap-1 cursor-pointer transition-colors"
  title="Copy message to clipboard"
  >
  {copiedMsgId === msg.id ? (
@@ -1166,7 +1166,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  )}
 
  {loading && (
- <div className="flex gap-3 mr-auto max-w-[80%] animate-fade-in">
+ <div className="flex gap-2 sm:gap-3 mr-auto max-w-[90%] sm:max-w-[80%] animate-fade-in">
  <div className="w-8 h-8 rounded-xl bg-brand-light/20 flex items-center justify-center text-sm border border-brand-light/45 shadow-xs shrink-0 self-start">
  🧶
  </div>
@@ -1209,7 +1209,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  </button>
  </div>
  ))}
- <span className="text-[10px] text-muted font-bold font-mono ml-2">
+ <span className="text-[11px] text-muted font-bold ml-2">
  {attachments.length} photo{attachments.length > 1 ? 's' : ''} attached
  </span>
  </div>
@@ -1314,7 +1314,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  initial={{ scale: 0.95, y: 10 }}
  animate={{ scale: 1, y: 0 }}
  exit={{ scale: 0.95, y: 10 }}
- className="bg-white rounded-3xl p-6 border border-subtle max-w-sm w-full space-y-4 shadow-2xl relative"
+ className="bg-white rounded-3xl p-5 sm:p-6 border border-subtle max-w-sm w-full space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto"
  onClick={(e) => e.stopPropagation()}
  >
  {/* Modal header */}
@@ -1325,7 +1325,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
 
  {/* Input */}
  <div className="space-y-1.5">
- <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider block">Topic / Pattern Name</label>
+ <label className="text-[11px] font-extrabold text-muted uppercase tracking-wider block">Topic / Pattern Name</label>
  <input
  type="text"
  value={newChatTitle}
@@ -1343,14 +1343,14 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
 
  {/* Quick Suggestion Chips */}
  <div className="space-y-1.5">
- <p className="text-[9px] text-muted uppercase tracking-wider font-extrabold">Quick Suggestions</p>
+ <p className="text-[11px] text-muted uppercase tracking-wider font-extrabold">Quick Suggestions</p>
  <div className="flex flex-wrap gap-1.5">
  {['Pattern Customizer', 'Yarn Color Matcher', 'Amigurumi Expert', 'US/UK Convert'].map((suggest) => (
  <button
  key={suggest}
  type="button"
  onClick={() => setNewChatTitle(suggest)}
- className="px-2.5 py-1.5 bg-surface hover:bg-brand/10 border border-subtle hover:border-brand/20 text-[10px] text-muted rounded-lg transition-all cursor-pointer font-bold"
+ className="px-2.5 py-1.5 bg-surface hover:bg-brand/10 border border-subtle hover:border-brand/20 text-[11px] text-muted rounded-lg transition-all cursor-pointer font-bold"
  >
  {suggest}
  </button>
@@ -1403,7 +1403,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  exit={{ scale: 0.95 }}
  src={lightboxImage}
  alt="Expanded view"
- className="max-w-full max-h-[90vh] object-contain rounded-xl select-none"
+ className="max-w-full max-h-[90dvh] object-contain rounded-xl select-none"
  onClick={(e) => e.stopPropagation()}
  />
  </motion.div>

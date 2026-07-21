@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
  FileText, Image as ImageIcon, Plus, Minus, Maximize2, Minimize2,
  ZoomIn, ZoomOut, RotateCw, Trash2, Upload, FileUp, ClipboardList,
- ChevronLeft, ChevronRight, RefreshCw, Edit2
+ ChevronLeft, ChevronRight, Edit2
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { CustomDropdown } from './CustomDropdown';
+import { YarnSpinner } from './YarnSpinner';
 import { Pattern, Project } from '../types';
 import { useDialog } from './DialogProvider';
 
@@ -442,7 +443,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
  };
 
  return (
- <div className="bg-white rounded-3xl border border-subtle warm-shadow-lg overflow-hidden flex flex-col min-h-[580px]">
+ <div className="bg-white rounded-3xl border border-subtle warm-shadow-lg overflow-hidden flex flex-col min-h-[420px] md:min-h-[580px]">
 
  {/* Pattern Selector / Upload Header */}
  <div className="p-4 bg-surface border-b border-subtle flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -451,7 +452,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
  <div className="flex items-center gap-3 w-full md:w-auto">
  {patterns.length > 0 ? (
  <div className="flex items-center gap-2 w-full md:w-auto">
- <div className="relative min-w-[200px]">
+ <div className="relative w-full sm:w-auto sm:min-w-[200px]">
  <CustomDropdown
  value={selectedPatternId}
  onChange={(val) => {
@@ -518,7 +519,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
  </div>
 
  {/* Main Panel Content (Uploading vs. Viewing) */}
- <div className="flex-1 flex flex-col bg-surface min-h-[460px] relative" ref={containerRef}>
+ <div className="flex-1 flex flex-col bg-surface min-h-[320px] md:min-h-[460px] relative" ref={containerRef}>
 
  {/* 1. UPLOADING FORM VIEW */}
  {uploadType !== null && (
@@ -547,7 +548,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
  className={`px-5 py-2.5 bg-accent hover:bg-accent/90 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-2 ${isUploading ? 'opacity-50 pointer-events-none' : ''
  }`}
  >
- {isUploading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+ {isUploading ? <YarnSpinner className="w-4 h-4" onBrand /> : <Upload className="w-4 h-4" />}
  {isUploading ? 'Processing File...' : 'Choose PDF File'}
  </label>
  </>
@@ -577,7 +578,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
  className={`px-5 py-2.5 bg-accent hover:bg-accent/90 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-2 ${isUploading ? 'opacity-50 pointer-events-none' : ''
  }`}
  >
- {isUploading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+ {isUploading ? <YarnSpinner className="w-4 h-4" onBrand /> : <Upload className="w-4 h-4" />}
  {isUploading ? 'Processing File...' : 'Choose Image File'}
  </label>
  </>
@@ -603,7 +604,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
  value={textContent}
  placeholder="Row 1: Ch 12, sc in 2nd ch from hook...&#10;Row 2: Ch 1, turn, sc in ea st across...&#10;[Support Markdown for easy rendering]"
  onChange={(e) => setTextContent(e.target.value)}
- className="w-full bg-white border border-subtle text-xs p-3 rounded-xl text-heading outline-none focus:ring-1 focus:ring-accent resize-none font-mono"
+ className="w-full bg-white border border-subtle text-xs p-3 rounded-xl text-heading outline-none focus:ring-1 focus:ring-accent resize-none"
  />
  </div>
 
@@ -612,7 +613,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
  disabled={isUploading || !textContent.trim()}
  className="w-full py-2.5 bg-accent hover:bg-accent/90 text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
  >
- {isUploading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+ {isUploading ? <YarnSpinner className="w-3.5 h-3.5" onBrand /> : <Plus className="w-3.5 h-3.5" />}
  Save Pattern
  </button>
  </div>
@@ -660,7 +661,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
  <div className="flex-1 flex flex-col h-full overflow-hidden">
 
  {/* Viewer Toolbar */}
- <div className="px-4 py-2 bg-surface border-b border-subtle flex justify-between items-center gap-4 text-xs font-semibold text-muted">
+ <div className="px-3 md:px-4 py-2 bg-surface border-b border-subtle flex justify-between items-center gap-2 md:gap-4 text-xs font-semibold text-muted min-w-0 max-w-full overflow-x-auto scrollbar-none touch-pan-x shrink-0">
 
  {/* Type specific toolbar options */}
  <div className="flex items-center gap-3">
@@ -695,7 +696,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
  >
  <ZoomOut className="w-3.5 h-3.5" />
  </button>
- <span className="text-[10px] px-1 font-mono">{textSize}px</span>
+ <span className="text-[11px] px-1">{textSize}px</span>
  <button
  onClick={() => setTextSize(prev => Math.min(28, prev + 2))}
  className="p-1.5 rounded-lg hover:bg-stone-50 border border-subtle bg-white cursor-pointer"
@@ -709,7 +710,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
  setTextContent(activePattern.patternContent || '');
  setIsEditingText(true);
  }}
- className="p-1.5 rounded-lg hover:bg-stone-50 border border-subtle bg-white cursor-pointer ml-2 flex items-center gap-1 text-[10px] font-bold text-muted hover:text-accent hover:border-accent/30"
+ className="p-1.5 rounded-lg hover:bg-stone-50 border border-subtle bg-white cursor-pointer ml-2 flex items-center gap-1 text-[11px] font-bold text-muted hover:text-accent hover:border-accent/30"
  title="Edit Text Pattern"
  >
  <Edit2 className="w-3.5 h-3.5 text-accent" />
@@ -727,7 +728,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
  >
  <ZoomOut className="w-3.5 h-3.5" />
  </button>
- <span className="text-[10px] px-1 font-mono">{Math.round(zoom * 100)}%</span>
+ <span className="text-[11px] px-1">{Math.round(zoom * 100)}%</span>
  <button
  onClick={() => setZoom(prev => Math.min(3, prev + 0.2))}
  className="p-1.5 rounded-lg hover:bg-stone-50 border border-subtle bg-white cursor-pointer"
@@ -754,7 +755,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
  >
  <ZoomOut className="w-3.5 h-3.5" />
  </button>
- <span className="text-[10px] px-1 font-mono">{Math.round(zoom * 100)}%</span>
+ <span className="text-[11px] px-1">{Math.round(zoom * 100)}%</span>
  <button
  onClick={() => setZoom(prev => Math.min(3, prev + 0.2))}
  className="p-1.5 rounded-lg hover:bg-stone-50 border border-subtle bg-white cursor-pointer"
@@ -785,7 +786,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
  {pdfLoading && (
  <div className="absolute inset-0 flex items-center justify-center bg-white/70 z-10">
  <div className="flex flex-col items-center gap-2">
- <RefreshCw className="w-6 h-6 text-accent animate-spin" />
+ <YarnSpinner className="w-6 h-6 text-accent" />
  <span className="text-[11px] font-bold text-muted">Rendering PDF page...</span>
  </div>
  </div>
@@ -821,7 +822,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
  <h4 className="font-serif font-extrabold text-heading text-sm">Edit Text Pattern</h4>
  <div className="space-y-3">
  <div className="space-y-1">
- <label className="text-[10px] font-bold text-muted uppercase tracking-wider">Pattern Name</label>
+ <label className="text-[11px] font-bold text-muted uppercase tracking-wider">Pattern Name</label>
  <input
  type="text"
  value={textTitle}
@@ -831,13 +832,13 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
  />
  </div>
  <div className="space-y-1">
- <label className="text-[10px] font-bold text-muted uppercase tracking-wider">Pattern Content</label>
+ <label className="text-[11px] font-bold text-muted uppercase tracking-wider">Pattern Content</label>
  <textarea
  rows={12}
  value={textContent}
  onChange={(e) => setTextContent(e.target.value)}
  placeholder="Pattern instructions (Supports Markdown)..."
- className="w-full bg-stone-50/50 border border-subtle text-xs p-3 rounded-xl text-heading outline-none focus:ring-1 focus:ring-accent resize-none font-mono"
+ className="w-full bg-stone-50/50 border border-subtle text-xs p-3 rounded-xl text-heading outline-none focus:ring-1 focus:ring-accent resize-none"
  />
  </div>
  </div>
@@ -889,12 +890,12 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
  <div className="flex-1 flex flex-col h-2/3 md:h-full overflow-hidden border-b md:border-b-0 md:border-r border-subtle">
 
  {/* Fullscreen Toolbar */}
- <div className="p-2 md:p-4 bg-surface border-b border-subtle flex justify-between items-center shrink-0 gap-2">
+ <div className="p-2 md:p-4 bg-surface border-b border-subtle flex justify-between items-center shrink-0 gap-2 min-w-0 max-w-full overflow-x-auto scrollbar-none touch-pan-x">
  <div className="flex items-center gap-2 md:gap-3">
- <span className="text-[9px] md:text-[10px] font-bold text-brand bg-brand/10 border border-brand/20 px-1.5 md:px-2.5 py-0.5 md:py-1 rounded-md">
+ <span className="text-[11px] font-bold text-brand bg-brand/10 border border-brand/20 px-1.5 md:px-2.5 py-0.5 md:py-1 rounded-md">
  Focus Mode
  </span>
- <span className="text-[10px] md:text-xs font-extrabold text-heading max-w-[120px] md:max-w-xs truncate">
+ <span className="text-[11px] md:text-xs font-extrabold text-heading max-w-[120px] md:max-w-xs truncate">
  {activePattern.fileName}
  </span>
  </div>
@@ -1031,7 +1032,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
 
  {/* Row Counter Side Drawer (Right panel in landscape/bottom panel in mobile) */}
  <div className="w-full md:w-80 bg-white p-6 md:p-8 flex flex-col justify-center items-center shrink-0 space-y-6 md:space-y-8 select-none">
- <span className="text-[10px] uppercase font-extrabold tracking-widest text-brand block font-mono">Row counter</span>
+ <span className="text-[11px] uppercase font-extrabold tracking-widest text-brand block">Row counter</span>
 
  <div className="flex items-center justify-center gap-5 py-2">
  {/* Symmetrical Decrease Row Button */}
@@ -1051,7 +1052,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
  title="Tap to increase row count"
  >
  <span className="text-4xl font-extrabold font-serif leading-none mt-2">{project.rowCount}</span>
- <span className="text-[10px] font-bold uppercase tracking-widest mt-2 opacity-90">Tap to Count</span>
+ <span className="text-[11px] font-bold uppercase tracking-widest mt-2 opacity-90">Tap to Count</span>
  </button>
 
  {/* Symmetrical Increase Row Button */}
@@ -1068,13 +1069,13 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
  <div className="flex gap-2 w-full justify-center">
  <button
  onClick={() => updateRowCount(5)}
- className="flex-1 py-2 bg-surface border border-subtle text-[10px] font-extrabold text-brand rounded-xl hover:bg-brand/5 transition-colors cursor-pointer"
+ className="flex-1 py-2 bg-surface border border-subtle text-[11px] font-extrabold text-brand rounded-xl hover:bg-brand/5 transition-colors cursor-pointer"
  >
  +5 Rows
  </button>
  <button
  onClick={() => updateRowCount(10)}
- className="flex-1 py-2 bg-surface border border-subtle text-[10px] font-extrabold text-brand rounded-xl hover:bg-brand/5 transition-colors cursor-pointer"
+ className="flex-1 py-2 bg-surface border border-subtle text-[11px] font-extrabold text-brand rounded-xl hover:bg-brand/5 transition-colors cursor-pointer"
  >
  +10 Rows
  </button>
@@ -1083,15 +1084,19 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
  const confirmed = await showConfirm('Reset row counter back to zero?');
  if (confirmed) onUpdateProject({ rowCount: 0 });
  }}
- className="px-3 py-2 bg-white border border-subtle text-[10px] font-extrabold text-muted rounded-xl hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-colors cursor-pointer"
+ className="px-3 py-2 bg-white border border-subtle text-[11px] font-extrabold text-muted rounded-xl hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-colors cursor-pointer"
  >
  Reset
  </button>
  </div>
 
- <div className="text-center pt-2 md:pt-4 border-t border-subtle w-full">
- <p className="text-[10px] text-muted leading-relaxed">
- Click focus canvas or use controls on left.<br />Your rows sync automatically to project board.
+ <div className="text-center pt-2 md:pt-4 border-t border-subtle w-full space-y-1.5">
+ <p className="text-[11px] font-bold text-heading leading-relaxed">
+ Tap the circle each time you finish a row.
+ </p>
+ <p className="text-[11px] text-muted leading-relaxed">
+ Your pattern stays in view while you count, and your progress
+ saves to this project automatically.
  </p>
  </div>
  </div>
