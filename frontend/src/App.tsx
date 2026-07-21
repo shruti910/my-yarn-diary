@@ -16,8 +16,10 @@ import { AuthScreen } from './components/AuthScreen';
 import { LandingPage } from './components/LandingPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { CrochetLoader } from './components/CrochetLoader';
+import { InstallPrompt } from './components/InstallPrompt';
+import { useOnlineStatus } from './lib/useOnlineStatus';
 import { Category, Project, JournalLog, ProjectStatus, ChatCategory } from './types';
-import { BookOpen, Sparkles, X, Menu, CircleUserRound, Settings, Mail, Trash2, User, Image as ImageIcon, Check } from 'lucide-react';
+import { BookOpen, Sparkles, X, Menu, CircleUserRound, Settings, Mail, Trash2, User, Image as ImageIcon, Check, CloudOff } from 'lucide-react';
 import { TerminologyToggle } from './components/TerminologyToggle';
 import { motion, AnimatePresence } from 'motion/react';
 import { useDialog } from './components/DialogProvider';
@@ -276,6 +278,7 @@ function SettingsModal({ isOpen, onClose, currentUser, onDeactivate }: SettingsM
 
 export default function App() {
  const { showToast, showAlert, showConfirm } = useDialog();
+ const isOnline = useOnlineStatus();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [shouldAutoOpenProjectModal, setShouldAutoOpenProjectModal] = useState(false);
@@ -519,7 +522,13 @@ export default function App() {
  await fetchProjects(activeCategoryId || 'all', 0, projectsPageSize, projectsSort, projectsSearch, projectsStatus);
  } catch (err: any) {
  console.error('Failed loading initial data sequence:', err);
+ // Installed as a PWA the shell loads from cache with no connection at all,
+ // so a generic "server error" would be actively misleading here.
+ if (!navigator.onLine) {
+ showToast("You're offline — reconnect to load your projects.", 'warning');
+ } else {
  showToast(err.message || 'Failed loading data from server.', 'error');
+ }
  } finally {
  setIsInitialLoading(false);
  }
@@ -995,6 +1004,25 @@ export default function App() {
     return () => window.removeEventListener('open-new-project-modal', handleOpenNewProject);
   }, [selectedProject, activeTab]);
 
+  // Long-pressing the installed app icon offers a "New project" shortcut, which
+  // launches at /?action=new-project. This sets the flag directly rather than
+  // dispatching 'open-new-project-modal', because that handler no-ops when the
+  // dashboard is already active — exactly the cold-start case here.
+  useEffect(() => {
+    if (!token || !user) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('action') !== 'new-project') return;
+
+    setActiveTab('dashboard');
+    setSelectedProject(null);
+    setShouldAutoOpenProjectModal(true);
+
+    // Clear the param so a refresh doesn't reopen the modal
+    params.delete('action');
+    const query = params.toString();
+    window.history.replaceState({}, '', window.location.pathname + (query ? `?${query}` : ''));
+  }, [token, user]);
+
  if (!token || !user) {
  if (showAuth) {
  return (
@@ -1006,10 +1034,14 @@ export default function App() {
  );
  }
  return (
+ <>
  <LandingPage
  onSignIn={() => { setAuthIsLogin(true); setShowAuth(true); }}
  onGetStarted={() => { setAuthIsLogin(false); setShowAuth(true); }}
  />
+ {/* Most installs happen here, before anyone signs in */}
+ <InstallPrompt />
+ </>
  );
  }
 
@@ -1050,6 +1082,29 @@ export default function App() {
 
       {/* 2. Main working content frame */}
       <div className="flex-grow flex flex-col h-full overflow-hidden">
+
+        {/* Installed as a PWA there is no address bar to explain a dead network,
+            so connectivity has to be stated in the UI itself. */}
+        <AnimatePresence>
+          {!isOnline && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              role="status"
+              className="shrink-0 overflow-hidden bg-amber-50 border-b border-amber-200"
+            >
+              <div className="px-3 md:px-6 py-1.5 flex items-center justify-center gap-2 text-amber-800">
+                <CloudOff className="w-3.5 h-3.5 shrink-0" />
+                <span className="text-[11px] font-bold">
+                  You're offline — your projects won't load or save until you reconnect.
+                </span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <header className="px-2 md:px-6 py-1.5 md:py-2 bg-page/80 backdrop-blur-md border-b-2 border-subtle flex flex-row items-center justify-between gap-2 shrink-0 transition-all shadow-sm sticky top-0 z-10">
 
           {/* Welcome title indicator */}
@@ -1213,6 +1268,8 @@ export default function App() {
  onDismiss={handleDismissFloatingBuddy}
  />
  )}
+
+ <InstallPrompt />
 
  <AnimatePresence>
  {showCelebrationTitle && (

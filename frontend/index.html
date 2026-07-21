@@ -4,10 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>My Yarn Diary</title>
+    <meta name="description" content="Track your crochet projects, the yarns and hooks behind each one, and keep an AI helper in your pocket." />
+
+    <!-- PWA: the manifest link is injected by vite-plugin-pwa at build time. -->
+    <meta name="theme-color" content="#f7f0ee" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/logo.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
+
+    <!-- iOS has no manifest support for these; it needs its own meta tags to
+         launch standalone with the right title. 'default' status bar style keeps
+         the web view below the status bar, so no layout changes are needed. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Yarn Diary" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

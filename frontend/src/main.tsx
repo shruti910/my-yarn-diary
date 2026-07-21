@@ -67,6 +67,7 @@ if (sentryDsn) {
 }
 
 import { DialogProvider } from './components/DialogProvider';
+import { PwaUpdatePrompt } from './components/PwaUpdatePrompt';
 
 const container = document.getElementById("root");
 if (container) {
@@ -75,6 +76,8 @@ if (container) {
  <StrictMode>
  <DialogProvider>
  <App />
+ {/* Registers the service worker and prompts when a new build is waiting */}
+ <PwaUpdatePrompt />
  </DialogProvider>
  </StrictMode>
  );
