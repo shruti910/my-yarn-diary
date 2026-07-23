@@ -20,7 +20,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const frontend = resolve(here, '..');
 
 const SIZE = 512;
-const BRAND = '#D6708A'; // --brand-default from src/index.css
+const BRAND = '#BC5873'; // brand tile pink
 const INK = '#FFF8F5';
 const LINES = ['My Yarn', 'Diary'];
 

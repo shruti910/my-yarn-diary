@@ -13,28 +13,48 @@ interface ImageCache {
 }
 
 /**
- * Preloads all project images (cover photo, gallery photos, journal logs)
+ * Helper to parse image pattern content whether stored as a single base64 string
+ * or a JSON string array of base64 images.
+ */
+function getImagePatternUrls(patternContent: string): string[] {
+  if (!patternContent) return [];
+  try {
+    const parsed = JSON.parse(patternContent);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item): item is string => typeof item === 'string' && item.length > 0);
+    }
+  } catch {
+    // Single base64 string fallback
+  }
+  return [patternContent];
+}
+
+/**
+ * Preloads all project images (cover photo, gallery photos, journal logs, pattern images)
  * to determine their natural dimensions for proportional rendering in the PDF.
  */
 async function preloadImages(
- coverPhotoBase64: string | null,
- productPhotos: string[],
- logs: JournalLog[],
- patterns: Pattern[]
+  coverPhotoBase64: string | null,
+  productPhotos: string[],
+  logs: JournalLog[],
+  patterns: Pattern[]
 ): Promise<ImageCache> {
- const cache: ImageCache = {};
- const urls: string[] = [];
+  const cache: ImageCache = {};
+  const urls: string[] = [];
 
- if (coverPhotoBase64) urls.push(coverPhotoBase64);
- productPhotos.forEach(p => {
- if (p) urls.push(p);
- });
- logs.forEach(log => {
- if (log.imageBase64) urls.push(log.imageBase64);
- });
- patterns.forEach(p => {
- if (p.patternType === 'image' && p.patternContent) urls.push(p.patternContent);
- });
+  if (coverPhotoBase64) urls.push(coverPhotoBase64);
+  productPhotos.forEach(p => {
+    if (p) urls.push(p);
+  });
+  logs.forEach(log => {
+    if (log.imageBase64) urls.push(log.imageBase64);
+  });
+  patterns.forEach(p => {
+    if (p.patternType === 'image' && p.patternContent) {
+      const imgs = getImagePatternUrls(p.patternContent);
+      imgs.forEach(url => urls.push(url));
+    }
+  });
 
  const uniqueUrls = Array.from(new Set(urls));
 
@@ -91,76 +111,70 @@ class PDFPageContext {
 }
 
 /**
- * Draws the vector logo, header running title, and footers with page numbers on a specific page.
+ * Draws the logo, header running title, and footers with page numbers on a specific page.
  */
 function drawHeaderAndFooter(
- doc: jsPDF,
- pageNum: number,
- totalPages: number,
- projectTitle: string
+  doc: jsPDF,
+  pageNum: number,
+  totalPages: number,
+  projectTitle: string,
+  logoImg: HTMLImageElement | null
 ) {
- // --- HEADER SECTION ---
- // Draw Crochet Hook crossing behind (vector path)
- doc.setDrawColor('#813B4C'); // Sage accent
- doc.setLineWidth(0.4);
- doc.line(20, 18, 29, 9); // Hook handle diagonal
- // Hook Tip/Knob
- doc.setFillColor('#813B4C');
- doc.circle(29, 9, 0.5, 'F');
+  // --- HEADER SECTION ---
+  let textX = 20; // Default fallback left-aligned X position
 
- // Draw Yarn Ball Circle
- doc.setFillColor('#D4738B'); // Coral primary accent
- doc.circle(24, 14, 3.2, 'F');
+  if (logoImg) {
+    try {
+      doc.addImage(logoImg, 'PNG', 20.5, 11, 7, 7, undefined, 'FAST');
+      textX = 30; // Shift text to make room for logo
+    } catch (err) {
+      console.warn('Failed to draw loaded logo, falling back to text only', err);
+    }
+  }
 
- // Draw Yarn ball texture (criss-cross ellipses)
- doc.setDrawColor('#FFFFFF');
- doc.setLineWidth(0.18);
- doc.ellipse(24, 14, 2.3, 1.1, 'S');
- doc.ellipse(24, 14, 1.1, 2.3, 'S');
+  // Website Brand Name Text
+  doc.setFont('Grand Hotel', 'normal');
+  doc.setFontSize(15);
+  doc.setTextColor('#BC5873'); // Brand Logo color
+  doc.text('My Yarn Diary', textX, 14.5);
 
- // Website Brand Name Text
- doc.setFont('Grand Hotel', 'normal');
- doc.setFontSize(15);
- doc.setTextColor('#BC5873'); // Brand Logo color
- doc.text('My Yarn Diary', 30, 14.5);
+  // Brand Tagline
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(5.5);
+  doc.setTextColor('#813B4C');
+  doc.text('CRAFTER COMPANION', textX, 18);
 
- // Brand Tagline
- doc.setFont('helvetica', 'normal');
- doc.setFontSize(5.5);
- doc.setTextColor('#813B4C');
- doc.text('CRAFTER COMPANION', 30, 18);
+  // Right-aligned Project Title running text
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor('#813B4C');
+  const truncatedTitle = projectTitle.length > 35 ? projectTitle.substring(0, 32) + '...' : projectTitle;
+  doc.text(truncatedTitle, 190, 14, { align: 'right' });
 
- // Right-aligned Project Title running text
- doc.setFont('helvetica', 'normal');
- doc.setFontSize(8.5);
- doc.setTextColor('#813B4C');
- const truncatedTitle = projectTitle.length > 35 ? projectTitle.substring(0, 32) + '...' : projectTitle;
- doc.text(truncatedTitle, 190, 14, { align: 'right' });
+  // Header Divider
+  doc.setDrawColor('#BABABA');
+  doc.setLineWidth(0.25);
+  doc.line(20, 20, 190, 20);
 
- // Header Divider
- doc.setDrawColor('#BABABA');
- doc.setLineWidth(0.25);
- doc.line(20, 20, 190, 20);
+  // --- FOOTER SECTION ---
+  // Footer Divider
+  doc.line(20, 280, 190, 280);
 
- // --- FOOTER SECTION ---
- // Footer Divider
- doc.line(20, 280, 190, 280);
+  // Left-aligned watermark tagline
+  doc.setFont('Grand Hotel', 'normal');
+  doc.setFontSize(12);
+  doc.setTextColor('#BC5873');
+  doc.text('My Yarn Diary', 20, 285.5);
 
- // Left-aligned watermark tagline
- doc.setFont('Grand Hotel', 'normal');
- doc.setFontSize(12);
- doc.setTextColor('#BC5873');
- doc.text('My Yarn Diary', 20, 285.5);
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(7.5);
+  doc.setTextColor('#696868');
+  doc.text(' - Handmade with Love', 42, 285.5);
 
- doc.setFont('helvetica', 'italic');
- doc.setFontSize(7.5);
- doc.setTextColor('#696868');
- doc.text(' - Handmade with Love', 42, 285.5);
-
- // Right-aligned Page numbering
- doc.setFont('helvetica', 'normal');
- doc.setFontSize(8);
- doc.text(`Page ${pageNum} of ${totalPages}`, 190, 285.5, { align: 'right' });
+  // Right-aligned Page numbering
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text(`Page ${pageNum} of ${totalPages}`, 190, 285.5, { align: 'right' });
 }
 
 /**
@@ -202,43 +216,61 @@ function addImageSafe(
  * Generates and downloads the PDF export for a specific project.
  */
 export async function exportProjectToPdf(
- project: Project,
- logs: JournalLog[],
- categoryName: string,
- selectedCoverPhotoIdOrBase64: string | null
+  project: Project,
+  logs: JournalLog[],
+  categoryName: string,
+  selectedCoverPhotoIdOrBase64: string | null,
+  rawProductPhotos?: string[]
 ) {
- // Resolve the cover photo base64
- let coverPhotoBase64: string | null = null;
- if (selectedCoverPhotoIdOrBase64) {
- const matched = project.photos?.find(p => String(p.id) === selectedCoverPhotoIdOrBase64 || p.photoBase64 === selectedCoverPhotoIdOrBase64);
- if (matched) {
- coverPhotoBase64 = matched.photoBase64;
- } else if (selectedCoverPhotoIdOrBase64.startsWith('data:image/')) {
- coverPhotoBase64 = selectedCoverPhotoIdOrBase64;
- }
- }
- if (!coverPhotoBase64) {
- coverPhotoBase64 = project.photos?.find(p => p.isCover)?.photoBase64 || null;
- }
+  const allProductPhotos = (rawProductPhotos && rawProductPhotos.length > 0)
+    ? rawProductPhotos
+    : (project.photos || []).map(p => p.photoBase64);
 
- // Check if there are any PDF patterns and count their pages beforehand
- const pdfPatterns = (project.patterns || []).filter(p => p.patternType === 'pdf' && p.patternContent);
- let pdfPatternsPageCount = 0;
- for (const pattern of pdfPatterns) {
+  // Resolve the cover photo base64
+  let coverPhotoBase64: string | null = null;
+  if (selectedCoverPhotoIdOrBase64) {
+    const matched = project.photos?.find(p => String(p.id) === selectedCoverPhotoIdOrBase64 || p.photoBase64 === selectedCoverPhotoIdOrBase64);
+    if (matched) {
+      coverPhotoBase64 = matched.photoBase64;
+    } else if (selectedCoverPhotoIdOrBase64.startsWith('data:image/')) {
+      coverPhotoBase64 = selectedCoverPhotoIdOrBase64;
+    }
+  }
+  if (!coverPhotoBase64 && allProductPhotos.length > 0) {
+    const coverObj = project.photos?.find(p => p.isCover);
+    coverPhotoBase64 = coverObj ? coverObj.photoBase64 : allProductPhotos[0];
+  }
+
+  // Check if there are any PDF patterns and count their pages beforehand
+  const pdfPatterns = (project.patterns || []).filter(p => p.patternType === 'pdf' && p.patternContent);
+  let pdfPatternsPageCount = 0;
+  for (const pattern of pdfPatterns) {
+    try {
+      const base64Data = pattern.patternContent.replace(/^data:application\/pdf;base64,/, '');
+      const bytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+      const patternPdfDoc = await PDFDocument.load(bytes);
+      pdfPatternsPageCount += patternPdfDoc.getPageCount();
+    } catch (e) {
+      console.warn(`Failed to read PDF page count for ${pattern.fileName || ''}:`, e);
+    }
+  }
+
+  // Preload all image assets to calculate dimensions
+  const imageCache = await preloadImages(coverPhotoBase64, allProductPhotos, logs, project.patterns || []);
+
+ // Load actual logo image
+ let logoImg: HTMLImageElement | null = null;
  try {
- const base64Data = pattern.patternContent.replace(/^data:application\/pdf;base64,/, '');
- const bytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
- const patternPdfDoc = await PDFDocument.load(bytes);
- pdfPatternsPageCount += patternPdfDoc.getPageCount();
- } catch (e) {
- console.warn(`Failed to read PDF page count for ${pattern.fileName || ''}:`, e);
+   logoImg = await new Promise<HTMLImageElement>((resolve, reject) => {
+     const img = new Image();
+     img.crossOrigin = 'anonymous';
+     img.onload = () => resolve(img);
+     img.onerror = (e) => reject(e);
+     img.src = '/pwa-192x192.png';
+   });
+ } catch (err) {
+   console.warn('Failed to load logo image for PDF:', err);
  }
- }
-
- const allProductPhotos = (project.photos || []).map(p => p.photoBase64);
-
- // Preload all image assets to calculate dimensions
- const imageCache = await preloadImages(coverPhotoBase64, allProductPhotos, logs, project.patterns || []);
 
  const doc = new jsPDF({
  orientation: 'portrait',
@@ -655,55 +687,59 @@ export async function exportProjectToPdf(
 
  // Render contents for TEXT and IMAGE patterns inline
  for (const pattern of project.patterns) {
- if (pattern.patternType === 'text' && pattern.patternContent) {
- ctx.ensureSpace(20);
- doc.setFont('helvetica', 'bold');
- doc.setFontSize(9.5);
- doc.setTextColor('#242223');
- doc.text(`PATTERN TEXT: ${pattern.fileName || 'Notes'}`, ctx.marginLeft, ctx.currentY + 4);
- ctx.currentY += 6;
+    if (pattern.patternType === 'text' && pattern.patternContent) {
+      ctx.ensureSpace(15);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor('#242223');
+      doc.text(`PATTERN TEXT: ${pattern.fileName || 'Notes'}`, ctx.marginLeft, ctx.currentY + 4);
+      ctx.currentY += 6;
 
- const textLines = doc.splitTextToSize(pattern.patternContent, ctx.usableWidth - 6);
- const textH = textLines.length * 4.2 + 8;
- ctx.ensureSpace(textH + 4);
+      const textLines = doc.splitTextToSize(pattern.patternContent, ctx.usableWidth - 6);
+      const lineH = 4.2;
 
- doc.setFillColor('#FFFFFF');
- doc.rect(ctx.marginLeft, ctx.currentY, ctx.usableWidth, textH, 'F');
- doc.setDrawColor('#BABABA');
- doc.rect(ctx.marginLeft, ctx.currentY, ctx.usableWidth, textH, 'S');
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor('#242223');
 
- doc.setFillColor('#813B4C');
- doc.rect(ctx.marginLeft, ctx.currentY, 1.2, textH, 'F');
+      for (let l = 0; l < textLines.length; l++) {
+        ctx.ensureSpace(lineH + 1);
+        doc.text(textLines[l], ctx.marginLeft + 4, ctx.currentY + 3.5);
+        doc.setFillColor('#813B4C');
+        doc.rect(ctx.marginLeft, ctx.currentY, 1.2, lineH, 'F');
+        ctx.currentY += lineH;
+      }
+      ctx.currentY += 6;
+    } else if (pattern.patternType === 'image' && pattern.patternContent) {
+      const images = getImagePatternUrls(pattern.patternContent);
+      for (let imgIdx = 0; imgIdx < images.length; imgIdx++) {
+        const imgUrl = images[imgIdx];
+        const dim = imageCache[imgUrl] || { width: 400, height: 300 };
+        const maxW = 130;
+        const maxH = 80;
+        const scale = Math.min(maxW / dim.width, maxH / dim.height);
+        const w = dim.width * scale;
+        const h = dim.height * scale;
 
- doc.setFont('helvetica', 'normal');
- doc.setFontSize(8.5);
- doc.setTextColor('#242223');
- doc.text(textLines, ctx.marginLeft + 4, ctx.currentY + 5.5);
+        ctx.ensureSpace(h + 16);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor('#242223');
+        const titleLabel = images.length > 1
+          ? `PATTERN IMAGE (${imgIdx + 1}/${images.length}): ${pattern.fileName || 'Image'}`
+          : `PATTERN IMAGE: ${pattern.fileName || 'Image'}`;
+        doc.text(titleLabel, ctx.marginLeft, ctx.currentY + 4);
+        ctx.currentY += 6;
 
- ctx.currentY += textH + 6;
- } else if (pattern.patternType === 'image' && pattern.patternContent && imageCache[pattern.patternContent]) {
- const dim = imageCache[pattern.patternContent];
- const maxW = 130;
- const maxH = 80;
- const scale = Math.min(maxW / dim.width, maxH / dim.height);
- const w = dim.width * scale;
- const h = dim.height * scale;
+        const imgX = ctx.marginLeft + (ctx.usableWidth - w) / 2;
+        doc.setFillColor('#FFFFFF');
+        doc.roundedRect(imgX - 2, ctx.currentY, w + 4, h + 4, 1.5, 1.5, 'FD');
+        addImageSafe(doc, imgUrl, imgX, ctx.currentY + 2, w, h);
 
- ctx.ensureSpace(h + 16);
- doc.setFont('helvetica', 'bold');
- doc.setFontSize(9.5);
- doc.setTextColor('#242223');
- doc.text(`PATTERN IMAGE: ${pattern.fileName || 'Image'}`, ctx.marginLeft, ctx.currentY + 4);
- ctx.currentY += 6;
-
- const imgX = ctx.marginLeft + (ctx.usableWidth - w) / 2;
- doc.setFillColor('#FFFFFF');
- doc.roundedRect(imgX - 2, ctx.currentY, w + 4, h + 4, 1.5, 1.5, 'FD');
- addImageSafe(doc, pattern.patternContent, imgX, ctx.currentY + 2, w, h);
-
- ctx.currentY += h + 10;
- }
- }
+        ctx.currentY += h + 10;
+      }
+    }
+  }
  }
 
  // Save page count right here before progress journal starts!
@@ -840,7 +876,7 @@ export async function exportProjectToPdf(
  for (let i = 1; i <= totalPages; i++) {
  doc.setPage(i);
  const physicalPageNum = i <= pageCountA ? i : i + pdfPatternsPageCount;
- drawHeaderAndFooter(doc, physicalPageNum, totalPages + pdfPatternsPageCount, project.title);
+ drawHeaderAndFooter(doc, physicalPageNum, totalPages + pdfPatternsPageCount, project.title, logoImg);
  }
 
  // Save/Merge the document

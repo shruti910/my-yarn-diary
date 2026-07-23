@@ -20,7 +20,10 @@ export default defineConfig({
       manifest: {
         id: '/',
         name: 'My Yarn Diary',
-        short_name: 'Yarn Diary',
+        // Never drop the "My" — the brand is "My Yarn Diary", not "Yarn Diary".
+        // This is what Android's launcher and install prompt actually show, and
+        // 12 characters still fits under a home-screen icon without ellipsis.
+        short_name: 'My Yarn Diary',
         description:
           'An AI-enabled multimodal companion and journal tracking ecosystem for crochet crafters.',
         start_url: '/',

@@ -313,7 +313,7 @@ export function AuthScreen({ onAuthSuccess, initialIsLogin = true, onBack }: Aut
  <ChevronLeft className="w-4 h-4" /> Home
  </button>
  )}
- <div className="flex flex-col items-center mb-8">
+ <div className={`flex flex-col items-center mb-8 ${onBack ? 'mt-6 sm:mt-0' : ''}`}>
  <h1 className="grand-hotel-regular text-5xl tracking-tight text-center">
  My Yarn Diary
  </h1>

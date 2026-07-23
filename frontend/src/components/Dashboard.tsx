@@ -441,7 +441,7 @@ export function Dashboard({
 
                   {/* Visual Project Thumbnail */}
                   {getProjectCoverPhoto(p) ? (
-                    <div className="w-full h-20 sm:h-28 rounded-xl sm:rounded-2xl border border-subtle overflow-hidden bg-page relative">
+                    <div className="w-full aspect-[16/10] sm:aspect-[16/9] min-h-[160px] sm:min-h-[190px] rounded-xl sm:rounded-2xl border border-subtle overflow-hidden bg-page relative">
                       <img
                         src={getProjectCoverPhoto(p)}
                         alt={p.title}
@@ -449,8 +449,8 @@ export function Dashboard({
                       />
                     </div>
                   ) : (
-                    <div className="w-full h-20 sm:h-28 rounded-xl sm:rounded-2xl border border-subtle bg-surface flex flex-col items-center justify-center text-muted gap-1 shrink-0">
-                      <span className="text-xl sm:text-2xl">🧶</span>
+                    <div className="w-full aspect-[16/10] sm:aspect-[16/9] min-h-[160px] sm:min-h-[190px] rounded-xl sm:rounded-2xl border border-subtle bg-surface flex flex-col items-center justify-center text-muted gap-1 shrink-0">
+                      <span className="text-2xl sm:text-3xl">🧶</span>
                       <span className="text-[11px] font-bold uppercase tracking-wider">No photos yet</span>
                     </div>
                   )}

@@ -10,11 +10,33 @@ import { Download, Share, Plus, X } from 'lucide-react';
  *  - iOS Safari fires nothing and has no programmatic install, so the only
  *    option is to show the manual Share -> Add to Home Screen steps.
  *
- * Dismissal persists in localStorage, mirroring the floating-buddy pattern in
- * App.tsx, so the card is never a recurring nag.
+ * Dismissal is remembered in localStorage, mirroring the floating-buddy pattern
+ * in App.tsx, so the card is never a recurring nag — but it *expires*. An
+ * indefinite flag is a trap: localStorage survives both uninstalling the app and
+ * a hard reload, so a single early dismissal would hide the card forever on that
+ * profile with no way back short of clearing site data by hand.
  */
 
-const DISMISSED_KEY = 'crochet_install_dismissed';
+const DISMISSED_KEY = 'crochet_install_dismissed_until';
+const DISMISS_DAYS = 30;
+
+/** Dismissed and still inside the cooling-off window? */
+function isDismissActive(): boolean {
+  const raw = localStorage.getItem(DISMISSED_KEY);
+  if (!raw) return false;
+  const until = Number(raw);
+  // Treat unparseable values (including the legacy 'true' flag this key
+  // replaced) as expired, so nobody stays permanently opted out.
+  if (!Number.isFinite(until)) {
+    localStorage.removeItem(DISMISSED_KEY);
+    return false;
+  }
+  if (Date.now() > until) {
+    localStorage.removeItem(DISMISSED_KEY);
+    return false;
+  }
+  return true;
+}
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -43,9 +65,7 @@ function isIosSafari(): boolean {
 export function InstallPrompt() {
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
   const [showIosHint, setShowIosHint] = useState(false);
-  const [dismissed, setDismissed] = useState<boolean>(
-    () => localStorage.getItem(DISMISSED_KEY) === 'true'
-  );
+  const [dismissed, setDismissed] = useState<boolean>(isDismissActive);
 
   useEffect(() => {
     // Already installed and launched from the home screen: nothing to offer.
@@ -59,33 +79,56 @@ export function InstallPrompt() {
 
     const handleInstalled = () => {
       setInstallEvent(null);
+      (window as any).__installPromptEvent = null;
       setShowIosHint(false);
       localStorage.removeItem(DISMISSED_KEY);
     };
 
+    // The event may already have fired before this component mounted; the
+    // snippet in index.html stashes it for exactly that case.
+    const stashed = (window as any).__installPromptEvent as BeforeInstallPromptEvent | null;
+    if (stashed) setInstallEvent(stashed);
+
+    const handleStashed = () => {
+      const e = (window as any).__installPromptEvent as BeforeInstallPromptEvent | null;
+      if (e) setInstallEvent(e);
+    };
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('installpromptready', handleStashed);
     window.addEventListener('appinstalled', handleInstalled);
 
     if (isIosSafari()) setShowIosHint(true);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('installpromptready', handleStashed);
       window.removeEventListener('appinstalled', handleInstalled);
     };
   }, []);
 
   const handleDismiss = () => {
     setDismissed(true);
-    localStorage.setItem(DISMISSED_KEY, 'true');
+    localStorage.setItem(DISMISSED_KEY, String(Date.now() + DISMISS_DAYS * 86_400_000));
   };
 
   const handleInstall = async () => {
     if (!installEvent) return;
-    await installEvent.prompt();
-    const { outcome } = await installEvent.userChoice;
-    // The stashed event is single-use either way
+    // The stashed event is single-use, so clear it whatever the outcome —
+    // including the copy in index.html, which would otherwise hand a spent
+    // event back to the next mount.
     setInstallEvent(null);
-    if (outcome === 'dismissed') handleDismiss();
+    (window as any).__installPromptEvent = null;
+    try {
+      await installEvent.prompt();
+      await installEvent.userChoice;
+    } catch {
+      // Chrome rejects prompt() if the event has already been consumed or the
+      // gesture expired; there is nothing to recover, just stop showing the card.
+    }
+    // Deliberately no dismissal on an 'accepted'/'dismissed' split: backing out
+    // of the browser's own dialog is a "not now", not a 30-day opt-out, and the
+    // card hides regardless because the single-use event is now spent.
   };
 
   const visible = !dismissed && (installEvent !== null || showIosHint);

@@ -773,13 +773,17 @@ export default function App() {
  });
 
  if (res) {
- // Keep state synced with the official server response
- const merged = {
+ // Keep state synced with the official server response while preserving non-DTO fields like photos
+ setProjects(prev => prev.map(p => p.projectId === projectId ? {
+ ...p,
  ...res,
  categoryId: res.categoryId || res.folderId
- } as Project;
- setProjects(prev => prev.map(p => p.projectId === projectId ? merged : p));
- setSelectedProject(merged);
+ } : p));
+ setSelectedProject(prev => prev ? {
+ ...prev,
+ ...res,
+ categoryId: res.categoryId || res.folderId
+ } : null);
  }
  } catch (err: any) {
  console.error('Failed to sync row count with backend:', err);
@@ -800,17 +804,21 @@ export default function App() {
  body: JSON.stringify(getPayload(selectedProject, updates))
  });
  if (res) {
- const merged = {
+ setProjects(prev => prev.map(p => p.projectId === projectId ? {
+ ...p,
  ...res,
  categoryId: res.categoryId || res.folderId
- } as Project;
- setProjects(prev => prev.map(p => p.projectId === projectId ? merged : p));
- setSelectedProject(merged);
+ } : p));
+ setSelectedProject(prev => prev ? {
+ ...prev,
+ ...res,
+ categoryId: res.categoryId || res.folderId
+ } : null);
  showToast('Saving..', 'success');
 
  const oldStatus = selectedProject.status;
  if (updates.status === ProjectStatus.Completed && oldStatus !== ProjectStatus.Completed) {
- setShowCelebrationTitle(merged.title);
+ setShowCelebrationTitle(res.title || selectedProject.title);
  }
  }
  } catch (err: any) {
@@ -873,13 +881,13 @@ export default function App() {
  body: JSON.stringify(payload)
  });
  if (res) {
- const merged = {
+ setProjects(prev => prev.map(p => p.projectId === projectId ? {
+ ...p,
  ...res,
  categoryId: res.categoryId || res.folderId
- } as Project;
- setProjects(prev => prev.map(p => p.projectId === projectId ? merged : p));
+ } : p));
  setSelectedProject(null); // Return to list view
- showToast(merged.isArchive ? 'Project archived successfully!' : 'Project unarchived successfully!', 'success');
+ showToast(res.isArchive ? 'Project archived successfully!' : 'Project unarchived successfully!', 'success');
  fetchProjects(activeCategoryId, projectsPage, projectsPageSize);
  }
  } catch (err: any) {
