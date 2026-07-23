@@ -3,16 +3,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ChevronUp, ChevronDown, Trash2, Camera, NotebookPen, Save, FolderOpen, Calendar, Heart, Copy, Archive, Star, FolderUp, ClipboardList, PackageOpen, Play, Pause, CircleCheckBig, Clock, CirclePause, Route, ReceiptText, FileText, Download, Plus, Minus, Scissors, PenTool } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, ChevronUp, ChevronDown, Trash2, Camera, NotebookPen, Save, FolderOpen, Calendar, Heart, Copy, Archive, Star, FolderUp, ClipboardList, PackageOpen, Play, Pause, CircleCheckBig, Clock, CirclePause, Route, ReceiptText, FileText, Download, Plus, Minus, Spool, PenTool, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Project, JournalLog, Category, ProjectStatus, Yarn, Hook } from '../types';
 import { CustomDropdown } from './CustomDropdown';
 import { useDialog } from './DialogProvider';
-import { YarnManager } from './YarnManager';
-import { HookManager } from './HookManager';
+import { YarnManager, YarnManagerHandle } from './YarnManager';
+import { HookManager, HookManagerHandle } from './HookManager';
 import { PatternViewer } from './PatternViewer';
 import { YarnSpinner } from './YarnSpinner';
 import { exportProjectToPdf } from '../lib/pdfExport';
+import { useAutosave } from '../hooks/useAutosave';
 
 const capitalizeWords = (str: string): string => {
  if (!str) return '';
@@ -69,15 +70,74 @@ export function ProjectDetail({
  const [logsPageSize, setLogsPageSize] = useState(5);
  const [logsTotalPages, setLogsTotalPages] = useState(0);
  const [logsTotalElements, setLogsTotalElements] = useState(0);
- const [textEntry, setTextEntry] = useState('');
+  const [textEntry, setTextEntry] = useState('');
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [editingLogText, setEditingLogText] = useState<string>('');
  const [logImage, setLogImage] = useState<string | null>(null);
  const [logImageMime, setLogImageMime] = useState('');
  const [logImageBase64, setLogImageBase64] = useState<string | null>(null);
+
+  // LocalStorage draft for the in-progress journal entry (text + attached photo),
+  // so nothing is lost if the tab is closed before clicking "Add Entry".
+  useEffect(() => {
+    if (!project?.projectId) return;
+    const savedDraft = localStorage.getItem(`journal_draft_${project.projectId}`);
+    if (savedDraft && !textEntry) {
+      setTextEntry(savedDraft);
+    }
+    const savedPhoto = localStorage.getItem(`journal_draft_photo_${project.projectId}`);
+    if (savedPhoto && !logImage) {
+      try {
+        const p = JSON.parse(savedPhoto);
+        if (p.logImage) setLogImage(p.logImage);
+        if (p.logImageMime) setLogImageMime(p.logImageMime);
+        if (p.logImageBase64) setLogImageBase64(p.logImageBase64);
+      } catch (e) {
+        console.error('Failed to restore journal photo draft:', e);
+      }
+    }
+  }, [project?.projectId]);
+
+  useEffect(() => {
+    if (!project?.projectId) return;
+    if (textEntry) {
+      localStorage.setItem(`journal_draft_${project.projectId}`, textEntry);
+    } else {
+      localStorage.removeItem(`journal_draft_${project.projectId}`);
+    }
+  }, [textEntry, project?.projectId]);
+
+  useEffect(() => {
+    if (!project?.projectId) return;
+    const key = `journal_draft_photo_${project.projectId}`;
+    if (logImage) {
+      try {
+        localStorage.setItem(key, JSON.stringify({ logImage, logImageMime, logImageBase64 }));
+      } catch (e) {
+        console.error('Failed to persist journal photo draft:', e);
+      }
+    } else {
+      localStorage.removeItem(key);
+    }
+  }, [logImage, logImageMime, logImageBase64, project?.projectId]);
+
+  // Debounced autosave while editing an existing journal entry (no save-on-blur).
+  const logEditAutosave = useAutosave<{ logId: string; text: string }>(async ({ logId, text }) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const res = await fetchWithToken(`/api/v1/logs/${logId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ textEntry: trimmed })
+    });
+    if (res) {
+      setLogs(prev => prev.map(l => (l.logId === logId ? { ...l, textEntry: trimmed } : l)));
+    }
+  });
  const [submittingLog, setSubmittingLog] = useState(false);
  const [isSubmitting, setIsSubmitting] = useState(false);
  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
  const [isExporting, setIsExporting] = useState(false);
- const { showAlert, showConfirm } = useDialog();
+ const { showAlert, showConfirm, showToast } = useDialog();
 
  // Edit fields
  const [title, setTitle] = useState(project.title);
@@ -98,7 +158,28 @@ export function ProjectDetail({
 
  // Unsaved modal, lightbox & camera states
  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
- const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+
+  // Keyboard navigation for Lightbox image slider
+  useEffect(() => {
+    if (!lightboxImage) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const idx = productPhotos.indexOf(lightboxImage);
+      if (idx === -1) return;
+      if (e.key === 'ArrowRight') {
+        const nextIdx = (idx + 1) % productPhotos.length;
+        setLightboxImage(productPhotos[nextIdx]);
+      } else if (e.key === 'ArrowLeft') {
+        const prevIdx = (idx - 1 + productPhotos.length) % productPhotos.length;
+        setLightboxImage(productPhotos[prevIdx]);
+      } else if (e.key === 'Escape') {
+        setLightboxImage(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxImage, productPhotos]);
  const [isCameraActive, setIsCameraActive] = useState(false);
  const [cameraTarget, setCameraTarget] = useState<'product' | 'log' | null>(null);
  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
@@ -108,13 +189,38 @@ export function ProjectDetail({
  const [activeTab, setActiveTab] = useState<'journal' | 'pattern'>('journal');
  const [isYarnsOpen, setIsYarnsOpen] = useState(false);
  const [isHooksOpen, setIsHooksOpen] = useState(false);
+ const yarnManagerRef = useRef<YarnManagerHandle>(null);
+ const hookManagerRef = useRef<HookManagerHandle>(null);
+ const [pendingYarnAdd, setPendingYarnAdd] = useState(false);
+ const [pendingHookAdd, setPendingHookAdd] = useState(false);
+
+ // Add a yarn/hook, opening the section first (the manager only mounts when open,
+ // so a queued add fires once it's available).
+ const addYarn = () => {
+   if (yarnManagerRef.current) yarnManagerRef.current.add();
+   else { setIsYarnsOpen(true); setPendingYarnAdd(true); }
+ };
+ const addHook = () => {
+   if (hookManagerRef.current) hookManagerRef.current.add();
+   else { setIsHooksOpen(true); setPendingHookAdd(true); }
+ };
+ useEffect(() => {
+   if (isYarnsOpen && pendingYarnAdd && yarnManagerRef.current) {
+     yarnManagerRef.current.add();
+     setPendingYarnAdd(false);
+   }
+ }, [isYarnsOpen, pendingYarnAdd]);
+ useEffect(() => {
+   if (isHooksOpen && pendingHookAdd && hookManagerRef.current) {
+     hookManagerRef.current.add();
+     setPendingHookAdd(false);
+   }
+ }, [isHooksOpen, pendingHookAdd]);
 
  const isDateRangeInvalid = !!(startDate && endDate && startDate > endDate);
 
  useEffect(() => {
  setTitle(project.title);
- setYarns(project.yarns || []);
- setHooks(project.hooks || []);
  setStatus(project.status);
  setNotes(project.notes || '');
  setTargetCategoryId(project.categoryId);
@@ -133,11 +239,18 @@ export function ProjectDetail({
  project.endDate,
  project.careInstructions,
  project.totalTime,
- project.yarns?.map(y => `${y.brand}:${y.lineName}:${y.colorway}:${y.quantityUsed}`).join(','),
- project.hooks?.map(h => `${h.sizeMm}:${h.sizeUs}:${h.material}`).join(','),
  project.photos?.map(p => `${p.id}:${p.isCover}`).join(','),
  project.photos?.map(p => p.photoBase64).join(',')
  ]);
+
+ // Yarn/hook counts are owned by their managers (authoritative fetch from their
+ // dedicated endpoints) and reported up via onYarnsChange/onHooksChange. We only
+ // re-seed the badge state when switching to a different project, so a stale
+ // yarns/hooks array on a projects PUT response can't clobber the count.
+ useEffect(() => {
+ setYarns(project.yarns || []);
+ setHooks(project.hooks || []);
+ }, [project.projectId]);
 
  const fetchWithToken = async (url: string, options: RequestInit = {}) => {
  if (!token) throw new Error('No authentication token available');
@@ -390,27 +503,28 @@ export function ProjectDetail({
  };
 
  const handleExportPdf = async () => {
- setIsExporting(true);
- try {
- const activeCategory = categories.find(c => c.categoryId === targetCategoryId || c.categoryId === project.categoryId);
- await exportProjectToPdf(
- {
- ...project,
- title,
- yarns,
- hooks,
- status,
- notes,
- startDate,
- endDate,
- careInstructions,
- totalTime
- },
- logs,
- activeCategory?.name || 'General',
- coverPhoto
- );
- } catch (err) {
+    setIsExporting(true);
+    try {
+      const activeCategory = categories.find(c => c.categoryId === targetCategoryId || c.categoryId === project.categoryId);
+      await exportProjectToPdf(
+        {
+          ...project,
+          title,
+          yarns,
+          hooks,
+          status,
+          notes,
+          startDate,
+          endDate,
+          careInstructions,
+          totalTime
+        },
+        logs,
+        activeCategory?.name || 'General',
+        coverPhoto,
+        productPhotos
+      );
+    } catch (err) {
  console.error('Failed to export PDF:', err);
  await showAlert('An error occurred while generating the PDF. Please try again.', 'Export Failed');
  } finally {
@@ -536,6 +650,9 @@ export function ProjectDetail({
  };
 
  const removeProductPhoto = async (index: number) => {
+ const confirmed = await showConfirm('Are you sure you want to remove this photo from your gallery?');
+ if (!confirmed) return;
+
  const photoBase64 = productPhotos[index];
  const photoObj = project.photos?.find(p => p.photoBase64 === photoBase64);
 
@@ -640,37 +757,61 @@ export function ProjectDetail({
  }
  };
 
- const handleAddLog = async (e: React.FormEvent) => {
- e.preventDefault();
- if (!textEntry.trim()) return;
+  const handleAddLog = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!textEntry.trim()) return;
 
- setSubmittingLog(true);
+    setSubmittingLog(true);
 
- try {
- const payload = {
- textEntry: textEntry.trim(),
- imageBase64: logImage || '',
- rowCountSnapshot: project.rowCount || 0
- };
+    try {
+      const payload = {
+        textEntry: textEntry.trim(),
+        imageBase64: logImage || '',
+        rowCountSnapshot: project.rowCount || 0
+      };
 
- const res = await fetchWithToken(`/api/v1/projects/${project.projectId}/logs`, {
- method: 'POST',
- body: JSON.stringify(payload)
- });
+      const res = await fetchWithToken(`/api/v1/projects/${project.projectId}/logs`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
 
- if (res) {
- setLogs(prev => [res as JournalLog, ...prev]);
- setTextEntry('');
- setLogImage(null);
- setLogImageBase64(null);
- loadLogs(0, logsPageSize, true);
- }
- } catch (err) {
- console.error('Failed to append progress log:', err);
- } finally {
- setSubmittingLog(false);
- }
- };
+      if (res) {
+        setLogs(prev => [res as JournalLog, ...prev]);
+        setTextEntry('');
+        setLogImage(null);
+        setLogImageMime('');
+        setLogImageBase64(null);
+        localStorage.removeItem(`journal_draft_${project.projectId}`);
+        localStorage.removeItem(`journal_draft_photo_${project.projectId}`);
+        showToast('Saving...', 'success');
+        loadLogs(0, logsPageSize, true);
+      }
+    } catch (err) {
+      console.error('Failed to append progress log:', err);
+    } finally {
+      setSubmittingLog(false);
+    }
+  };
+
+  const handleUpdateLog = async (logId: string, text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    try {
+      const res = await fetchWithToken(`/api/v1/logs/${logId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ textEntry: trimmed })
+      });
+      if (res) {
+        setLogs(prev => prev.map(l => l.logId === logId ? { ...l, textEntry: trimmed } : l));
+        showToast('Saving...', 'success');
+        setEditingLogId(null);
+      }
+    } catch (err) {
+      console.error('Failed to update journal log:', err);
+      showToast('Failed to save journal entry.', 'error');
+    }
+  };
 
  const handleDeleteLog = async (logId: string) => {
  const confirmed = await showConfirm('Are you sure you want to discard this journal entry?');
@@ -1142,8 +1283,8 @@ export function ProjectDetail({
  <span className="text-[11px] uppercase font-extrabold tracking-widest text-brand pb-1 border-b border-subtle flex items-center gap-1.5">
  <Calendar className="w-3.5 h-3.5 text-brand" /> Project Duration
  </span>
- <div className="grid grid-cols-2 gap-3">
- <div className="space-y-1">
+ <div className="grid grid-cols-2 gap-4">
+ <div className="space-y-1 min-w-0">
  <label className="text-[11px] font-extrabold text-muted uppercase tracking-wider block">Date Started</label>
  <input
  type="date"
@@ -1153,7 +1294,7 @@ export function ProjectDetail({
  className="w-full bg-surface border border-subtle text-xs p-2 rounded-xl text-heading focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand font-semibold disabled:opacity-60"
  />
  </div>
- <div className="space-y-1">
+ <div className="space-y-1 min-w-0">
  <label className="text-[11px] font-extrabold text-muted uppercase tracking-wider block">Date Ended</label>
  <input
  type="date"
@@ -1192,23 +1333,51 @@ export function ProjectDetail({
 
  {/* YARNS SPECIFICATIONS */}
  <div className="bg-white rounded-2xl p-4 border border-subtle warm-shadow-lg space-y-3 animate-fade-in">
+ <div className="w-full flex items-center justify-between gap-2">
  <button
  onClick={() => setIsYarnsOpen(!isYarnsOpen)}
- className="w-full flex items-center justify-between text-left focus:outline-none cursor-pointer"
+ className="flex-1 flex items-center text-left focus:outline-none cursor-pointer"
  >
  <span className="text-[11px] uppercase font-extrabold tracking-widest text-brand flex items-center gap-1.5">
- <Scissors className="w-3.5 h-3.5 text-brand" /> Yarns Used
+ <Spool className="w-3.5 h-3.5 text-brand" /> Yarns Used
+ {yarns.length > 0 && (
+ <span className="text-[11px] px-1.5 py-0.5 rounded-full font-extrabold bg-brand/10 text-brand ml-1">
+ {yarns.length}
  </span>
+ )}
+ </span>
+ </button>
+ <div className="flex items-center gap-1.5 shrink-0">
+ <button
+ type="button"
+ onClick={addYarn}
+ disabled={isSubmitting}
+ className="px-2.5 py-1 bg-brand hover:bg-brand/90 text-white rounded-lg text-[11px] font-extrabold flex items-center gap-1 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+ title="Add yarn"
+ >
+ <Plus className="w-3 h-3" /> Add
+ </button>
+ <button
+ type="button"
+ onClick={() => setIsYarnsOpen(!isYarnsOpen)}
+ className="p-1 rounded-lg hover:bg-brand/10 focus:outline-none cursor-pointer"
+ title={isYarnsOpen ? 'Collapse' : 'Expand'}
+ >
  <ChevronDown className={`w-4 h-4 text-brand transition-transform duration-300 ${isYarnsOpen ? 'rotate-180' : ''}`} />
  </button>
+ </div>
+ </div>
  {isYarnsOpen && (
  <div className="pt-2 animate-fade-in">
  <YarnManager
+ ref={yarnManagerRef}
  projectId={project.projectId}
  initialYarns={project.yarns}
  isNewProject={project.isNewProject}
  fetchWithToken={fetchWithToken}
  disabled={isSubmitting}
+ hideAddButton
+ onYarnsChange={(updated) => setYarns(updated)}
  />
  </div>
  )}
@@ -1216,23 +1385,51 @@ export function ProjectDetail({
 
  {/* HOOKS SPECIFICATIONS */}
  <div className="bg-white rounded-2xl p-4 border border-subtle warm-shadow-lg space-y-3 animate-fade-in">
+ <div className="w-full flex items-center justify-between gap-2">
  <button
  onClick={() => setIsHooksOpen(!isHooksOpen)}
- className="w-full flex items-center justify-between text-left focus:outline-none cursor-pointer"
+ className="flex-1 flex items-center text-left focus:outline-none cursor-pointer"
  >
  <span className="text-[11px] uppercase font-extrabold tracking-widest text-brand flex items-center gap-1.5">
  <PenTool className="w-3.5 h-3.5 text-brand" /> Hooks Used
+ {hooks.length > 0 && (
+ <span className="text-[11px] px-1.5 py-0.5 rounded-full font-extrabold bg-brand/10 text-brand ml-1">
+ {hooks.length}
  </span>
+ )}
+ </span>
+ </button>
+ <div className="flex items-center gap-1.5 shrink-0">
+ <button
+ type="button"
+ onClick={addHook}
+ disabled={isSubmitting}
+ className="px-2.5 py-1 bg-brand hover:bg-brand/90 text-white rounded-lg text-[11px] font-extrabold flex items-center gap-1 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+ title="Add hook"
+ >
+ <Plus className="w-3 h-3" /> Add
+ </button>
+ <button
+ type="button"
+ onClick={() => setIsHooksOpen(!isHooksOpen)}
+ className="p-1 rounded-lg hover:bg-brand/10 focus:outline-none cursor-pointer"
+ title={isHooksOpen ? 'Collapse' : 'Expand'}
+ >
  <ChevronDown className={`w-4 h-4 text-brand transition-transform duration-300 ${isHooksOpen ? 'rotate-180' : ''}`} />
  </button>
+ </div>
+ </div>
  {isHooksOpen && (
  <div className="pt-2 animate-fade-in">
  <HookManager
+ ref={hookManagerRef}
  projectId={project.projectId}
  initialHooks={project.hooks}
  isNewProject={project.isNewProject}
  fetchWithToken={fetchWithToken}
  disabled={isSubmitting}
+ hideAddButton
+ onHooksChange={(updated) => setHooks(updated)}
  />
  </div>
  )}
@@ -1265,43 +1462,14 @@ export function ProjectDetail({
  onClick={() => setLightboxImage(photo)}
  className="w-full h-full object-cover group-hover:scale-105 transition-transform cursor-pointer"
  />
-
- {productPhotos.length > 1 && (
- <button
- type="button"
- onClick={async () => {
- if (matchedPhoto) {
- try {
- await fetchWithToken(`/api/v1/projects/${project.projectId}/photos`, {
- method: 'PUT',
- body: JSON.stringify({ id: matchedPhoto.id, isCover: true })
- });
- await fetchPhotos();
- } catch (err) {
- console.error('Failed to update cover photo:', err);
- }
- }
- }}
- className={`absolute bottom-1 left-1 p-1 rounded-lg text-[11px] font-extrabold transition-all flex items-center gap-0.5 shadow-xs cursor-pointer ${isCover
- ? 'bg-accent text-white'
- : 'bg-white/95 text-muted hover:bg-white'
- }`}
- title="Use as cover"
+ {isCover && (
+ <div
+ className="absolute top-1.5 right-1.5 bg-accent text-white p-1 rounded-full shadow-md z-10 animate-scale-up"
+ title="Cover Photo"
  >
- <Star className="w-3 h-3" fill={isCover ? 'white' : 'transparent'} />
- {isCover ? 'Cover Photo' : 'Use as cover'}
- </button>
+ <Star className="w-3 h-3 fill-white" />
+ </div>
  )}
-
- <button
- type="button"
- onClick={() => removeProductPhoto(i)}
- disabled={isUploadingPhoto || isSubmitting}
- className="absolute top-1 right-1 w-5 h-5 bg-black/60 hover:bg-red-500 rounded-full text-white text-[11px] flex items-center justify-center font-bold transition-all opacity-0 group-hover:opacity-100 cursor-pointer disabled:opacity-40"
- title="Remove Photo"
- >
- ×
- </button>
  </div>
  );
  })}
@@ -1485,7 +1653,7 @@ export function ProjectDetail({
  key={log.logId}
  className="bg-white rounded-2xl p-4 border border-subtle warm-shadow hover:border-accent/30 transition-all flex flex-col md:flex-row gap-4 items-start justify-between"
  >
- <div className="space-y-1.5 flex-1">
+ <div className="space-y-1.5 flex-1 w-full">
  <div className="flex flex-wrap items-center gap-2">
  <span className="text-[11px] font-bold text-muted bg-page border border-subtle px-2 py-0.5 rounded-md flex items-center gap-1">
  <Calendar className="w-3 h-3 text-accent" />
@@ -1495,21 +1663,65 @@ export function ProjectDetail({
  <span className="text-[11px] font-extrabold text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-md">Row {log.rowCountSnapshot} Milestone</span>
  )}
  </div>
+
+ {editingLogId === log.logId ? (
+ <div className="space-y-2 pt-1 w-full">
+ <textarea
+ value={editingLogText}
+ onChange={(e) => {
+ setEditingLogText(e.target.value);
+ logEditAutosave.schedule({ logId: log.logId, text: e.target.value });
+ }}
+ rows={3}
+ className="w-full p-2.5 bg-surface border border-brand rounded-xl text-xs font-semibold text-heading focus:outline-none"
+ />
+ <div className="flex justify-end gap-2">
+ <button
+ type="button"
+ onClick={() => handleUpdateLog(log.logId, editingLogText)}
+ className="px-3 py-1 bg-brand text-white text-[11px] font-extrabold rounded-lg hover:bg-brand/90 cursor-pointer"
+ >
+ Save Log
+ </button>
+ <button
+ type="button"
+ onClick={() => setEditingLogId(null)}
+ className="px-3 py-1 bg-white border border-subtle text-muted text-[11px] font-bold rounded-lg hover:bg-page cursor-pointer"
+ >
+ Cancel
+ </button>
+ </div>
+ </div>
+ ) : (
  <p className="text-xs text-heading whitespace-pre-wrap leading-relaxed font-semibold">{log.textEntry}</p>
+ )}
  </div>
 
- <div className="flex items-center gap-4 shrink-0 justify-between w-full md:w-auto self-end md:self-stretch">
+ <div className="flex items-center gap-2 shrink-0 justify-between w-full md:w-auto self-end md:self-stretch">
  {log.imageBase64 && (
  <div className="relative group">
  <img
  src={log.imageBase64}
- alt="Log snapshot snapshot"
+ alt="Log snapshot"
  onClick={() => setLightboxImage(log.imageBase64)}
  className="w-20 h-20 rounded-xl object-cover border border-subtle shadow-xs cursor-pointer hover:scale-105 transition-transform"
  />
  </div>
  )}
 
+ <div className="flex items-center gap-1">
+ {editingLogId !== log.logId && (
+ <button
+ onClick={() => {
+ setEditingLogId(log.logId);
+ setEditingLogText(log.textEntry);
+ }}
+ className="p-2 text-muted hover:text-brand hover:bg-brand/10 rounded-xl transition-colors cursor-pointer"
+ title="Edit log entry"
+ >
+ <Pencil className="w-4 h-4 cursor-pointer" />
+ </button>
+ )}
  <button
  onClick={() => handleDeleteLog(log.logId)}
  className="p-2 text-muted hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
@@ -1517,6 +1729,7 @@ export function ProjectDetail({
  >
  <Trash2 className="w-4 h-4 cursor-pointer" />
  </button>
+ </div>
  </div>
  </div>
  ))}
@@ -1657,27 +1870,146 @@ export function ProjectDetail({
  </div>
  )}
 
- {/* LIGHTBOX OVERLAY */}
- {lightboxImage && (
- <div
- className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in"
- onClick={() => setLightboxImage(null)}
- >
- <button
- onClick={() => setLightboxImage(null)}
- className="absolute top-6 right-6 w-10 h-10 bg-white/10 hover:bg-white/20 text-white rounded-full text-xl flex items-center justify-center font-bold transition-colors cursor-pointer"
- title="Close image"
- >
- ×
- </button>
- <img
- src={lightboxImage}
- alt="Enlarged preview"
- className="max-w-full max-h-full object-contain rounded-2xl animate-scale-up"
- onClick={(e) => e.stopPropagation()}
- />
+ {/* LIGHTBOX OVERLAY WITH GALLERY SLIDER */}
+ {lightboxImage && (() => {
+        const currentIndex = productPhotos.indexOf(lightboxImage);
+        const totalPhotos = productPhotos.length;
+        const matchedPhoto = project.photos?.find(p => p.photoBase64 === lightboxImage);
+        const isCover = matchedPhoto
+          ? (coverPhoto === String(matchedPhoto.id) || (coverPhoto === null && matchedPhoto.isCover))
+          : (coverPhoto === lightboxImage);
+
+        const goToNext = () => {
+          if (totalPhotos <= 1 || currentIndex === -1) return;
+          const nextIdx = (currentIndex + 1) % totalPhotos;
+          setLightboxImage(productPhotos[nextIdx]);
+        };
+
+        const goToPrev = () => {
+          if (totalPhotos <= 1 || currentIndex === -1) return;
+          const prevIdx = (currentIndex - 1 + totalPhotos) % totalPhotos;
+          setLightboxImage(productPhotos[prevIdx]);
+        };
+
+        const handleTouchStart = (e: React.TouchEvent) => {
+          setTouchStartX(e.touches[0].clientX);
+        };
+
+        const handleTouchEnd = (e: React.TouchEvent) => {
+          if (touchStartX === null) return;
+          const touchEndX = e.changedTouches[0].clientX;
+          const diffX = touchStartX - touchEndX;
+          if (Math.abs(diffX) > 40) {
+            if (diffX > 0) {
+              goToNext();
+            } else {
+              goToPrev();
+            }
+          }
+          setTouchStartX(null);
+        };
+
+        return (
+          <div
+            className="fixed inset-0 z-[10000] flex flex-col items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in select-none"
+            onClick={() => setLightboxImage(null)}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
+            {/* Top Bar: Counter & Controls */}
+            <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-20">
+              <span className="text-white/80 text-xs font-extrabold bg-white/10 px-3 py-1.5 rounded-xl backdrop-blur-sm">
+                Photo {currentIndex !== -1 ? currentIndex + 1 : 1} of {totalPhotos}
+              </span>
+
+              <div className="flex items-center gap-2">
+                {matchedPhoto && (
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
+                        const newCoverState = !isCover;
+                        await fetchWithToken(`/api/v1/projects/${project.projectId}/photos`, {
+                          method: 'PUT',
+                          body: JSON.stringify({ id: matchedPhoto.id, isCover: newCoverState })
+                        });
+                        await fetchPhotos();
+                        showToast(newCoverState ? 'Set as cover photo!' : 'Removed cover photo', 'success');
+                      } catch (err) {
+                        console.error('Failed to update cover photo:', err);
+                        showToast('Failed to update cover photo state.', 'error');
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg cursor-pointer ${
+                      isCover
+                        ? 'bg-accent text-white hover:bg-accent/90'
+                        : 'bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm'
+                    }`}
+                    title={isCover ? 'Remove as cover photo' : 'Set as cover photo'}
+                  >
+                    <Star className="w-3.5 h-3.5" fill={isCover ? 'white' : 'transparent'} />
+                    {isCover ? 'Remove Cover' : 'Set as Cover'}
+                  </button>
+                )}
+
+                <button
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (currentIndex !== -1) {
+                      setLightboxImage(null);
+                      await removeProductPhoto(currentIndex);
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-lg"
+                  title="Delete this photo"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete Photo
+                </button>
+
+                <button
+                  onClick={() => setLightboxImage(null)}
+                  className="w-9 h-9 bg-white/10 hover:bg-white/20 text-white rounded-full text-xl flex items-center justify-center font-bold transition-colors cursor-pointer"
+                  title="Close image"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            {/* Slider Navigation Arrows */}
+            {totalPhotos > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); goToPrev(); }}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 bg-white/15 hover:bg-white/30 text-white rounded-full flex items-center justify-center transition-all shadow-xl cursor-pointer z-20 active:scale-95"
+                  title="Previous Photo (Left Arrow)"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); goToNext(); }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 bg-white/15 hover:bg-white/30 text-white rounded-full flex items-center justify-center transition-all shadow-xl cursor-pointer z-20 active:scale-95"
+                  title="Next Photo (Right Arrow)"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+              </>
+            )}
+
+            {/* Main Image Display */}
+            <img
+              key={lightboxImage}
+              src={lightboxImage}
+              alt="Enlarged gallery preview"
+              className="max-w-full max-h-[82vh] object-contain rounded-2xl animate-scale-up shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        );
+      })()}
  </div>
- )}
- </div>
-  );
+ );
 }

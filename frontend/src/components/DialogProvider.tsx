@@ -164,7 +164,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
  animate={{ opacity: 1, y: 0, scale: 1 }}
  exit={{ opacity: 0, y: 20, scale: 0.95 }}
  transition={{ duration: 0.2 }}
- className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[999999] w-full max-w-xs md:max-w-sm p-4 rounded-2xl border backdrop-blur-md shadow-lg flex items-start gap-3 ${toast.type === 'success'
+ className={`fixed bottom-safe left-1/2 -translate-x-1/2 z-[999999] w-full max-w-xs md:max-w-sm p-4 rounded-2xl border backdrop-blur-md shadow-lg flex items-start gap-3 ${toast.type === 'success'
  ? 'bg-emerald-50/90 border-emerald-200 text-emerald-800'
  : toast.type === 'warning'
  ? 'bg-amber-50/90 border-amber-200 text-amber-800'

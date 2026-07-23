@@ -10,11 +10,21 @@ import { motion } from 'motion/react';
 import { auth, googleProvider } from '../lib/firebase';
 import {
  signInWithPopup,
+ signInWithRedirect,
  signInWithEmailAndPassword,
  createUserWithEmailAndPassword,
  updateProfile,
  sendPasswordResetEmail
 } from 'firebase/auth';
+
+/**
+ * True when launched from a home-screen icon rather than a browser tab.
+ * Popups behave badly there — on iOS the OS hands window.open() to Safari as a
+ * separate context, so the sign-in result never makes it back to the app.
+ */
+const isRunningStandalone = (): boolean =>
+ window.matchMedia('(display-mode: standalone)').matches ||
+ (window.navigator as any).standalone === true;
 
 interface AuthScreenProps {
  onAuthSuccess: (token: string, user: any) => void;
@@ -255,6 +265,14 @@ export function AuthScreen({ onAuthSuccess, initialIsLogin = true, onBack }: Aut
  setError('');
  setLoading(true);
  try {
+ if (isRunningStandalone()) {
+ // Navigates away and comes back signed in. No getRedirectResult() call is
+ // needed: App.tsx's onAuthStateChanged listener picks the user up on
+ // return and runs the same backend sync that onAuthSuccess would.
+ await signInWithRedirect(auth, googleProvider);
+ return;
+ }
+
  const userCredential = await signInWithPopup(auth, googleProvider);
  const user = userCredential.user;
  const token = await user.getIdToken();
@@ -295,7 +313,7 @@ export function AuthScreen({ onAuthSuccess, initialIsLogin = true, onBack }: Aut
  <ChevronLeft className="w-4 h-4" /> Home
  </button>
  )}
- <div className="flex flex-col items-center mb-8">
+ <div className={`flex flex-col items-center mb-8 ${onBack ? 'mt-6 sm:mt-0' : ''}`}>
  <h1 className="grand-hotel-regular text-5xl tracking-tight text-center">
  My Yarn Diary
  </h1>

@@ -350,6 +350,12 @@
  /* Respect the notch / home indicator (paired with viewport-fit=cover). */
  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
  .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+
+ /* Drop-in replacement for `bottom-6` on fixed elements. Identical in a browser
+    tab; once installed as a PWA the browser chrome is gone, so the offset also
+    has to clear the iPhone home indicator. Offsets rather than pads, so bordered
+    pills don't end up looking bottom-heavy. */
+ .bottom-safe { bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px)); }
 }
 
 /* --- Touch accessibility ---------------------------------------------------
