@@ -4,10 +4,38 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>My Yarn Diary</title>
+    <meta name="description" content="Track your crochet projects, the yarns and hooks behind each one, and keep an AI helper in your pocket." />
+
+    <!-- PWA: the manifest link is injected by vite-plugin-pwa at build time. -->
+    <meta name="theme-color" content="#f7f0ee" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/logo.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
+
+    <!-- iOS has no manifest support for these; it needs its own meta tags to
+         launch standalone with the right title. 'default' status bar style keeps
+         the web view below the status bar, so no layout changes are needed. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="My Yarn Diary" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+
+    <!-- Chrome fires `beforeinstallprompt` once, early, and does not replay it.
+         The React bundle is ~2MB, so on a cold load the event can fire before
+         InstallPrompt.tsx mounts its listener — and a missed event means the
+         Install card never appears at all. Stash it here, in <head>, and let the
+         component pick it up on mount. -->
+    <script>
+      window.__installPromptEvent = null;
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.__installPromptEvent = e;
+        window.dispatchEvent(new Event('installpromptready'));
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

@@ -774,7 +774,10 @@ export function Sidebar({
                                         {tempProfilePicture && (
                                             <button
                                                 type="button"
-                                                onClick={() => setTempProfilePicture('')}
+                                                onClick={async () => {
+                                                    const confirmed = await showConfirm('Are you sure you want to remove your profile picture?');
+                                                    if (confirmed) setTempProfilePicture('');
+                                                }}
                                                 className="py-1 px-3 bg-red-50 hover:bg-red-100/60 border border-red-200 rounded-lg text-[11px] font-bold text-red-500 transition-all cursor-pointer"
                                             >
                                                 Remove Photo
