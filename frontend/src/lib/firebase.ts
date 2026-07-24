@@ -1,5 +1,11 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  setPersistence,
+  indexedDBLocalPersistence,
+  browserLocalPersistence,
+} from 'firebase/auth';
 
 // Vite loads public credentials from your frontend environment configuration files
 const firebaseConfig = {
@@ -13,4 +19,15 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+
+// The default web persistence stack can fall back to in-memory/session storage,
+// which iOS standalone PWAs wipe when Safari hands control back after a redirect
+// sign-in. Pin persistence to durable storage (IndexedDB, then localStorage) so
+// the auth session survives the round-trip. Ordered by preference.
+setPersistence(auth, indexedDBLocalPersistence).catch(() =>
+  setPersistence(auth, browserLocalPersistence).catch(() => {
+    // Both unavailable (private mode / storage blocked): keep the default.
+  })
+);
+
 export const googleProvider = new GoogleAuthProvider();
