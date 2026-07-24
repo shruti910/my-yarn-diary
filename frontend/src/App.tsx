@@ -24,7 +24,7 @@ import { TerminologyToggle } from './components/TerminologyToggle';
 import { motion, AnimatePresence } from 'motion/react';
 import { useDialog } from './components/DialogProvider';
 import { auth } from './lib/firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut, getRedirectResult } from 'firebase/auth';
 
 interface ProfileModalProps {
  isOpen: boolean;
@@ -371,6 +371,14 @@ export default function App() {
 
  // Authenticate user on startup if token is available
  useEffect(() => {
+ // Explicitly complete a pending redirect sign-in (Google SSO in the iOS
+ // standalone PWA returns this way). Without this, the redirect result can be
+ // dropped before onAuthStateChanged sees it, leaving the user stuck on the
+ // landing page. Any error here is surfaced, not swallowed.
+ getRedirectResult(auth).catch((err) => {
+ console.error('Google redirect sign-in failed to complete:', err);
+ });
+
  const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
  if (firebaseUser) {
  const idToken = await firebaseUser.getIdToken();
