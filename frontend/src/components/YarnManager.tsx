@@ -49,7 +49,21 @@ function YarnCard({ yarn, index, disabled, isEditing, onSetEditing, onChange, on
 
   // Update parent state immediately and schedule a debounced background save.
   const edit = (field: keyof Yarn, value: any) => {
-    const updated = { ...yarn, [field]: value };
+    let val = value;
+    if (field === 'fiberContent' && typeof val === 'string' && val.length > 500) {
+      val = val.slice(0, 500);
+    }
+    if ((field === 'brand' || field === 'lineName' || field === 'dyeLot') && typeof val === 'string' && val.length > 255) {
+      val = val.slice(0, 255);
+    }
+    if ((field === 'colorway' || field === 'weight' || field === 'unit') && typeof val === 'string' && val.length > 30) {
+      val = val.slice(0, 30);
+    }
+    if (field === 'quantityUsed' && typeof val === 'number') {
+      if (val < 0) val = 0;
+      if (val > 100000) val = 100000;
+    }
+    const updated = { ...yarn, [field]: val };
     onChange(updated);
     schedule(updated);
   };
@@ -147,6 +161,7 @@ function YarnCard({ yarn, index, disabled, isEditing, onSetEditing, onChange, on
               <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider block mb-1">Brand Name</label>
               <input
                 type="text"
+                maxLength={255}
                 value={yarn.brand || ''}
                 disabled={disabled}
                 onChange={(e) => edit('brand', e.target.value)}
@@ -158,6 +173,7 @@ function YarnCard({ yarn, index, disabled, isEditing, onSetEditing, onChange, on
               <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider block mb-1">Line Name</label>
               <input
                 type="text"
+                maxLength={255}
                 value={yarn.lineName || ''}
                 disabled={disabled}
                 onChange={(e) => edit('lineName', e.target.value)}
@@ -181,6 +197,7 @@ function YarnCard({ yarn, index, disabled, isEditing, onSetEditing, onChange, on
                 />
                 <input
                   type="text"
+                  maxLength={30}
                   value={yarn.colorway || ''}
                   disabled={disabled}
                   onChange={(e) => edit('colorway', e.target.value)}
@@ -193,6 +210,7 @@ function YarnCard({ yarn, index, disabled, isEditing, onSetEditing, onChange, on
               <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider block mb-1">Dye Lot</label>
               <input
                 type="text"
+                maxLength={255}
                 value={yarn.dyeLot || ''}
                 disabled={disabled}
                 onChange={(e) => edit('dyeLot', e.target.value)}
@@ -208,6 +226,7 @@ function YarnCard({ yarn, index, disabled, isEditing, onSetEditing, onChange, on
               <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider block mb-1">Yarn Weight</label>
               <input
                 type="text"
+                maxLength={30}
                 value={yarn.weight || ''}
                 disabled={disabled}
                 onChange={(e) => edit('weight', e.target.value)}
@@ -221,6 +240,7 @@ function YarnCard({ yarn, index, disabled, isEditing, onSetEditing, onChange, on
                 type="text"
                 value={yarn.fiberContent || ''}
                 disabled={disabled}
+                maxLength={500}
                 onChange={(e) => edit('fiberContent', e.target.value)}
                 className={inputClass}
                 placeholder="e.g. 100% Acrylic"
@@ -237,6 +257,7 @@ function YarnCard({ yarn, index, disabled, isEditing, onSetEditing, onChange, on
                 value={yarn.quantityUsed || ''}
                 disabled={disabled}
                 min="0"
+                max="100000"
                 step="0.5"
                 onChange={(e) => edit('quantityUsed', e.target.value ? parseFloat(e.target.value) : 0)}
                 className="w-28 bg-surface border border-subtle text-xs p-2.5 rounded-xl text-heading focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand font-semibold"
@@ -294,14 +315,9 @@ export const YarnManager = forwardRef<YarnManagerHandle, YarnManagerProps>(funct
   // PUT response can carry a stale yarns array, so once mounted we trust our own
   // fetch from the dedicated /yarns endpoint, not repeated parent prop updates.
   useEffect(() => {
-    if (isNewProject) {
-      setYarns([]);
-      setIsLoading(false);
-      return;
-    }
     if (initialYarns !== undefined) setYarns(initialYarns); // instant first paint
     fetchYarns(); // reconcile with the authoritative list
-  }, [projectId, isNewProject]);
+  }, [projectId]);
 
   const addYarn = async () => {
     try {
@@ -342,6 +358,10 @@ export const YarnManager = forwardRef<YarnManagerHandle, YarnManagerProps>(funct
 
   const saveYarn = async (yarn: Yarn) => {
     if (!yarn.yarnId) return;
+    if (yarn.fiberContent && yarn.fiberContent.length > 500) {
+      showToast('Fiber content must not exceed 500 characters.', 'error');
+      return;
+    }
     try {
       await fetchWithToken(`/api/v1/yarns/${yarn.yarnId}`, {
         method: 'PUT',

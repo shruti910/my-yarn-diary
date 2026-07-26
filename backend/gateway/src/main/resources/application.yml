@@ -25,6 +25,7 @@ spring:
             maxAge: 86400
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials Access-Control-Max-Age, RETAIN_FIRST
+        - SecureHeaders
       routes:
         - id: user_service_routes
           uri: ${USER_SERVICE_URL}

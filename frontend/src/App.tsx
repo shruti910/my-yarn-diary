@@ -24,989 +24,999 @@ import { TerminologyToggle } from './components/TerminologyToggle';
 import { motion, AnimatePresence } from 'motion/react';
 import { useDialog } from './components/DialogProvider';
 import { auth } from './lib/firebase';
-import { onAuthStateChanged, signOut, getRedirectResult } from 'firebase/auth';
+import { onIdTokenChanged, signOut, getRedirectResult } from 'firebase/auth';
 
 interface ProfileModalProps {
- isOpen: boolean;
- onClose: () => void;
- currentUser: any;
- onSave: (displayName: string, profilePicture: string) => Promise<void>;
+  isOpen: boolean;
+  onClose: () => void;
+  currentUser: any;
+  onSave: (displayName: string, profilePicture: string) => Promise<void>;
 }
 
 function ProfileModal({ isOpen, onClose, currentUser, onSave }: ProfileModalProps) {
- const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
- const [profilePicture, setProfilePicture] = useState(currentUser?.profilePicture || '');
- const [isSubmitting, setIsSubmitting] = useState(false);
+  const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
+  const [profilePicture, setProfilePicture] = useState(currentUser?.profilePicture || '');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
- useEffect(() => {
- if (currentUser) {
- setDisplayName(currentUser.displayName || '');
- setProfilePicture(currentUser.profilePicture || '');
- }
- }, [currentUser, isOpen]);
+  useEffect(() => {
+    if (currentUser) {
+      setDisplayName(currentUser.displayName || '');
+      setProfilePicture(currentUser.profilePicture || '');
+    }
+  }, [currentUser, isOpen]);
 
- if (!isOpen) return null;
+  if (!isOpen) return null;
 
- const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
- const file = e.target.files?.[0];
- if (!file) return;
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
- const maxBytes = 2 * 1024 * 1024;
- if (file.size > maxBytes) {
- alert('Profile picture size exceeds the maximum allowed limit of 2MB.');
- return;
- }
+    const maxBytes = 2 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      alert('Profile picture size exceeds the maximum allowed limit of 2MB.');
+      return;
+    }
 
- const reader = new FileReader();
- reader.onloadend = () => {
- setProfilePicture(reader.result as string);
- };
- reader.readAsDataURL(file);
- };
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfilePicture(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
 
- const handleSubmit = async (e: React.FormEvent) => {
- e.preventDefault();
- if (!displayName.trim()) return;
- setIsSubmitting(true);
- try {
- await onSave(displayName.trim(), profilePicture.trim());
- onClose();
- } catch (err) {
- // Handled in caller
- } finally {
- setIsSubmitting(false);
- }
- };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!displayName.trim()) return;
+    setIsSubmitting(true);
+    try {
+      await onSave(displayName.trim(), profilePicture.trim());
+      onClose();
+    } catch (err) {
+      // Handled in caller
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
- return (
- <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs select-none">
- <motion.div
- initial={{ opacity: 0, scale: 0.95, y: 15 }}
- animate={{ opacity: 1, scale: 1, y: 0 }}
- exit={{ opacity: 0, scale: 0.95, y: 15 }}
- transition={{ duration: 0.2 }}
- className="bg-white rounded-[2rem] border border-subtle max-w-md w-full p-6 space-y-6 shadow-2xl relative max-h-[90dvh] overflow-y-auto scrollbar-hide"
- >
- <button
- onClick={onClose}
- className="absolute top-4 right-4 p-2 text-muted hover:text-brand hover:bg-stone-100 rounded-full transition-colors cursor-pointer"
- >
- <X className="w-5 h-5" />
- </button>
+  return (
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs select-none">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 15 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 15 }}
+        transition={{ duration: 0.2 }}
+        className="bg-white rounded-[2rem] border border-subtle max-w-md w-full p-6 space-y-6 shadow-2xl relative max-h-[90dvh] overflow-y-auto scrollbar-hide"
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 text-muted hover:text-brand hover:bg-stone-100 rounded-full transition-colors cursor-pointer"
+        >
+          <X className="w-5 h-5" />
+        </button>
 
- <div className="flex items-center gap-3 border-b border-subtle pb-4">
- <div className="p-2.5 rounded-xl bg-brand/10 text-brand">
- <CircleUserRound className="w-6 h-6" />
- </div>
- <div>
- <h3 className="font-serif font-extrabold text-heading text-lg">Edit Profile</h3>
- <p className="text-xs text-muted font-medium">Update your display name and upload profile picture</p>
- </div>
- </div>
+        <div className="flex items-center gap-3 border-b border-subtle pb-4">
+          <div className="p-2.5 rounded-xl bg-brand/10 text-brand">
+            <CircleUserRound className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="font-serif font-extrabold text-heading text-lg">Edit Profile</h3>
+            <p className="text-xs text-muted font-medium">Update your display name and upload profile picture</p>
+          </div>
+        </div>
 
- <form onSubmit={handleSubmit} className="space-y-5">
- {/* Avatar Preview & File Input Container */}
- <div className="flex items-center gap-4 bg-page p-4 rounded-2xl border border-subtle/60">
- <div
- className="relative group cursor-pointer shrink-0"
- onClick={() => document.getElementById('avatar-upload')?.click()}
- >
- {profilePicture ? (
- <img
- src={profilePicture}
- alt="Avatar Preview"
- className="w-16 h-16 rounded-xl object-cover border border-subtle shadow-sm bg-white group-hover:opacity-75 transition-opacity"
- />
- ) : (
- <div className="w-16 h-16 rounded-xl flex items-center justify-center text-lg font-bold text-white bg-gradient-to-br from-brand to-brand-light border border-subtle shadow-sm group-hover:opacity-75 transition-opacity">
- {displayName ? displayName.slice(0, 2).toUpperCase() : 'C'}
- </div>
- )}
- <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white rounded-xl opacity-0 group-hover:opacity-100 transition-opacity">
- <span className="text-[11px] font-bold uppercase">Upload</span>
- </div>
- </div>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Avatar Preview & File Input Container */}
+          <div className="flex items-center gap-4 bg-page p-4 rounded-2xl border border-subtle/60">
+            <div
+              className="relative group cursor-pointer shrink-0"
+              onClick={() => document.getElementById('avatar-upload')?.click()}
+            >
+              {profilePicture ? (
+                <img
+                  src={profilePicture}
+                  alt="Avatar Preview"
+                  className="w-16 h-16 rounded-xl object-cover border border-subtle shadow-sm bg-white group-hover:opacity-75 transition-opacity"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-xl flex items-center justify-center text-lg font-bold text-white bg-gradient-to-br from-brand to-brand-light border border-subtle shadow-sm group-hover:opacity-75 transition-opacity">
+                  {displayName ? Array.from(displayName.trim()).slice(0, 2).join('').toUpperCase() || 'C' : 'C'}
+                </div>
+              )}
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white rounded-xl opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="text-[11px] font-bold uppercase">Upload</span>
+              </div>
+            </div>
 
- <div className="flex-1 space-y-1.5">
- <span className="text-[11px] font-bold text-muted uppercase tracking-wider block">Profile Image</span>
- <input
- type="file"
- id="avatar-upload"
- accept="image/*"
- className="hidden"
- onChange={handleFileChange}
- />
- <div className="flex items-center gap-2">
- <button
- type="button"
- onClick={() => document.getElementById('avatar-upload')?.click()}
- className="px-3 py-1.5 bg-white border border-subtle text-muted hover:text-brand rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
- >
- Choose Image File
- </button>
- {profilePicture && (
- <button
- type="button"
- onClick={() => setProfilePicture('')}
- className="px-2.5 py-1.5 bg-transparent text-red-500 hover:text-red-600 text-xs font-bold cursor-pointer"
- >
- Remove
- </button>
- )}
- </div>
- </div>
- </div>
+            <div className="flex-1 space-y-1.5">
+              <span className="text-[11px] font-bold text-muted uppercase tracking-wider block">Profile Image</span>
+              <input
+                type="file"
+                id="avatar-upload"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => document.getElementById('avatar-upload')?.click()}
+                  className="px-3 py-1.5 bg-white border border-subtle text-muted hover:text-brand rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  Choose Image File
+                </button>
+                {profilePicture && (
+                  <button
+                    type="button"
+                    onClick={() => setProfilePicture('')}
+                    className="px-2.5 py-1.5 bg-transparent text-red-500 hover:text-red-600 text-xs font-bold cursor-pointer"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
 
- {/* Display Name Input */}
- <div className="space-y-1.5">
- <label htmlFor="displayNameInput" className="text-[11px] font-bold text-muted uppercase tracking-wider block">Display Name</label>
- <input
- id="displayNameInput"
- type="text"
- required
- disabled={isSubmitting}
- value={displayName}
- onChange={(e) => setDisplayName(e.target.value)}
- placeholder="Enter your name"
- className="w-full bg-white border border-subtle rounded-xl text-xs p-3 focus:outline-none focus:border-brand text-heading font-semibold"
- />
- </div>
+          {/* Display Name Input */}
+          <div className="space-y-1.5">
+            <label htmlFor="displayNameInput" className="text-[11px] font-bold text-muted uppercase tracking-wider block">Display Name</label>
+            <input
+              id="displayNameInput"
+              type="text"
+              required
+              disabled={isSubmitting}
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="Enter your name"
+              className="w-full bg-white border border-subtle rounded-xl text-xs p-3 focus:outline-none focus:border-brand text-heading font-semibold"
+            />
+          </div>
 
- <div className="flex justify-end gap-2.5 pt-2">
- <button
- type="button"
- disabled={isSubmitting}
- onClick={onClose}
- className="px-4 py-2.5 bg-surface hover:bg-page text-muted border border-subtle rounded-xl text-xs font-bold transition-all cursor-pointer hover:border-accent disabled:opacity-50"
- >
- Cancel
- </button>
- <button
- type="submit"
- disabled={isSubmitting || !displayName.trim()}
- className="px-5 py-2.5 bg-brand hover:bg-brand/90 text-white font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer shadow-brand flex items-center justify-center gap-1.5 disabled:opacity-50"
- >
- {isSubmitting ? 'Saving...' : 'Save Changes'}
- </button>
- </div>
- </form>
- </motion.div>
- </div>
- );
+          <div className="flex justify-end gap-2.5 pt-2">
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={onClose}
+              className="px-4 py-2.5 bg-surface hover:bg-page text-muted border border-subtle rounded-xl text-xs font-bold transition-all cursor-pointer hover:border-accent disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting || !displayName.trim()}
+              className="px-5 py-2.5 bg-brand hover:bg-brand/90 text-white font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer shadow-brand flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              {isSubmitting ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
 }
 
 interface SettingsModalProps {
- isOpen: boolean;
- onClose: () => void;
- currentUser: any;
- onDeactivate: () => Promise<void>;
+  isOpen: boolean;
+  onClose: () => void;
+  currentUser: any;
+  onDeactivate: () => Promise<void>;
 }
 
 function SettingsModal({ isOpen, onClose, currentUser, onDeactivate }: SettingsModalProps) {
- if (!isOpen) return null;
+  if (!isOpen) return null;
 
- const mailtoUrl = `mailto:myyarndiary@gmail.com?subject=Delete%20Account%20Request&body=Please%20delete%20my%20account%20associated%20with%20email%20${encodeURIComponent(currentUser?.email || '')}.`;
+  const mailtoUrl = `mailto:myyarndiary@gmail.com?subject=Delete%20Account%20Request&body=Please%20delete%20my%20account%20associated%20with%20email%20${encodeURIComponent(currentUser?.email || '')}.`;
 
- return (
- <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs select-none">
- <motion.div
- initial={{ opacity: 0, scale: 0.95, y: 15 }}
- animate={{ opacity: 1, scale: 1, y: 0 }}
- exit={{ opacity: 0, scale: 0.95, y: 15 }}
- transition={{ duration: 0.2 }}
- className="bg-white rounded-[2rem] border border-subtle max-w-md w-full p-6 space-y-6 shadow-2xl relative max-h-[90dvh] overflow-y-auto scrollbar-hide"
- >
- <button
- onClick={onClose}
- className="absolute top-4 right-4 p-2 text-muted hover:text-brand hover:bg-stone-100 rounded-full transition-colors cursor-pointer"
- >
- <X className="w-5 h-5" />
- </button>
+  return (
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs select-none">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 15 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 15 }}
+        transition={{ duration: 0.2 }}
+        className="bg-white rounded-[2rem] border border-subtle max-w-md w-full p-6 space-y-6 shadow-2xl relative max-h-[90dvh] overflow-y-auto scrollbar-hide"
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 text-muted hover:text-brand hover:bg-stone-100 rounded-full transition-colors cursor-pointer"
+        >
+          <X className="w-5 h-5" />
+        </button>
 
- <div className="flex items-center gap-3 border-b border-subtle pb-3">
- <div className="p-2.5 rounded-xl bg-accent/10 text-accent">
- <Settings className="w-6 h-6" />
- </div>
- <div>
- <h3 className="font-serif font-extrabold text-heading text-lg">Account Settings</h3>
- <p className="text-xs text-muted font-medium">Manage your account preferences</p>
- </div>
- </div>
+        <div className="flex items-center gap-3 border-b border-subtle pb-3">
+          <div className="p-2.5 rounded-xl bg-accent/10 text-accent">
+            <Settings className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="font-serif font-extrabold text-heading text-lg">Account Settings</h3>
+            <p className="text-xs text-muted font-medium">Manage your account preferences</p>
+          </div>
+        </div>
 
- <div className="space-y-4">
- {/* Deactivate Option Card */}
- <div className="p-4 bg-amber-50/40 border border-amber-200/60 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
- <div className="space-y-1 max-w-[240px]">
- <h4 className="text-xs font-bold text-amber-800">Deactivate Account</h4>
- <p className="text-[11px] text-stone-600 leading-relaxed">
- Temporarily disable your profile. You can reactivate anytime by logging back in.
- </p>
- </div>
- <button
- onClick={onDeactivate}
- className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shadow-amber-600/10 shrink-0 self-start sm:self-center"
- >
- Deactivate
- </button>
- </div>
+        <div className="space-y-4">
+          {/* Deactivate Option Card */}
+          <div className="p-4 bg-amber-50/40 border border-amber-200/60 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1 max-w-[240px]">
+              <h4 className="text-xs font-bold text-amber-800">Deactivate Account</h4>
+              <p className="text-[11px] text-stone-600 leading-relaxed">
+                Temporarily disable your profile. You can reactivate anytime by logging back in.
+              </p>
+            </div>
+            <button
+              onClick={onDeactivate}
+              className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shadow-amber-600/10 shrink-0 self-start sm:self-center"
+            >
+              Deactivate
+            </button>
+          </div>
 
- {/* Delete Option Card */}
- <div className="p-4 bg-red-50/40 border border-red-200/60 rounded-2xl flex flex-col gap-3">
- <div className="space-y-1">
- <h4 className="text-xs font-bold text-red-800">Delete Account</h4>
- <p className="text-[11px] text-stone-600 leading-relaxed font-semibold">
- Permanently delete all stored projects, patterns, and journals. This action is irreversible.
- </p>
- </div>
+          {/* Delete Option Card */}
+          <div className="p-4 bg-red-50/40 border border-red-200/60 rounded-2xl flex flex-col gap-3">
+            <div className="space-y-1">
+              <h4 className="text-xs font-bold text-red-800">Delete Account</h4>
+              <p className="text-[11px] text-stone-600 leading-relaxed font-semibold">
+                Permanently delete all stored projects, patterns, and journals. This action is irreversible.
+              </p>
+            </div>
 
- <a
- href={mailtoUrl}
- className="w-full py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shadow-red-600/10 flex items-center justify-center gap-1.5 text-center"
- >
- <Mail className="w-3.5 h-3.5" />
- Contact Support to Delete Account
- </a>
- <p className="text-[11px] text-center text-stone-500 font-semibold italic">
- Opens your default mail app to email support at myyarndiary@gmail.com
- </p>
- </div>
- </div>
- </motion.div>
- </div>
- );
+            <a
+              href={mailtoUrl}
+              className="w-full py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shadow-red-600/10 flex items-center justify-center gap-1.5 text-center"
+            >
+              <Mail className="w-3.5 h-3.5" />
+              Contact Support to Delete Account
+            </a>
+            <p className="text-[11px] text-center text-stone-500 font-semibold italic">
+              Opens your default mail app to email support at myyarndiary@gmail.com
+            </p>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
 }
 
 export default function App() {
- const { showToast, showAlert, showConfirm } = useDialog();
- const isOnline = useOnlineStatus();
+  const { showToast, showAlert, showConfirm } = useDialog();
+  const isOnline = useOnlineStatus();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [shouldAutoOpenProjectModal, setShouldAutoOpenProjectModal] = useState(false);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('crochet_token'));
- const [user, setUser] = useState<any>(null);
- // Landing page → auth flow: unauthenticated visitors see the landing page first;
- // Sign in / Sign up flip to the AuthScreen (in the matching mode).
- const [showAuth, setShowAuth] = useState(false);
- const [authIsLogin, setAuthIsLogin] = useState(true);
- const [activeTab, setActiveTab] = useState<'dashboard' | 'aitools' | 'gallery'>('dashboard');
- const [aiToolsInitialTab, setAiToolsInitialTab] = useState<ChatCategory>('crochet-buddy');
- const [isFloatingBuddyDismissed, setIsFloatingBuddyDismissed] = useState<boolean>(() => {
- return localStorage.getItem('crochet_floating_buddy_dismissed') === 'true';
- });
- const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
- const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
- if (typeof window !== 'undefined' && window.innerWidth < 1024) return true;
- return localStorage.getItem('crochet_sidebar_collapsed') === 'true';
- });
 
- const toggleSidebar = () => {
- setIsSidebarCollapsed(prev => {
- const nextVal = !prev;
- localStorage.setItem('crochet_sidebar_collapsed', String(nextVal));
- return nextVal;
- });
- };
+  // Render-state copy only. Firebase owns durable auth-session persistence.
+  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
 
- const handleSelectFloatingTool = (category: ChatCategory) => {
- setAiToolsInitialTab(category);
- setActiveTab('aitools');
- setSelectedProject(null);
- setIsSidebarCollapsed(true);
- localStorage.setItem('crochet_sidebar_collapsed', 'true');
- };
+  // Landing page → auth flow: unauthenticated visitors see the landing page first;
+  // Sign in / Sign up flip to the AuthScreen (in the matching mode).
+  const [showAuth, setShowAuth] = useState(false);
+  const [authIsLogin, setAuthIsLogin] = useState(true);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'aitools' | 'gallery'>('dashboard');
+  const [aiToolsInitialTab, setAiToolsInitialTab] = useState<ChatCategory>('crochet-buddy');
+  const [isFloatingBuddyDismissed, setIsFloatingBuddyDismissed] = useState<boolean>(() => {
+    return localStorage.getItem('crochet_floating_buddy_dismissed') === 'true';
+  });
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) return true;
+    return localStorage.getItem('crochet_sidebar_collapsed') === 'true';
+  });
 
- const handleDismissFloatingBuddy = () => {
- setIsFloatingBuddyDismissed(true);
- localStorage.setItem('crochet_floating_buddy_dismissed', 'true');
- };
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed(prev => {
+      const nextVal = !prev;
+      localStorage.setItem('crochet_sidebar_collapsed', String(nextVal));
+      return nextVal;
+    });
+  };
 
- // Storage catalog
- const [categories, setCategories] = useState<Category[]>([]);
- const [projects, setProjects] = useState<Project[]>([]);
- const [journalLogs, setJournalLogs] = useState<JournalLog[]>([]);
+  const handleSelectFloatingTool = (category: ChatCategory) => {
+    setAiToolsInitialTab(category);
+    setActiveTab('aitools');
+    setSelectedProject(null);
+    setIsSidebarCollapsed(true);
+    localStorage.setItem('crochet_sidebar_collapsed', 'true');
+  };
 
- // Server-side projects pagination states
- const [projectsPage, setProjectsPage] = useState(0);
- const [projectsPageSize, setProjectsPageSize] = useState(10);
- const [projectsTotalPages, setProjectsTotalPages] = useState(0);
- const [projectsTotalElements, setProjectsTotalElements] = useState(0);
- const [projectsSort, setProjectsSort] = useState('createdAt,desc');
- const [projectsSearch, setProjectsSearch] = useState('');
- const [projectsStatus, setProjectsStatus] = useState('all');
+  const handleDismissFloatingBuddy = () => {
+    setIsFloatingBuddyDismissed(true);
+    localStorage.setItem('crochet_floating_buddy_dismissed', 'true');
+  };
 
- const [activeCategoryId, setActiveCategoryId] = useState<string>('all');
- const [selectedProject, setSelectedProject] = useState<Project | null>(null);
- const [showCelebrationTitle, setShowCelebrationTitle] = useState<string | null>(null);
+  // Storage catalog
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [journalLogs, setJournalLogs] = useState<JournalLog[]>([]);
 
- const rowCountTimeoutRef = useRef<any>(null);
+  // Server-side projects pagination states
+  const [projectsPage, setProjectsPage] = useState(0);
+  const [projectsPageSize, setProjectsPageSize] = useState(10);
+  const [projectsTotalPages, setProjectsTotalPages] = useState(0);
+  const [projectsTotalElements, setProjectsTotalElements] = useState(0);
+  const [projectsSort, setProjectsSort] = useState('createdAt,desc');
+  const [projectsSearch, setProjectsSearch] = useState('');
+  const [projectsStatus, setProjectsStatus] = useState('all');
 
- // Proactive background wakeup ping on mount to boot Cloud Run containers instantly
- // useEffect(() => {
- // fetch('/api/v1/categories').catch(() => { });
- // }, []);
+  const [activeCategoryId, setActiveCategoryId] = useState<string>('all');
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [showCelebrationTitle, setShowCelebrationTitle] = useState<string | null>(null);
 
- const syncUserWithBackend = async (idToken: string, fallbackProfile: any) => {
- try {
- const response = await fetch('/api/v1/users', {
- method: 'POST',
- headers: {
- 'Authorization': `Bearer ${idToken}`,
- 'Content-Type': 'application/json',
- 'X-User-Name': fallbackProfile?.displayName || '',
- 'X-User-Email': fallbackProfile?.email || '',
- 'X-User-Profile-Picture': fallbackProfile?.profilePicture || ''
- }
- });
- if (response.ok) {
- const dbUser = await response.json();
- return dbUser;
- } else {
- console.error('Failed to sync user with backend:', response.statusText);
- }
- } catch (err) {
- console.error('Network error during user sync:', err);
- }
- return fallbackProfile;
- };
+  const rowCountTimeoutRef = useRef<any>(null);
+  const syncedFirebaseUserRef = useRef<string | null>(null);
 
- // Authenticate user on startup if token is available
- useEffect(() => {
- // Explicitly complete a pending redirect sign-in (Google SSO in the iOS
- // standalone PWA returns this way). Without this, the redirect result can be
- // dropped before onAuthStateChanged sees it, leaving the user stuck on the
- // landing page. Any error here is surfaced, not swallowed.
- getRedirectResult(auth).catch((err) => {
- console.error('Google redirect sign-in failed to complete:', err);
- });
+  const syncUserWithBackend = async (idToken: string, fallbackProfile: any) => {
+    try {
+      const response = await fetch('/api/v1/users', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (response.ok) {
+        const dbUser = await response.json();
+        return dbUser;
+      } else {
+        console.error('Failed to sync user with backend:', response.statusText);
+      }
+    } catch (err) {
+      console.error('Network error during user sync:', err);
+    }
+    return fallbackProfile;
+  };
 
- const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
- if (firebaseUser) {
- const idToken = await firebaseUser.getIdToken();
- const profileObj = {
- userId: firebaseUser.uid,
- displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Crafter',
- email: firebaseUser.email || '',
- profilePicture: firebaseUser.photoURL || '',
- createdAt: firebaseUser.metadata.creationTime || new Date().toISOString()
- };
+  // Authenticate user on startup and subscribe to automatic token refreshes via Firebase onIdTokenChanged
+  useEffect(() => {
+    // Remove the legacy duplicate app token; Firebase owns the active session.
+    localStorage.removeItem('crochet_token');
 
- setToken(idToken);
- localStorage.setItem('crochet_token', idToken);
+    getRedirectResult(auth).catch((err) => {
+      console.error('Google redirect sign-in failed to complete:', err);
+    });
 
- // Sync user in database
- const dbUser = await syncUserWithBackend(idToken, profileObj);
- setUser(dbUser);
- localStorage.setItem('crochet_user', JSON.stringify(dbUser));
- setIsInitialLoading(false);
- } else {
- setToken(null);
- setUser(null);
- localStorage.removeItem('crochet_token');
- localStorage.removeItem('crochet_user');
- setIsInitialLoading(false);
- }
- });
+    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // When a new email/password account is being created in AuthScreen, ignore the initial
+        // onIdTokenChanged event (which fires before updateProfile has set the display name on the token).
+        // This ensures we only sync to the backend ONCE after getIdToken(true) produces a token with the user's chosen name.
+        if (sessionStorage.getItem('crochet_signup_in_progress') === 'true') {
+          return;
+        }
 
- return () => unsubscribe();
- }, []);
+        const idToken = await firebaseUser.getIdToken();
+        const profileObj = {
+          userId: firebaseUser.uid,
+          displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Crafter',
+          email: firebaseUser.email || '',
+          profilePicture: firebaseUser.photoURL || '',
+          createdAt: firebaseUser.metadata.creationTime || new Date().toISOString()
+        };
 
- const fetchWithToken = async (url: string, options: RequestInit = {}) => {
- if (!token) throw new Error('No authentication token available');
- const headers = {
- 'Authorization': `Bearer ${token}`,
- 'Content-Type': 'application/json',
- 'X-User-Terminology': user?.crochetTerminology || 'US',
- ...(options.headers || {})
- };
- try {
- const response = await fetch(url, { ...options, headers });
- if (!response.ok) {
- if (response.status === 401) {
- window.dispatchEvent(new Event('unauthorized'));
- }
- let rawMsg = '';
- try {
- const errData = await response.json();
- if (errData && errData.message) {
- rawMsg = errData.message;
- }
- } catch (_) { }
+        // Keep a render-state copy only; Firebase remains the persistence owner.
+        setToken(idToken);
 
- let errMsg = '';
- if (response.status >= 500) {
- errMsg = 'An unexpected server error occurred. Please try again later.';
- } else if (response.status === 400) {
- if (rawMsg && (rawMsg.toLowerCase().includes('must be') || rawMsg.toLowerCase().includes('required') || rawMsg.toLowerCase().includes('already exists') || rawMsg.toLowerCase().includes('invalid name') || rawMsg.toLowerCase().includes('either the size'))) {
- errMsg = rawMsg;
- } else {
- errMsg = 'Invalid request. Please check your inputs and try again.';
- }
- } else if (response.status === 403) {
- errMsg = 'You do not have permission to perform this action.';
- } else if (response.status === 404) {
- errMsg = 'The requested item could not be found.';
- } else if (response.status === 409) {
- errMsg = 'This item already exists.';
- } else {
- errMsg = 'Something went wrong. Please check your connection and try again.';
- }
+        // Token refreshes also invoke this listener. Only sync the profile once
+        // per restored/sign-in session, rather than writing on every refresh.
+        if (syncedFirebaseUserRef.current !== firebaseUser.uid) {
+          syncedFirebaseUserRef.current = firebaseUser.uid;
+          const dbUser = await syncUserWithBackend(idToken, profileObj);
+          setUser(dbUser);
+          localStorage.setItem('crochet_user', JSON.stringify(dbUser));
+        }
+        setIsInitialLoading(false);
+      } else {
+        syncedFirebaseUserRef.current = null;
+        setToken(null);
+        setUser(null);
+        localStorage.removeItem('crochet_token');
+        localStorage.removeItem('crochet_user');
+        setIsInitialLoading(false);
+      }
+    });
 
- console.group('%c[Network API Error Interceptor]', 'color: var(--error-default); font-weight: bold;');
- console.error(`[URI]: ${url}`);
- console.error(`[Status Code]: ${response.status} (${response.statusText || 'Status Unknown'})`);
- console.error(`[Method]: ${options.method || 'GET'}`);
- console.groupEnd();
- throw new Error(errMsg);
- }
- if (response.status === 204) {
- return true;
- }
- return await response.json();
- } catch (err) {
- console.error(`%c[Pipeline Fetch Failure] unable to resolve: ${url}`, 'color: var(--warning-default); font-weight: bold;', err);
- throw err;
- }
- };
+    return () => unsubscribe();
+  }, []);
 
- const updateCrochetTerminology = async (pref: 'US' | 'UK') => {
- if (!token || !user) return;
- try {
- const response = await fetch(`/api/v1/users/${user.userId}`, {
- method: 'PUT',
- headers: {
- 'Authorization': `Bearer ${token}`,
- 'Content-Type': 'application/json'
- },
- body: JSON.stringify({
- crochetTerminology: pref
- })
- });
- if (response.ok) {
- const dbUser = await response.json();
- setUser(dbUser);
- localStorage.setItem('crochet_user', JSON.stringify(dbUser));
- showToast(`Terminology set to ${pref} Standard`, 'success');
- }
- } catch (err) {
- console.error('Failed to update terminology preference:', err);
- showToast('Failed to save terminology preference', 'error');
- }
- };
+  const fetchWithToken = async (url: string, options: RequestInit = {}) => {
+    let activeToken = token;
+    if (!activeToken && auth.currentUser) {
+      activeToken = await auth.currentUser.getIdToken();
+      setToken(activeToken);
+    }
+    if (!activeToken) throw new Error('No authentication token available');
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${activeToken}`,
+      'Content-Type': 'application/json',
+      'X-User-Terminology': user?.crochetTerminology || 'US',
+      ...(options.headers as Record<string, string> || {})
+    };
+    try {
+      const response = await fetch(url, { ...options, headers });
+      if (!response.ok) {
+        if (response.status === 401) {
+          window.dispatchEvent(new Event('unauthorized'));
+        }
+        let rawMsg = '';
+        try {
+          const errData = await response.json();
+          if (errData && errData.errors && typeof errData.errors === 'object') {
+            const valErrors = Object.values(errData.errors).filter(Boolean);
+            if (valErrors.length > 0) {
+              rawMsg = valErrors.join(' ');
+            }
+          }
+          if (!rawMsg && errData && errData.message && errData.message !== 'Request parameter validation failed.' && errData.message !== 'Validation Error') {
+            rawMsg = errData.message;
+          }
+          if (!rawMsg && errData && errData.error && typeof errData.error === 'string' && errData.error !== 'Validation Error') {
+            rawMsg = errData.error;
+          }
+        } catch (_) { }
 
- const loadAllData = async () => {
- if (!token || !user) return;
+        let errMsg = rawMsg;
+        if (!errMsg) {
+          if (response.status >= 500) {
+            errMsg = 'An unexpected server error occurred. Please try again later.';
+          } else if (response.status === 400) {
+            errMsg = 'Invalid request. Please check your inputs and try again.';
+          } else if (response.status === 403) {
+            errMsg = 'You do not have permission to perform this action.';
+          } else if (response.status === 404) {
+            errMsg = 'The requested item could not be found.';
+          } else if (response.status === 409) {
+            errMsg = 'This item already exists.';
+          } else {
+            errMsg = 'Something went wrong. Please check your connection and try again.';
+          }
+        }
 
- try {
- // 1. Fetch Categories
- const categoriesData = await fetchWithToken('/api/v1/categories');
- if (categoriesData) {
- let list = categoriesData.map((c: any) => ({
- ...c,
- categoryId: c.categoryId || c.folderId,
- } as Category));
+        console.group('%c[Network API Error Interceptor]', 'color: var(--error-default); font-weight: bold;');
+        console.error(`[URI]: ${url}`);
+        console.error(`[Status Code]: ${response.status} (${response.statusText || 'Status Unknown'})`);
+        console.error(`[Method]: ${options.method || 'GET'}`);
+        console.groupEnd();
+        throw new Error(errMsg);
+      }
+      if (response.status === 204) {
+        return true;
+      }
+      return await response.json();
+    } catch (err) {
+      console.error(`%c[Pipeline Fetch Failure] unable to resolve: ${url}`, 'color: var(--warning-default); font-weight: bold;', err);
+      throw err;
+    }
+  };
 
- if (list.length === 0) {
- // Create initial default category via API!
- const defaultCat = await fetchWithToken('/api/v1/categories', {
- method: 'POST',
- body: JSON.stringify({ name: 'Default' })
- });
- if (defaultCat) {
- list = [{
- ...defaultCat,
- categoryId: defaultCat.categoryId || defaultCat.folderId
- } as Category];
- }
- }
+  const updateCrochetTerminology = async (pref: 'US' | 'UK') => {
+    if (!token || !user) return;
+    try {
+      const response = await fetch(`/api/v1/users/${user.userId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          crochetTerminology: pref
+        })
+      });
+      if (response.ok) {
+        const dbUser = await response.json();
+        setUser(dbUser);
+        localStorage.setItem('crochet_user', JSON.stringify(dbUser));
+        showToast(`Terminology set to ${pref} Standard`, 'success');
+      }
+    } catch (err) {
+      console.error('Failed to update terminology preference:', err);
+      showToast('Failed to save terminology preference', 'error');
+    }
+  };
 
- list = list.sort((a, b) => new Date(a.createdAt || '').getTime() - new Date(b.createdAt || '').getTime());
- setCategories(list);
- if (!activeCategoryId) {
- setActiveCategoryId('all');
- }
- }
+  const loadAllData = async () => {
+    if (!token || !user) return;
 
- // 2. Fetch Projects (paginated)
- await fetchProjects(activeCategoryId || 'all', 0, projectsPageSize, projectsSort, projectsSearch, projectsStatus);
- } catch (err: any) {
- console.error('Failed loading initial data sequence:', err);
- // Installed as a PWA the shell loads from cache with no connection at all,
- // so a generic "server error" would be actively misleading here.
- if (!navigator.onLine) {
- showToast("You're offline — reconnect to load your projects.", 'warning');
- } else {
- showToast(err.message || 'Failed loading data from server.', 'error');
- }
- } finally {
- setIsInitialLoading(false);
- }
- };
+    try {
+      // 1. Fetch Categories
+      const categoriesData = await fetchWithToken('/api/v1/categories');
+      if (categoriesData) {
+        let list = categoriesData.map((c: any) => ({
+          ...c,
+          categoryId: c.categoryId || c.folderId,
+        } as Category));
 
- const fetchProjects = async (catId = activeCategoryId, page = projectsPage, size = projectsPageSize, sort = projectsSort, search = projectsSearch, status = projectsStatus) => {
- if (!token || !user) return;
- try {
- const actualCat = catId === 'all' ? '' : catId;
- const actualStatus = status === 'all' ? '' : status;
- const url = `/api/v1/projects?categoryId=${actualCat}&page=${page}&size=${size}&sort=${sort}&search=${search}&status=${actualStatus}`;
- const res = await fetchWithToken(url);
- if (res && res.content) {
- setProjects(res.content.map((p: any) => ({
- ...p,
- categoryId: p.categoryId || p.folderId,
- } as Project)));
- setProjectsTotalPages(res.totalPages);
- setProjectsTotalElements(res.totalElements);
- setProjectsPage(res.number);
- setProjectsPageSize(res.size);
- }
- } catch (err: any) {
- console.error('Failed fetching projects page:', err);
- showToast(err.message || 'Failed loading projects.', 'error');
- }
- };
+        if (list.length === 0) {
+          // Create initial default category via API!
+          const defaultCat = await fetchWithToken('/api/v1/categories', {
+            method: 'POST',
+            body: JSON.stringify({ name: 'Default' })
+          });
+          if (defaultCat) {
+            list = [{
+              ...defaultCat,
+              categoryId: defaultCat.categoryId || defaultCat.folderId
+            } as Category];
+          }
+        }
 
- // Sync data dynamically from backend with REST fetching
- useEffect(() => {
- if (!token || !user) return;
- loadAllData();
- }, [token, user]);
+        list = list.sort((a, b) => new Date(a.createdAt || '').getTime() - new Date(b.createdAt || '').getTime());
+        setCategories(list);
+        if (!activeCategoryId) {
+          setActiveCategoryId('all');
+        }
+      }
 
- // Refetch projects when filters or pagination states change
- useEffect(() => {
- if (!token || !user) return;
- if (categories.length > 0) {
- fetchProjects(activeCategoryId, projectsPage, projectsPageSize, projectsSort, projectsSearch, projectsStatus);
- }
- }, [activeCategoryId, projectsPage, projectsPageSize, projectsSort, projectsSearch, projectsStatus]);
+      // 2. Fetch Projects (paginated)
+      await fetchProjects(activeCategoryId || 'all', 0, projectsPageSize, projectsSort, projectsSearch, projectsStatus);
+    } catch (err: any) {
+      console.error('Failed loading initial data sequence:', err);
+      // Installed as a PWA the shell loads from cache with no connection at all,
+      // so a generic "server error" would be actively misleading here.
+      if (!navigator.onLine) {
+        showToast("You're offline — reconnect to load your projects.", 'warning');
+      } else {
+        showToast(err.message || 'Failed loading data from server.', 'error');
+      }
+    } finally {
+      setIsInitialLoading(false);
+    }
+  };
 
- // Auth outcomes
- const handleAuthSuccess = async (tokenStr: string, loggedInUser: any) => {
- setIsInitialLoading(true);
- setToken(tokenStr);
- setUser(loggedInUser);
- setActiveTab('dashboard');
+  const fetchProjects = async (catId = activeCategoryId, page = projectsPage, size = projectsPageSize, sort = projectsSort, search = projectsSearch, status = projectsStatus) => {
+    if (!token || !user) return;
+    try {
+      const actualCat = catId === 'all' ? '' : catId;
+      const actualStatus = status === 'all' ? '' : status;
+      const url = `/api/v1/projects?categoryId=${actualCat}&page=${page}&size=${size}&sort=${sort}&search=${search}&status=${actualStatus}`;
+      const res = await fetchWithToken(url);
+      if (res && res.content) {
+        setProjects(res.content.map((p: any) => ({
+          ...p,
+          categoryId: p.categoryId || p.folderId,
+        } as Project)));
+        setProjectsTotalPages(res.totalPages);
+        setProjectsTotalElements(res.totalElements);
+        setProjectsPage(res.number);
+        setProjectsPageSize(res.size);
+      }
+    } catch (err: any) {
+      console.error('Failed fetching projects page:', err);
+      showToast(err.message || 'Failed loading projects.', 'error');
+    }
+  };
 
- // Auto collapse on mobile when logging in
- if (window.innerWidth < 1024) {
- setIsSidebarCollapsed(true);
- }
- localStorage.setItem('crochet_token', tokenStr);
+  // Sync data dynamically from backend with REST fetching
+  useEffect(() => {
+    if (!token || !user) return;
+    loadAllData();
+  }, [token, user]);
 
- // Sync user in database
- const dbUser = await syncUserWithBackend(tokenStr, loggedInUser);
- setUser(dbUser);
- localStorage.setItem('crochet_user', JSON.stringify(dbUser));
- };
+  // Refetch projects when filters or pagination states change
+  useEffect(() => {
+    if (!token || !user) return;
+    if (categories.length > 0) {
+      fetchProjects(activeCategoryId, projectsPage, projectsPageSize, projectsSort, projectsSearch, projectsStatus);
+    }
+  }, [activeCategoryId, projectsPage, projectsPageSize, projectsSort, projectsSearch, projectsStatus]);
 
- const handleLogout = useCallback(async () => {
- try {
- await signOut(auth);
- } catch (e) {
- console.error(e);
- }
- localStorage.removeItem('crochet_token');
- localStorage.removeItem('crochet_user');
- localStorage.removeItem('crochet_floating_buddy_dismissed');
- setIsFloatingBuddyDismissed(false);
- setToken(null);
- setUser(null);
- setShowAuth(false); // return to the landing page, not the bare auth screen
- setCategories([]);
- setProjects([]);
- setJournalLogs([]);
- setActiveCategoryId('all');
- setSelectedProject(null);
- setActiveTab('dashboard');
- setIsInitialLoading(true);
- }, []);
+  // Auth outcomes
+  const handleAuthSuccess = () => {
+    setIsInitialLoading(true);
+    setActiveTab('dashboard');
 
- useEffect(() => {
- const handleUnauthorized = () => {
- handleLogout();
- };
- window.addEventListener('unauthorized', handleUnauthorized);
- return () => {
- window.removeEventListener('unauthorized', handleUnauthorized);
- };
- }, [handleLogout]);
+    // Auto collapse on mobile when logging in
+    if (window.innerWidth < 1024) {
+      setIsSidebarCollapsed(true);
+    }
+    // Firebase owns durable session persistence; remove legacy app-managed copies.
+    localStorage.removeItem('crochet_token');
+  };
 
- // --- CRUD DISPATCH FUNCTIONS ---
+  const handleLogout = useCallback(async () => {
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.error(e);
+    }
+    localStorage.removeItem('crochet_token');
+    localStorage.removeItem('crochet_user');
+    localStorage.removeItem('crochet_floating_buddy_dismissed');
+    setIsFloatingBuddyDismissed(false);
+    setToken(null);
+    setUser(null);
+    setShowAuth(false); // return to the landing page, not the bare auth screen
+    setCategories([]);
+    setProjects([]);
+    setJournalLogs([]);
+    setActiveCategoryId('all');
+    setSelectedProject(null);
+    setActiveTab('dashboard');
+    setIsInitialLoading(true);
+  }, []);
 
- const handleCreateCategory = async (name: string) => {
- if (!user) return;
- try {
- const res = await fetchWithToken('/api/v1/categories', {
- method: 'POST',
- body: JSON.stringify({ name: name.trim() })
- });
- if (res) {
- setCategories(prev => [...prev, {
- ...res,
- categoryId: res.categoryId || res.folderId
- } as Category]);
- setActiveCategoryId(res.categoryId || res.folderId);
- showToast('Category created successfully!', 'success');
- }
- } catch (err: any) {
- console.error('Failed creating directory folder:', err);
- showToast(err.message || 'Failed to create category.', 'error');
- throw err;
- }
- };
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      handleLogout();
+    };
+    window.addEventListener('unauthorized', handleUnauthorized);
+    return () => {
+      window.removeEventListener('unauthorized', handleUnauthorized);
+    };
+  }, [handleLogout]);
 
- const handleRenameCategory = async (categoryId: string, newName: string) => {
- try {
- const res = await fetchWithToken(`/api/v1/categories/${categoryId}`, {
- method: 'PUT',
- body: JSON.stringify({ name: newName.trim() })
- });
- if (res) {
- setCategories(prev => prev.map(c => c.categoryId === categoryId ? {
- ...res,
- categoryId: res.categoryId || res.folderId
- } as Category : c));
- showToast('Category renamed successfully!', 'success');
- }
- } catch (err: any) {
- console.error('Failed renaming directory folder:', err);
- showToast(err.message || 'Failed to rename category.', 'error');
- throw err;
- }
- };
+  // --- CRUD DISPATCH FUNCTIONS ---
 
- const handleDeleteCategory = async (categoryId: string) => {
- try {
- await fetchWithToken(`/api/v1/categories/${categoryId}`, { method: 'DELETE' });
- setCategories(prev => prev.filter(c => c.categoryId !== categoryId));
- if (activeCategoryId === categoryId) {
- setActiveCategoryId('all');
- }
- showToast('Category deleted successfully!', 'success');
- } catch (err: any) {
- console.error('Failed deleting directory folder:', err);
- showToast(err.message || 'Failed to delete category.', 'error');
- throw err;
- }
- };
+  const handleCreateCategory = async (name: string) => {
+    if (!user) return;
+    try {
+      const res = await fetchWithToken('/api/v1/categories', {
+        method: 'POST',
+        body: JSON.stringify({ name: name.trim() })
+      });
+      if (res) {
+        setCategories(prev => [...prev, {
+          ...res,
+          categoryId: res.categoryId || res.folderId
+        } as Category]);
+        setActiveCategoryId(res.categoryId || res.folderId);
+        showToast('Category created successfully!', 'success');
+      }
+    } catch (err: any) {
+      console.error('Failed creating directory folder:', err);
+      showToast(err.message || 'Failed to create category.', 'error');
+      throw err;
+    }
+  };
 
- const handleCreateProject = async (
- cid: string,
- title: string,
- notes?: string
- ) => {
- if (!user) return;
+  const handleRenameCategory = async (categoryId: string, newName: string) => {
+    try {
+      const res = await fetchWithToken(`/api/v1/categories/${categoryId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name: newName.trim() })
+      });
+      if (res) {
+        setCategories(prev => prev.map(c => c.categoryId === categoryId ? {
+          ...res,
+          categoryId: res.categoryId || res.folderId
+        } as Category : c));
+        showToast('Category renamed successfully!', 'success');
+      }
+    } catch (err: any) {
+      console.error('Failed renaming directory folder:', err);
+      showToast(err.message || 'Failed to rename category.', 'error');
+      throw err;
+    }
+  };
 
- let targetCid = cid;
- if (cid === 'all' || !cid) {
- const defaultCat = categories.find(c => c.name.toLowerCase() === 'default');
- targetCid = defaultCat?.categoryId || (categories[0]?.categoryId || 'f_default_' + user.userId);
- }
+  const handleDeleteCategory = async (categoryId: string) => {
+    try {
+      await fetchWithToken(`/api/v1/categories/${categoryId}`, { method: 'DELETE' });
+      setCategories(prev => prev.filter(c => c.categoryId !== categoryId));
+      if (activeCategoryId === categoryId) {
+        setActiveCategoryId('all');
+      }
+      showToast('Category deleted successfully!', 'success');
+    } catch (err: any) {
+      console.error('Failed deleting directory folder:', err);
+      showToast(err.message || 'Failed to delete category.', 'error');
+      throw err;
+    }
+  };
 
- const payload = {
- categoryId: targetCid,
- title: title.trim(),
- yarns: [],
- hooks: [],
- status: ProjectStatus.InProgress,
- rowCount: 0,
- notes: notes || '',
- patterns: []
- };
+  const handleCreateProject = async (
+    cid: string,
+    title: string,
+    notes?: string
+  ) => {
+    if (!user) return;
 
- try {
- const res = await fetchWithToken('/api/v1/projects', {
- method: 'POST',
- body: JSON.stringify(payload)
- });
- if (res) {
- const merged = {
- ...res,
- categoryId: res.categoryId || res.folderId,
- isNewProject: true
- } as Project;
- setProjects(prev => [merged, ...prev]);
- setSelectedProject(merged); // Automatically view the new project
- showToast('Project created successfully!', 'success');
- fetchProjects(activeCategoryId, 0, projectsPageSize);
- }
- } catch (err: any) {
- console.error('Failed creating project:', err);
- showToast(err.message || 'Failed to create project.', 'error');
- throw err;
- }
- };
+    let targetCid = cid;
+    if (cid === 'all' || !cid) {
+      const defaultCat = categories.find(c => c.name.toLowerCase() === 'default');
+      targetCid = defaultCat?.categoryId || (categories[0]?.categoryId || 'f_default_' + user.userId);
+    }
 
- const handleUpdateProject = async (updates: Partial<Project>) => {
- if (!selectedProject) return;
- const { projectId } = selectedProject;
+    const payload = {
+      categoryId: targetCid,
+      title: title.trim(),
+      yarns: [],
+      hooks: [],
+      status: ProjectStatus.InProgress,
+      rowCount: 0,
+      notes: notes || '',
+      patterns: []
+    };
 
- // Optimistically update the UI immediately
- const mergedLocally = {
- ...selectedProject,
- ...updates
- } as Project;
- setProjects(prev => prev.map(p => p.projectId === projectId ? mergedLocally : p));
- setSelectedProject(mergedLocally);
+    try {
+      const res = await fetchWithToken('/api/v1/projects', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      if (res) {
+        const merged = {
+          ...res,
+          categoryId: res.categoryId || res.folderId
+        } as Project;
+        setProjects(prev => [merged, ...prev]);
+        setSelectedProject(merged); // Automatically view the new project
+        showToast('Project created successfully!', 'success');
+        fetchProjects(activeCategoryId, 0, projectsPageSize);
+      }
+    } catch (err: any) {
+      console.error('Failed creating project:', err);
+      showToast(err.message || 'Failed to create project.', 'error');
+      throw err;
+    }
+  };
 
- const getPayload = (current: Project, upds: Partial<Project>) => {
- return {
- categoryId: upds.categoryId !== undefined ? upds.categoryId : current.categoryId,
- title: upds.title !== undefined ? upds.title : current.title,
- status: upds.status !== undefined ? upds.status : current.status,
- rowCount: upds.rowCount !== undefined ? upds.rowCount : current.rowCount,
- notes: upds.notes !== undefined ? upds.notes : current.notes,
- startDate: upds.startDate !== undefined ? upds.startDate : current.startDate,
- endDate: upds.endDate !== undefined ? upds.endDate : current.endDate,
- isArchive: upds.isArchive !== undefined ? upds.isArchive : current.isArchive,
- careInstructions: upds.careInstructions !== undefined ? upds.careInstructions : current.careInstructions,
- totalTime: upds.totalTime !== undefined ? upds.totalTime : current.totalTime,
- };
- };
+  const handleUpdateProject = async (updates: Partial<Project>) => {
+    if (!selectedProject) return;
+    const { projectId } = selectedProject;
 
- // Check if we are ONLY updating the row count (and possibly status)
- const isOnlyRowCount = Object.keys(updates).every(k => k === 'rowCount' || k === 'status');
+    // Optimistically update the UI immediately
+    const mergedLocally = {
+      ...selectedProject,
+      ...updates
+    } as Project;
+    setProjects(prev => prev.map(p => p.projectId === projectId ? mergedLocally : p));
+    setSelectedProject(mergedLocally);
 
- if (isOnlyRowCount) {
- // Clear any pending debounce saves
- if (rowCountTimeoutRef.current) {
- clearTimeout(rowCountTimeoutRef.current);
- }
+    const getPayload = (current: Project, upds: Partial<Project>) => {
+      return {
+        categoryId: upds.categoryId !== undefined ? upds.categoryId : current.categoryId,
+        title: upds.title !== undefined ? upds.title : current.title,
+        status: upds.status !== undefined ? upds.status : current.status,
+        rowCount: upds.rowCount !== undefined ? upds.rowCount : current.rowCount,
+        notes: upds.notes !== undefined ? upds.notes : current.notes,
+        startDate: upds.startDate !== undefined ? upds.startDate : current.startDate,
+        endDate: upds.endDate !== undefined ? upds.endDate : current.endDate,
+        isArchive: upds.isArchive !== undefined ? upds.isArchive : current.isArchive,
+        careInstructions: upds.careInstructions !== undefined ? upds.careInstructions : current.careInstructions,
+        totalTime: upds.totalTime !== undefined ? upds.totalTime : current.totalTime,
+      };
+    };
 
- // Debounce the save to the database by 1 second to avoid massive network calls on rapid clicks
- rowCountTimeoutRef.current = setTimeout(async () => {
- try {
- const res = await fetchWithToken(`/api/v1/projects/${projectId}`, {
- method: 'PUT',
- body: JSON.stringify(getPayload(selectedProject, updates))
- });
+    // Check if we are ONLY updating the row count (and possibly status)
+    const isOnlyRowCount = Object.keys(updates).every(k => k === 'rowCount' || k === 'status');
 
- if (res) {
- // Keep state synced with the official server response while preserving non-DTO fields like photos
- setProjects(prev => prev.map(p => p.projectId === projectId ? {
- ...p,
- ...res,
- categoryId: res.categoryId || res.folderId
- } : p));
- setSelectedProject(prev => prev ? {
- ...prev,
- ...res,
- categoryId: res.categoryId || res.folderId
- } : null);
- }
- } catch (err: any) {
- console.error('Failed to sync row count with backend:', err);
- }
- }, 1000);
+    if (isOnlyRowCount) {
+      // Clear any pending debounce saves
+      if (rowCountTimeoutRef.current) {
+        clearTimeout(rowCountTimeoutRef.current);
+      }
 
- return;
- }
+      // Debounce the save to the database by 1 second to avoid massive network calls on rapid clicks
+      rowCountTimeoutRef.current = setTimeout(async () => {
+        try {
+          const res = await fetchWithToken(`/api/v1/projects/${projectId}`, {
+            method: 'PUT',
+            body: JSON.stringify(getPayload(selectedProject, updates))
+          });
 
- // Otherwise, perform an immediate save for all other fields (e.g. text patterns, care instructions, notes)
- if (rowCountTimeoutRef.current) {
- clearTimeout(rowCountTimeoutRef.current);
- }
+          if (res) {
+            // Keep state synced with the official server response while preserving non-DTO fields like photos
+            setProjects(prev => prev.map(p => p.projectId === projectId ? {
+              ...p,
+              ...res,
+              categoryId: res.categoryId || res.folderId
+            } : p));
+            setSelectedProject(prev => prev ? {
+              ...prev,
+              ...res,
+              categoryId: res.categoryId || res.folderId
+            } : null);
+          }
+        } catch (err: any) {
+          console.error('Failed to sync row count with backend:', err);
+        }
+      }, 1000);
 
- try {
- const res = await fetchWithToken(`/api/v1/projects/${projectId}`, {
- method: 'PUT',
- body: JSON.stringify(getPayload(selectedProject, updates))
- });
- if (res) {
- setProjects(prev => prev.map(p => p.projectId === projectId ? {
- ...p,
- ...res,
- categoryId: res.categoryId || res.folderId
- } : p));
- setSelectedProject(prev => prev ? {
- ...prev,
- ...res,
- categoryId: res.categoryId || res.folderId
- } : null);
- showToast('Saving..', 'success');
+      return;
+    }
 
- const oldStatus = selectedProject.status;
- if (updates.status === ProjectStatus.Completed && oldStatus !== ProjectStatus.Completed) {
- setShowCelebrationTitle(res.title || selectedProject.title);
- }
- }
- } catch (err: any) {
- console.error('Failed updating project:', err);
- showToast(err.message || 'Failed to update project.', 'error');
- throw err;
- }
- };
+    // Otherwise, perform an immediate save for all other fields (e.g. text patterns, care instructions, notes)
+    if (rowCountTimeoutRef.current) {
+      clearTimeout(rowCountTimeoutRef.current);
+    }
 
- const handleUpdateProjectState = (updatedProject: Project) => {
- setProjects(prev => prev.map(p => p.projectId === updatedProject.projectId ? updatedProject : p));
- if (selectedProject?.projectId === updatedProject.projectId) {
- setSelectedProject(updatedProject);
- }
- };
+    try {
+      const res = await fetchWithToken(`/api/v1/projects/${projectId}`, {
+        method: 'PUT',
+        body: JSON.stringify(getPayload(selectedProject, updates))
+      });
+      if (res) {
+        setProjects(prev => prev.map(p => p.projectId === projectId ? {
+          ...p,
+          ...res,
+          categoryId: res.categoryId || res.folderId
+        } : p));
+        setSelectedProject(prev => prev ? {
+          ...prev,
+          ...res,
+          categoryId: res.categoryId || res.folderId
+        } : null);
+        showToast('Saving..', 'success');
 
- const handleDuplicateProject = async (projectId: string) => {
- try {
- const res = await fetchWithToken(`/api/v1/projects/${projectId}/duplicates`, {
- method: 'POST'
- });
- if (res) {
- const merged = {
- ...res,
- categoryId: res.categoryId || res.folderId
- } as Project;
- setProjects(prev => [merged, ...prev]);
- showToast('Project duplicated successfully!', 'success');
- setSelectedProject(null); // Return to list view
- fetchProjects(activeCategoryId, 0, projectsPageSize);
- }
- } catch (err: any) {
- console.error('Failed duplicating project:', err);
- showToast(err.message || 'Failed to duplicate project.', 'error');
- }
- };
+        const oldStatus = selectedProject.status;
+        if (updates.status === ProjectStatus.Completed && oldStatus !== ProjectStatus.Completed) {
+          setShowCelebrationTitle(res.title || selectedProject.title);
+        }
+      }
+    } catch (err: any) {
+      console.error('Failed updating project:', err);
+      showToast(err.message || 'Failed to update project.', 'error');
+      throw err;
+    }
+  };
 
- const handleArchiveProject = async (projectId: string) => {
- try {
- const currentProject = projects.find(p => p.projectId === projectId);
- if (!currentProject) return;
- const nextArchiveState = !currentProject.isArchive;
- const currentCover = currentProject.photos?.find(p => p.isCover);
- const currentCoverVal = currentCover ? String(currentCover.id) : null;
- const payload = {
- categoryId: currentProject.categoryId,
- title: currentProject.title,
- status: currentProject.status,
- rowCount: currentProject.rowCount,
- notes: currentProject.notes,
- startDate: currentProject.startDate,
- endDate: currentProject.endDate,
- isArchive: nextArchiveState,
- coverPhoto: currentCoverVal,
- careInstructions: currentProject.careInstructions,
- totalTime: currentProject.totalTime,
- };
- const res = await fetchWithToken(`/api/v1/projects/${projectId}`, {
- method: 'PUT',
- body: JSON.stringify(payload)
- });
- if (res) {
- setProjects(prev => prev.map(p => p.projectId === projectId ? {
- ...p,
- ...res,
- categoryId: res.categoryId || res.folderId
- } : p));
- setSelectedProject(null); // Return to list view
- showToast(res.isArchive ? 'Project archived successfully!' : 'Project unarchived successfully!', 'success');
- fetchProjects(activeCategoryId, projectsPage, projectsPageSize);
- }
- } catch (err: any) {
- console.error('Failed toggling archive project status:', err);
- showToast(err.message || 'Failed to archive project.', 'error');
- }
- };
+  const handleUpdateProjectState = (updatedProject: Project) => {
+    setProjects(prev => prev.map(p => p.projectId === updatedProject.projectId ? updatedProject : p));
+    if (selectedProject?.projectId === updatedProject.projectId) {
+      setSelectedProject(updatedProject);
+    }
+  };
 
- const handleDeleteProject = async (projectId: string) => {
- try {
- await fetchWithToken(`/api/v1/projects/${projectId}`, { method: 'DELETE' });
- setProjects(prev => prev.filter(p => p.projectId !== projectId));
- if (selectedProject?.projectId === projectId) {
- setSelectedProject(null);
- }
- showToast('Project deleted successfully!', 'success');
- fetchProjects(activeCategoryId, 0, projectsPageSize);
- } catch (err: any) {
- console.error('Failed deleting project:', err);
- showToast(err.message || 'Failed to delete project.', 'error');
- throw err;
- }
- };
+  const handleDuplicateProject = async (projectId: string) => {
+    try {
+      const res = await fetchWithToken(`/api/v1/projects/${projectId}/duplicates`, {
+        method: 'POST'
+      });
+      if (res) {
+        const merged = {
+          ...res,
+          categoryId: res.categoryId || res.folderId
+        } as Project;
+        setProjects(prev => [merged, ...prev]);
+        showToast('Project duplicated successfully!', 'success');
+        setSelectedProject(null); // Return to list view
+        fetchProjects(activeCategoryId, 0, projectsPageSize);
+      }
+    } catch (err: any) {
+      console.error('Failed duplicating project:', err);
+      showToast(err.message || 'Failed to duplicate project.', 'error');
+    }
+  };
 
- const handleToggleFavorite = async (projectId: string) => {
- try {
- const res = await fetchWithToken(`/api/v1/projects/${projectId}/favorite`, {
- method: 'POST'
- });
- if (res) {
- setProjects(prev => prev.map(p => p.projectId === projectId ? {
- ...p,
- isFavorite: res.isFavorite
- } : p));
- showToast(res.isFavorite ? 'Added to Favourites ❤️' : 'Removed from Favourites', 'success');
- fetchProjects(activeCategoryId, projectsPage, projectsPageSize);
- }
- } catch (err: any) {
- console.error('Failed to toggle project favorite status:', err);
- showToast(err.message || 'Failed to toggle favorite status.', 'error');
- }
- };
+  const handleArchiveProject = async (projectId: string) => {
+    try {
+      const currentProject = projects.find(p => p.projectId === projectId);
+      if (!currentProject) return;
+      const nextArchiveState = !currentProject.isArchive;
+      const currentCover = currentProject.photos?.find(p => p.isCover);
+      const currentCoverVal = currentCover ? String(currentCover.id) : null;
+      const payload = {
+        categoryId: currentProject.categoryId,
+        title: currentProject.title,
+        status: currentProject.status,
+        rowCount: currentProject.rowCount,
+        notes: currentProject.notes,
+        startDate: currentProject.startDate,
+        endDate: currentProject.endDate,
+        isArchive: nextArchiveState,
+        coverPhoto: currentCoverVal,
+        careInstructions: currentProject.careInstructions,
+        totalTime: currentProject.totalTime,
+      };
+      const res = await fetchWithToken(`/api/v1/projects/${projectId}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+      if (res) {
+        setProjects(prev => prev.map(p => p.projectId === projectId ? {
+          ...p,
+          ...res,
+          categoryId: res.categoryId || res.folderId
+        } : p));
+        setSelectedProject(null); // Return to list view
+        showToast(res.isArchive ? 'Project archived successfully!' : 'Project unarchived successfully!', 'success');
+        fetchProjects(activeCategoryId, projectsPage, projectsPageSize);
+      }
+    } catch (err: any) {
+      console.error('Failed toggling archive project status:', err);
+      showToast(err.message || 'Failed to archive project.', 'error');
+    }
+  };
 
- const handleUpdateProfile = async (displayName: string, profilePicture: string) => {
- try {
- const res = await fetchWithToken(`/api/v1/users/${user.userId}`, {
- method: 'PUT',
- body: JSON.stringify({ displayName, profilePicture })
- });
- if (res) {
- setUser(res);
- localStorage.setItem('crochet_user', JSON.stringify(res));
- showToast('Profile updated successfully!', 'success');
- setIsProfileOpen(false);
- }
- } catch (err: any) {
- console.error('Failed to update profile:', err);
- showToast(err.message || 'Failed to update profile.', 'error');
- }
- };
+  const handleDeleteProject = async (projectId: string) => {
+    try {
+      await fetchWithToken(`/api/v1/projects/${projectId}`, { method: 'DELETE' });
+      setProjects(prev => prev.filter(p => p.projectId !== projectId));
+      if (selectedProject?.projectId === projectId) {
+        setSelectedProject(null);
+      }
+      showToast('Project deleted successfully!', 'success');
+      fetchProjects(activeCategoryId, 0, projectsPageSize);
+    } catch (err: any) {
+      console.error('Failed deleting project:', err);
+      showToast(err.message || 'Failed to delete project.', 'error');
+      throw err;
+    }
+  };
 
- const handleDeactivateAccount = async () => {
- const confirmed = await showConfirm(
- 'Are you sure you want to deactivate your account? This will hide your profile and log you out. You can re-activate by logging in again.',
- 'Deactivate Account'
- );
- if (!confirmed) return;
+  const handleToggleFavorite = async (projectId: string) => {
+    try {
+      const res = await fetchWithToken(`/api/v1/projects/${projectId}/favorite`, {
+        method: 'POST'
+      });
+      if (res) {
+        setProjects(prev => prev.map(p => p.projectId === projectId ? {
+          ...p,
+          isFavorite: res.isFavorite
+        } : p));
+        showToast(res.isFavorite ? 'Added to Favourites ❤️' : 'Removed from Favourites', 'success');
+        fetchProjects(activeCategoryId, projectsPage, projectsPageSize);
+      }
+    } catch (err: any) {
+      console.error('Failed to toggle project favorite status:', err);
+      showToast(err.message || 'Failed to toggle favorite status.', 'error');
+    }
+  };
 
- try {
- await fetchWithToken(`/api/v1/users/${user.userId}`, {
- method: 'DELETE'
- });
- showToast('Account deactivated successfully.', 'success');
- setIsSettingsOpen(false);
- handleLogout();
- } catch (err: any) {
- console.error('Failed to deactivate account:', err);
- showToast(err.message || 'Failed to deactivate account.', 'error');
- }
- };
+  const handleUpdateProfile = async (displayName: string, profilePicture: string) => {
+    try {
+      const res = await fetchWithToken(`/api/v1/users/${user.userId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ displayName, profilePicture })
+      });
+      if (res) {
+        setUser(res);
+        localStorage.setItem('crochet_user', JSON.stringify(res));
+        showToast('Profile updated successfully!', 'success');
+        setIsProfileOpen(false);
+      }
+    } catch (err: any) {
+      console.error('Failed to update profile:', err);
+      showToast(err.message || 'Failed to update profile.', 'error');
+    }
+  };
 
- const handleSelectCategory = (categoryId: string) => {
- setActiveCategoryId(categoryId);
- setSelectedProject(null);
- setActiveTab('dashboard');
- };
+  const handleDeactivateAccount = async () => {
+    const confirmed = await showConfirm(
+      'Are you sure you want to deactivate your account? This will hide your profile and log you out. You can re-activate by logging in again.',
+      'Deactivate Account'
+    );
+    if (!confirmed) return;
 
- const handleSelectProject = async (projectSummary: Project) => {
- setSelectedProject(projectSummary);
- try {
- const detailedProject = await fetchWithToken(`/api/v1/projects/${projectSummary.projectId}/full`);
- if (detailedProject) {
- const mapped = {
- ...detailedProject,
- categoryId: detailedProject.categoryId || detailedProject.folderId
- } as Project;
- setSelectedProject(mapped);
- setProjects(prev => prev.map(p => p.projectId === mapped.projectId ? mapped : p));
- }
- } catch (err: any) {
- console.error('Failed fetching project details:', err);
- showToast('Failed to load project details.', 'error');
- }
- };
+    try {
+      await fetchWithToken(`/api/v1/users/${user.userId}`, {
+        method: 'DELETE'
+      });
+      showToast('Account deactivated successfully.', 'success');
+      setIsSettingsOpen(false);
+      handleLogout();
+    } catch (err: any) {
+      console.error('Failed to deactivate account:', err);
+      showToast(err.message || 'Failed to deactivate account.', 'error');
+    }
+  };
 
- const matchedProjectInList = selectedProject ? projects.find(p => p.projectId === selectedProject.projectId) : null;
- const liveSelectedProject = selectedProject
- ? (matchedProjectInList
- ? { ...matchedProjectInList, isNewProject: selectedProject.isNewProject } as Project
- : selectedProject)
- : null;
+  const handleSelectCategory = (categoryId: string) => {
+    setActiveCategoryId(categoryId);
+    setSelectedProject(null);
+    setActiveTab('dashboard');
+  };
+
+  const handleSelectProject = async (projectSummary: Project) => {
+    setSelectedProject(projectSummary);
+    try {
+      const detailedProject = await fetchWithToken(`/api/v1/projects/${projectSummary.projectId}/full`);
+      if (detailedProject) {
+        const mapped = {
+          ...detailedProject,
+          categoryId: detailedProject.categoryId || detailedProject.folderId
+        } as Project;
+        setSelectedProject(mapped);
+        setProjects(prev => prev.map(p => p.projectId === mapped.projectId ? mapped : p));
+      }
+    } catch (err: any) {
+      console.error('Failed fetching project details:', err);
+      showToast('Failed to load project details.', 'error');
+    }
+  };
+
+  const matchedProjectInList = selectedProject ? projects.find(p => p.projectId === selectedProject.projectId) : null;
+  const liveSelectedProject = selectedProject
+    ? (matchedProjectInList || selectedProject)
+    : null;
 
   useEffect(() => {
     const handleOpenNewProject = (e: any) => {
@@ -1039,33 +1049,33 @@ export default function App() {
     window.history.replaceState({}, '', window.location.pathname + (query ? `?${query}` : ''));
   }, [token, user]);
 
- if (!token || !user) {
- if (showAuth) {
- return (
- <AuthScreen
- onAuthSuccess={handleAuthSuccess}
- initialIsLogin={authIsLogin}
- onBack={() => setShowAuth(false)}
- />
- );
- }
- return (
- <>
- <LandingPage
- onSignIn={() => { setAuthIsLogin(true); setShowAuth(true); }}
- onGetStarted={() => { setAuthIsLogin(false); setShowAuth(true); }}
- />
- {/* Most installs happen here, before anyone signs in */}
- <InstallPrompt />
- </>
- );
- }
+  if (!token || !user) {
+    if (showAuth) {
+      return (
+        <AuthScreen
+          onAuthSuccess={handleAuthSuccess}
+          initialIsLogin={authIsLogin}
+          onBack={() => setShowAuth(false)}
+        />
+      );
+    }
+    return (
+      <>
+        <LandingPage
+          onSignIn={() => { setAuthIsLogin(true); setShowAuth(true); }}
+          onGetStarted={() => { setAuthIsLogin(false); setShowAuth(true); }}
+        />
+        {/* Most installs happen here, before anyone signs in */}
+        <InstallPrompt />
+      </>
+    );
+  }
 
- if (isInitialLoading) {
- return <CrochetLoader />;
- }
+  if (isInitialLoading) {
+    return <CrochetLoader />;
+  }
 
- return (
+  return (
     <div id="crochet-app-workspace" className="h-dvh bg-page flex text-body overflow-hidden font-sans select-none selection:bg-brand-light/40 selection:text-heading">
 
       {/* Mobile Backdrop */}
@@ -1161,7 +1171,7 @@ export default function App() {
             <div className="flex bg-white p-0.5 sm:p-1 rounded-full border border-subtle shadow-sm shrink-0">
               <button
                 onClick={() => { setActiveTab('dashboard'); setSelectedProject(null); }}
-                className={`tap-safe px-2.5 sm:px-4 py-1 text-[11px] sm:text-xs md:text-sm font-bold rounded-full flex items-center gap-1 transition-all cursor-pointer ${activeTab ==='dashboard'
+                className={`tap-safe px-2.5 sm:px-4 py-1 text-[11px] sm:text-xs md:text-sm font-bold rounded-full flex items-center gap-1 transition-all cursor-pointer ${activeTab === 'dashboard'
                   ? 'bg-brand text-white shadow-md'
                   : 'text-muted hover:bg-surface hover:text-heading'
                   }`}
@@ -1177,7 +1187,7 @@ export default function App() {
                   setIsSidebarCollapsed(true);
                   localStorage.setItem('crochet_sidebar_collapsed', 'true');
                 }}
-                className={`tap-safe px-2.5 sm:px-4 py-1 text-[11px] sm:text-xs md:text-sm font-bold rounded-full flex items-center gap-1 transition-all cursor-pointer ${activeTab ==='aitools'
+                className={`tap-safe px-2.5 sm:px-4 py-1 text-[11px] sm:text-xs md:text-sm font-bold rounded-full flex items-center gap-1 transition-all cursor-pointer ${activeTab === 'aitools'
                   ? 'bg-brand text-white shadow-md'
                   : 'text-muted hover:bg-surface hover:text-heading'
                   }`}
@@ -1189,134 +1199,134 @@ export default function App() {
           </div>
         </header>
 
- {/* Core Workspace Board with transition animations */}
- <main className="flex-1 overflow-hidden relative">
- <AnimatePresence mode="wait">
- <motion.div
- key={activeTab + (liveSelectedProject ? '-project' : '')}
- initial={{ opacity: 0, y: 10 }}
- animate={{ opacity: 1, y: 0 }}
- exit={{ opacity: 0, y: -10 }}
- transition={{ duration: 0.15 }}
- className="h-full overflow-y-auto"
- >
- {activeTab === 'dashboard' && (
- liveSelectedProject ? (
- <ErrorBoundary>
- <ProjectDetail
- project={liveSelectedProject}
- categories={categories}
- token={token}
- onBack={() => setSelectedProject(null)}
- onUpdateProject={handleUpdateProject}
- onUpdateProjectState={handleUpdateProjectState}
- onToggleFavorite={handleToggleFavorite}
- onDeleteProject={handleDeleteProject}
- onDuplicateProject={handleDuplicateProject}
- onArchiveProject={handleArchiveProject}
- user={user}
- onUpdateCrochetTerminology={updateCrochetTerminology}
- />
- </ErrorBoundary>
- ) : (
- <ErrorBoundary>
-            <Dashboard
-              autoOpenNewProject={shouldAutoOpenProjectModal}
-              onModalOpened={() => setShouldAutoOpenProjectModal(false)}
-              projects={projects}
- journalLogs={journalLogs}
- categoryId={activeCategoryId}
- categories={categories}
- token={token}
- onSelectProject={handleSelectProject}
- onCreateProject={handleCreateProject}
- onDeleteProject={handleDeleteProject}
- onToggleFavorite={handleToggleFavorite}
- isSidebarCollapsed={isSidebarCollapsed}
- onSelectCategory={handleSelectCategory}
- user={user}
- onUpdateCrochetTerminology={updateCrochetTerminology}
- page={projectsPage}
- pageSize={projectsPageSize}
- totalPages={projectsTotalPages}
- totalElements={projectsTotalElements}
- sort={projectsSort}
- searchQuery={projectsSearch}
- stageFilter={projectsStatus}
- onPageChange={setProjectsPage}
- onPageSizeChange={setProjectsPageSize}
- onSortChange={setProjectsSort}
- onSearchChange={setProjectsSearch}
- onStageFilterChange={setProjectsStatus}
- />
- </ErrorBoundary>
- )
- )}
+        {/* Core Workspace Board with transition animations */}
+        <main className="flex-1 overflow-hidden relative">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab + (liveSelectedProject ? '-project' : '')}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.15 }}
+              className="h-full overflow-y-auto"
+            >
+              {activeTab === 'dashboard' && (
+                liveSelectedProject ? (
+                  <ErrorBoundary>
+                    <ProjectDetail
+                      project={liveSelectedProject}
+                      categories={categories}
+                      token={token}
+                      onBack={() => setSelectedProject(null)}
+                      onUpdateProject={handleUpdateProject}
+                      onUpdateProjectState={handleUpdateProjectState}
+                      onToggleFavorite={handleToggleFavorite}
+                      onDeleteProject={handleDeleteProject}
+                      onDuplicateProject={handleDuplicateProject}
+                      onArchiveProject={handleArchiveProject}
+                      user={user}
+                      onUpdateCrochetTerminology={updateCrochetTerminology}
+                    />
+                  </ErrorBoundary>
+                ) : (
+                  <ErrorBoundary>
+                    <Dashboard
+                      autoOpenNewProject={shouldAutoOpenProjectModal}
+                      onModalOpened={() => setShouldAutoOpenProjectModal(false)}
+                      projects={projects}
+                      journalLogs={journalLogs}
+                      categoryId={activeCategoryId}
+                      categories={categories}
+                      token={token}
+                      onSelectProject={handleSelectProject}
+                      onCreateProject={handleCreateProject}
+                      onDeleteProject={handleDeleteProject}
+                      onToggleFavorite={handleToggleFavorite}
+                      isSidebarCollapsed={isSidebarCollapsed}
+                      onSelectCategory={handleSelectCategory}
+                      user={user}
+                      onUpdateCrochetTerminology={updateCrochetTerminology}
+                      page={projectsPage}
+                      pageSize={projectsPageSize}
+                      totalPages={projectsTotalPages}
+                      totalElements={projectsTotalElements}
+                      sort={projectsSort}
+                      searchQuery={projectsSearch}
+                      stageFilter={projectsStatus}
+                      onPageChange={setProjectsPage}
+                      onPageSizeChange={setProjectsPageSize}
+                      onSortChange={setProjectsSort}
+                      onSearchChange={setProjectsSearch}
+                      onStageFilterChange={setProjectsStatus}
+                    />
+                  </ErrorBoundary>
+                )
+              )}
 
 
- {activeTab === 'gallery' && (
- <ErrorBoundary>
- <ProjectGallery projects={projects} token={token} />
- </ErrorBoundary>
- )}
+              {activeTab === 'gallery' && (
+                <ErrorBoundary>
+                  <ProjectGallery projects={projects} token={token} />
+                </ErrorBoundary>
+              )}
 
- {activeTab === 'aitools' && (
- <ErrorBoundary>
- <AiTools
- key={aiToolsInitialTab}
- token={token}
- initialTab={aiToolsInitialTab}
- user={user}
- onUpdateCrochetTerminology={updateCrochetTerminology}
- />
- </ErrorBoundary>
- )}
- </motion.div>
- </AnimatePresence>
- </main>
- </div>
+              {activeTab === 'aitools' && (
+                <ErrorBoundary>
+                  <AiTools
+                    key={aiToolsInitialTab}
+                    token={token}
+                    initialTab={aiToolsInitialTab}
+                    user={user}
+                    onUpdateCrochetTerminology={updateCrochetTerminology}
+                  />
+                </ErrorBoundary>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </main>
+      </div>
 
 
 
- {token && activeTab !== 'aitools' && !isFloatingBuddyDismissed && (
- <FloatingAiBuddy
- onSelectTool={handleSelectFloatingTool}
- onDismiss={handleDismissFloatingBuddy}
- />
- )}
+      {token && activeTab !== 'aitools' && !isFloatingBuddyDismissed && (
+        <FloatingAiBuddy
+          onSelectTool={handleSelectFloatingTool}
+          onDismiss={handleDismissFloatingBuddy}
+        />
+      )}
 
- <InstallPrompt />
+      <InstallPrompt />
 
- <AnimatePresence>
- {showCelebrationTitle && (
- <Celebration
- projectTitle={showCelebrationTitle}
- onClose={() => setShowCelebrationTitle(null)}
- />
- )}
- </AnimatePresence>
+      <AnimatePresence>
+        {showCelebrationTitle && (
+          <Celebration
+            projectTitle={showCelebrationTitle}
+            onClose={() => setShowCelebrationTitle(null)}
+          />
+        )}
+      </AnimatePresence>
 
- <AnimatePresence>
- {isProfileOpen && (
- <ProfileModal
- isOpen={isProfileOpen}
- onClose={() => setIsProfileOpen(false)}
- currentUser={user}
- onSave={handleUpdateProfile}
- />
- )}
- </AnimatePresence>
+      <AnimatePresence>
+        {isProfileOpen && (
+          <ProfileModal
+            isOpen={isProfileOpen}
+            onClose={() => setIsProfileOpen(false)}
+            currentUser={user}
+            onSave={handleUpdateProfile}
+          />
+        )}
+      </AnimatePresence>
 
- <AnimatePresence>
- {isSettingsOpen && (
- <SettingsModal
- isOpen={isSettingsOpen}
- onClose={() => setIsSettingsOpen(false)}
- currentUser={user}
- onDeactivate={handleDeactivateAccount}
- />
- )}
- </AnimatePresence>
- </div>
- );
+      <AnimatePresence>
+        {isSettingsOpen && (
+          <SettingsModal
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+            currentUser={user}
+            onDeactivate={handleDeactivateAccount}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }

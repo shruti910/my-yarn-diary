@@ -17,7 +17,6 @@ import org.springframework.data.web.PageableDefault;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1")
-@CrossOrigin(origins = "*")
 public class AiController {
 
     private final AiService aiService;
@@ -49,7 +48,7 @@ public class AiController {
 
     @PostMapping("/chats")
     public ResponseEntity<ChatSessionDto> createSession(@RequestHeader("X-User-Id") String userId,
-            @RequestBody ChatCreateRequest request) {
+            @RequestBody @jakarta.validation.Valid ChatCreateRequest request) {
         log.info("Creating a new AI chat session for user: {}", userId);
         return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
                 .body(aiService.createSession(userId, request));
@@ -60,7 +59,7 @@ public class AiController {
             @RequestHeader("X-User-Id") String userId,
             @RequestHeader(value = "X-User-Terminology", defaultValue = "US") String userTerminology,
             @PathVariable String chatId,
-            @RequestBody MessageRequest request) {
+            @RequestBody @jakarta.validation.Valid MessageRequest request) {
         log.info("Sending message to AI chat session: {} by user: {}", chatId, userId);
         if (userTerminology != null && !"US".equalsIgnoreCase(userTerminology)
                 && !"UK".equalsIgnoreCase(userTerminology)) {
@@ -80,7 +79,7 @@ public class AiController {
     @PutMapping("/chats/{chatId}")
     public ResponseEntity<ChatSessionDto> updateSession(@RequestHeader("X-User-Id") String userId,
             @PathVariable String chatId,
-            @RequestBody ChatUpdateRequest request) {
+            @RequestBody @jakarta.validation.Valid ChatUpdateRequest request) {
         log.info("Updating AI chat session: {} for user: {}", chatId, userId);
         return ResponseEntity.ok(aiService.updateSession(userId, chatId, request));
     }

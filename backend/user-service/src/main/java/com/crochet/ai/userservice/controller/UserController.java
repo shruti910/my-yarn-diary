@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/users")
-@CrossOrigin(origins = "*")
 public class UserController {
 
     private final UserService userService;
@@ -28,9 +27,13 @@ public class UserController {
             @RequestHeader(value = "X-User-Email", required = false) String email,
             @RequestHeader(value = "X-User-Name", required = false) String displayName,
             @RequestHeader(value = "X-User-Profile-Picture", required = false) String profilePicture) {
-        log.info("Syncing user from gateway headers. userId: '{}', email: '{}'", userId, email);
+        String decodedEmail = decodeHeader(email);
+        String decodedDisplayName = decodeHeader(displayName);
+        String decodedProfilePicture = decodeHeader(profilePicture);
+        log.info("Syncing user from gateway headers. userId: '{}', email: '{}', displayName: '{}'", userId,
+                decodedEmail, decodedDisplayName);
         return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
-                .body(userService.syncUser(userId, email, displayName, profilePicture));
+                .body(userService.syncUser(userId, decodedEmail, decodedDisplayName, decodedProfilePicture));
     }
 
     @GetMapping("/{id}")
@@ -46,7 +49,7 @@ public class UserController {
     public ResponseEntity<UserResponse> updateProfile(
             @RequestHeader("X-User-Id") String authenticatedUserId,
             @PathVariable("id") String userId,
-            @RequestBody UserSignUpRequest request) {
+            @RequestBody @jakarta.validation.Valid UserSignUpRequest request) {
         log.info("Updating profile details for userId: {} (authenticated: {})", userId, authenticatedUserId);
         validateUserOwnership(authenticatedUserId, userId);
         return ResponseEntity.ok(userService.updateProfile(userId, request));
@@ -56,8 +59,9 @@ public class UserController {
     public ResponseEntity<UserResponse> updateMembership(
             @RequestHeader("X-User-Id") String authenticatedUserId,
             @PathVariable("id") String userId,
-            @RequestBody MembershipUpdateRequest request) {
-        log.info("Updating membership level to '{}' for userId: {} (authenticated: {})", request.getMembershipStatus(), userId, authenticatedUserId);
+            @RequestBody @jakarta.validation.Valid MembershipUpdateRequest request) {
+        log.info("Updating membership level to '{}' for userId: {} (authenticated: {})", request.getMembershipStatus(),
+                userId, authenticatedUserId);
         validateUserOwnership(authenticatedUserId, userId);
         return ResponseEntity.ok(userService.updateMembership(userId, request));
     }
@@ -72,7 +76,7 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    @PutMapping({"/profile/change-password", "/{id}/password"})
+    @PutMapping({ "/profile/change-password", "/{id}/password" })
     public ResponseEntity<Void> changePassword(
             @RequestHeader("X-User-Id") String authenticatedUserId,
             @RequestHeader("X-Firebase-Uid") String firebaseUid,
@@ -85,6 +89,16 @@ public class UserController {
     private void validateUserOwnership(String authenticatedUserId, String targetUserId) {
         if (authenticatedUserId == null || !authenticatedUserId.equalsIgnoreCase(targetUserId)) {
             throw new ForbiddenException("Access denied: You are not authorized to view or modify this profile.");
+        }
+    }
+
+    private String decodeHeader(String val) {
+        if (val == null || val.isBlank())
+            return null;
+        try {
+            return java.net.URLDecoder.decode(val, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return val;
         }
     }
 }

@@ -12,6 +12,7 @@ import { useDialog } from './DialogProvider';
 import { motion, AnimatePresence } from 'motion/react';
 import { updateProfile, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { isValidName, TEXT_REGEX_MESSAGE } from '../lib/validation';
 import packageJson from '../../package.json';
 
 const capitalizeWords = (str: string): string => {
@@ -30,9 +31,7 @@ const capitalizeWords = (str: string): string => {
         .join(' ');
 };
 
-const isValidName = (str: string): boolean => {
-    return /^[ \p{L}\p{N}\-_()#.\p{Emoji}\p{Extended_Pictographic}\p{M}\p{Cf}]+$/u.test(str) && /[\p{L}\p{N}\p{Emoji}\p{Extended_Pictographic}]/u.test(str);
-};
+
 
 const isStockOrEmptyAvatar = (url?: string): boolean => {
     if (!url) return true;
@@ -46,9 +45,12 @@ const getInitials = (name?: string): string => {
     if (!trimmed) return 'C';
     const parts = trimmed.split(/\s+/);
     if (parts.length >= 2) {
-        return (parts[0][0] + parts[1][0]).toUpperCase();
+        const first = Array.from(parts[0])[0] || '';
+        const second = Array.from(parts[1])[0] || '';
+        return (first + second).toUpperCase();
     }
-    return trimmed.slice(0, Math.min(2, trimmed.length)).toUpperCase();
+    const chars = Array.from(trimmed);
+    return chars.slice(0, Math.min(2, chars.length)).join('').toUpperCase();
 };
 
 
@@ -124,6 +126,11 @@ export function Sidebar({
             return;
         }
 
+        if (newPass.length > 100) {
+            showAlert('New password must not exceed 100 characters.', 'Password Too Long');
+            return;
+        }
+
         if (newPass !== confPass) {
             showAlert('New passwords do not match.', 'Password Mismatch');
             return;
@@ -155,7 +162,14 @@ export function Sidebar({
                 let errMsg = 'Failed to update password on the server.';
                 try {
                     const data = await response.json();
-                    if (data && data.message) errMsg = data.message;
+                    if (data && data.errors && typeof data.errors === 'object') {
+                        const valErrors = Object.values(data.errors).filter(Boolean);
+                        if (valErrors.length > 0) errMsg = valErrors.join(' ');
+                    } else if (data && data.message && data.message !== 'Request parameter validation failed.' && data.message !== 'Validation Error') {
+                        errMsg = data.message;
+                    } else if (data && data.error && typeof data.error === 'string' && data.error !== 'Validation Error') {
+                        errMsg = data.error;
+                    }
                 } catch (_) { }
                 throw new Error(errMsg);
             }
@@ -210,6 +224,10 @@ export function Sidebar({
         if (!token) return;
         const name = tempDisplayName.trim();
         if (!name) return;
+        if (name.length > 100) {
+            await showAlert('Display name must not exceed 100 characters.', 'Invalid Name');
+            return;
+        }
 
         setIsSavingProfile(true);
         let activeToken = token;
@@ -252,18 +270,23 @@ export function Sidebar({
                 setIsProfileOpen(false);
                 await showAlert('Profile updated successfully!', 'Success');
             } else {
-                let errorMsg = '';
-                if (response.status >= 500) {
-                    errorMsg = 'An unexpected server error occurred. Please try again later.';
-                } else {
-                    let rawMsg = 'Failed to update profile. Please try again.';
-                    try {
-                        const data = await response.json();
-                        if (data && data.message) rawMsg = data.message;
-                    } catch (_) { }
+                let rawMsg = '';
+                try {
+                    const data = await response.json();
+                    if (data && data.errors && typeof data.errors === 'object') {
+                        const valErrors = Object.values(data.errors).filter(Boolean);
+                        if (valErrors.length > 0) rawMsg = valErrors.join(' ');
+                    } else if (data && data.message && data.message !== 'Request parameter validation failed.' && data.message !== 'Validation Error') {
+                        rawMsg = data.message;
+                    } else if (data && data.error && typeof data.error === 'string' && data.error !== 'Validation Error') {
+                        rawMsg = data.error;
+                    }
+                } catch (_) { }
 
-                    if (rawMsg && (rawMsg.toLowerCase().includes('must be') || rawMsg.toLowerCase().includes('required') || rawMsg.toLowerCase().includes('already exists') || rawMsg.toLowerCase().includes('invalid name'))) {
-                        errorMsg = rawMsg;
+                let errorMsg = rawMsg;
+                if (!errorMsg) {
+                    if (response.status >= 500) {
+                        errorMsg = 'An unexpected server error occurred. Please try again later.';
                     } else {
                         errorMsg = 'Failed to update profile. Please check your inputs and try again.';
                     }
@@ -314,6 +337,11 @@ export function Sidebar({
         const trimmed = newCategoryName.trim();
         if (!trimmed || isSubmitting) return;
 
+        if (trimmed.length > 100) {
+            await showAlert('Category name must not exceed 100 characters.');
+            return;
+        }
+
         const capitalized = capitalizeWords(trimmed);
         const norm = capitalized.toLowerCase();
         if (norm === 'default' || norm === 'favourites ❤️') {
@@ -321,7 +349,7 @@ export function Sidebar({
             return;
         }
         if (!isValidName(capitalized)) {
-            await showAlert('Category name can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, parentheses, and emojis.');
+            await showAlert(TEXT_REGEX_MESSAGE);
             return;
         }
 
@@ -348,6 +376,11 @@ export function Sidebar({
         const trimmed = editCategoryName.trim();
         if (!trimmed || isSubmitting) return;
 
+        if (trimmed.length > 100) {
+            await showAlert('Category name must not exceed 100 characters.');
+            return;
+        }
+
         const capitalized = capitalizeWords(trimmed);
         const norm = capitalized.toLowerCase();
         if (norm === 'default' || norm === 'favourites ❤️') {
@@ -355,7 +388,7 @@ export function Sidebar({
             return;
         }
         if (!isValidName(capitalized)) {
-            await showAlert('Category name can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, parentheses, and emojis.');
+            await showAlert(TEXT_REGEX_MESSAGE);
             return;
         }
 
@@ -473,6 +506,7 @@ export function Sidebar({
                             <input
                                 type="text"
                                 autoFocus
+                                maxLength={100}
                                 disabled={isSubmitting}
                                 value={newCategoryName}
                                 onChange={(e) => setNewCategoryName(e.target.value)}
@@ -554,6 +588,7 @@ export function Sidebar({
                                     {isEditing ? (
                                         <input
                                             type="text"
+                                            maxLength={100}
                                             value={editCategoryName}
                                             disabled={isSubmitting}
                                             onClick={(e) => e.stopPropagation()}
@@ -962,6 +997,7 @@ export function Sidebar({
                                     <label className="text-[11px] font-bold text-muted uppercase tracking-widest">Current Password</label>
                                     <input
                                         type="password"
+                                        maxLength={100}
                                         value={currentPassword}
                                         onChange={(e) => setCurrentPassword(e.target.value)}
                                         placeholder="Enter current password"
@@ -973,6 +1009,7 @@ export function Sidebar({
                                     <label className="text-[11px] font-bold text-muted uppercase tracking-widest">New Password</label>
                                     <input
                                         type="password"
+                                        maxLength={100}
                                         value={newPassword}
                                         onChange={(e) => setNewPassword(e.target.value)}
                                         placeholder="Enter new password (min 6 characters)"
@@ -984,6 +1021,7 @@ export function Sidebar({
                                     <label className="text-[11px] font-bold text-muted uppercase tracking-widest">Confirm New Password</label>
                                     <input
                                         type="password"
+                                        maxLength={100}
                                         value={confirmNewPassword}
                                         onChange={(e) => setConfirmNewPassword(e.target.value)}
                                         placeholder="Re-enter new password"

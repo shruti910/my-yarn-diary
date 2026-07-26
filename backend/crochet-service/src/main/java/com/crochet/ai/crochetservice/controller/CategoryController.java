@@ -13,7 +13,6 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/categories")
-@CrossOrigin(origins = "*")
 public class CategoryController {
 
     private final CrochetService crochetService;
@@ -31,7 +30,7 @@ public class CategoryController {
 
     @PostMapping
     public ResponseEntity<CategoryResponse> createCategory(@RequestHeader("X-User-Id") String userId,
-            @RequestBody CategoryRequest request) {
+            @RequestBody @jakarta.validation.Valid CategoryRequest request) {
         log.info("Creating new category: '{}' for user: {}", request.getName(), userId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(crochetService.createCategory(userId, request));
@@ -40,7 +39,7 @@ public class CategoryController {
     @PutMapping("/{categoryId}")
     public ResponseEntity<CategoryResponse> updateCategory(@RequestHeader("X-User-Id") String userId,
             @PathVariable String categoryId,
-            @RequestBody CategoryRequest request) {
+            @RequestBody @jakarta.validation.Valid CategoryRequest request) {
         log.info("Updating categoryId: {} for user: {} to new name: '{}'", categoryId, userId, request.getName());
         return ResponseEntity.ok(crochetService.updateCategory(userId, categoryId, request));
     }

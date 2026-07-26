@@ -12,9 +12,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "projects")
@@ -92,7 +90,6 @@ public class Project {
     @Builder.Default
     private boolean isArchive = false;
 
-
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JsonIgnore
     @Builder.Default
@@ -103,8 +100,6 @@ public class Project {
     @JsonProperty("patterns")
     @Builder.Default
     private List<Pattern> patternEntities = new ArrayList<>();
-
-
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

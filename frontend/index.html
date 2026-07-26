@@ -6,6 +6,9 @@
     <title>My Yarn Diary</title>
     <meta name="description" content="Track your crochet projects, the yarns and hooks behind each one, and keep an AI helper in your pocket." />
 
+    <!-- Content Security Policy (XSS Mitigation & Resource Control) -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://accounts.google.com https://*.gstatic.com https://identitytoolkit.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' http: https: ws: wss: https://*.googleapis.com https://*.firebaseapp.com https://*.sentry.io; frame-src 'self' https://*.firebaseapp.com https://accounts.google.com; object-src 'none'; worker-src 'self' blob:;" />
+
     <!-- PWA: the manifest link is injected by vite-plugin-pwa at build time. -->
     <meta name="theme-color" content="#f7f0ee" />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />

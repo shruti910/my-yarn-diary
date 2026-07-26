@@ -1015,14 +1015,11 @@ public class CrochetService {
                 throw new BadRequestException("'" + name + "' is a reserved category name.");
             }
         }
-        boolean hasLetterOrDigitOrEmoji = java.util.regex.Pattern.compile("[\\p{L}\\p{N}\\p{IsEmoji}]").matcher(trimmed)
-                .find();
-        boolean onlyAllowedChars = java.util.regex.Pattern.compile("^[ \\p{L}\\p{N}\\-_()#.\\p{IsEmoji}\\p{M}\\p{Cf}]+$")
+        boolean onlyAllowedChars = java.util.regex.Pattern.compile(com.crochet.ai.crochetservice.util.ValidationConstants.TEXT_REGEX)
                 .matcher(trimmed)
                 .matches();
-        if (!hasLetterOrDigitOrEmoji || !onlyAllowedChars) {
-            throw new BadRequestException(
-                    type + " name can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, parentheses, and emojis");
+        if (!onlyAllowedChars) {
+            throw new BadRequestException(type + " name contains invalid characters (< > ; \\ or control characters)");
         }
     }
 }

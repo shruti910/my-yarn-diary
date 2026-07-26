@@ -12,7 +12,6 @@ import java.util.List;
 
 @Slf4j
 @RestController
-@CrossOrigin(origins = "*")
 public class PhotoController {
 
     private final CrochetService crochetService;
@@ -41,7 +40,7 @@ public class PhotoController {
     @PutMapping("/api/v1/projects/{projectId}/photos")
     public ResponseEntity<PhotoResponse> updatePhoto(@RequestHeader("X-User-Id") String userId,
             @PathVariable String projectId,
-            @RequestBody PhotoUpdateRequest request) {
+            @RequestBody @jakarta.validation.Valid PhotoUpdateRequest request) {
         log.info("Updating photo status for projectId: {} for user: {}", projectId, userId);
         return ResponseEntity.ok(crochetService.updatePhoto(userId, projectId, request));
     }

@@ -18,7 +18,6 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1")
-@CrossOrigin(origins = "*")
 public class JournalLogController {
 
     private final CrochetService crochetService;
@@ -42,7 +41,7 @@ public class JournalLogController {
     @PostMapping("/projects/{projectId}/logs")
     public ResponseEntity<JournalLogResponse> createJournalLog(@RequestHeader("X-User-Id") String userId,
             @PathVariable String projectId,
-            @RequestBody JournalLogRequest request) {
+            @RequestBody @jakarta.validation.Valid JournalLogRequest request) {
         log.info("Creating journal log entry for projectId: {} by user: {}", projectId, userId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(crochetService.createJournalLog(userId, projectId, request));
@@ -58,7 +57,7 @@ public class JournalLogController {
     @PutMapping("/logs/{logId}")
     public ResponseEntity<JournalLogResponse> updateJournalLog(@RequestHeader("X-User-Id") String userId,
             @PathVariable String logId,
-            @RequestBody JournalLogRequest request) {
+            @RequestBody @jakarta.validation.Valid JournalLogRequest request) {
         log.info("Updating journal log ID: {} for user: {}", logId, userId);
         return ResponseEntity.ok(crochetService.updateJournalLog(userId, logId, request));
     }

@@ -13,6 +13,7 @@ import { HookManager, HookManagerHandle } from './HookManager';
 import { PatternViewer } from './PatternViewer';
 import { YarnSpinner } from './YarnSpinner';
 import { exportProjectToPdf } from '../lib/pdfExport';
+import { isValidName, TEXT_REGEX_MESSAGE } from '../lib/validation';
 import { useAutosave } from '../hooks/useAutosave';
 
 const capitalizeWords = (str: string): string => {
@@ -31,9 +32,7 @@ const capitalizeWords = (str: string): string => {
  .join(' ');
 };
 
-const isValidName = (str: string): boolean => {
- return /^[ \p{L}\p{N}\-_()#.\p{Emoji}\p{Extended_Pictographic}\p{M}\p{Cf}]+$/u.test(str) && /[\p{L}\p{N}\p{Emoji}\p{Extended_Pictographic}]/u.test(str);
-};
+
 
 
 interface ProjectDetailProps {
@@ -183,6 +182,14 @@ export function ProjectDetail({
  const [isCameraActive, setIsCameraActive] = useState(false);
  const [cameraTarget, setCameraTarget] = useState<'product' | 'log' | null>(null);
  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+
+ useEffect(() => {
+   return () => {
+     if (cameraStream) {
+       cameraStream.getTracks().forEach(track => track.stop());
+     }
+   };
+ }, [cameraStream]);
  const videoRef = React.useRef<HTMLVideoElement | null>(null);
  const autoSaveTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
  const lastFetchedLogsRef = React.useRef<{ projectId: string; page: number; size: number } | null>(null);
@@ -265,32 +272,39 @@ export function ProjectDetail({
  if (response.status === 401) {
  window.dispatchEvent(new Event('unauthorized'));
  }
- let rawMsg = '';
- try {
- const errData = await response.json();
- if (errData && errData.message) {
- rawMsg = errData.message;
- }
- } catch (_) { }
+  let rawMsg = '';
+  try {
+  const errData = await response.json();
+  if (errData && errData.errors && typeof errData.errors === 'object') {
+  const valErrors = Object.values(errData.errors).filter(Boolean);
+  if (valErrors.length > 0) {
+  rawMsg = valErrors.join(' ');
+  }
+  }
+  if (!rawMsg && errData && errData.message && errData.message !== 'Request parameter validation failed.' && errData.message !== 'Validation Error') {
+  rawMsg = errData.message;
+  }
+  if (!rawMsg && errData && errData.error && typeof errData.error === 'string' && errData.error !== 'Validation Error') {
+  rawMsg = errData.error;
+  }
+  } catch (_) { }
 
- let errMsg = '';
- if (response.status >= 500) {
- errMsg = 'An unexpected server error occurred. Please try again later.';
- } else if (response.status === 400) {
- if (rawMsg && (rawMsg.toLowerCase().includes('must be') || rawMsg.toLowerCase().includes('required') || rawMsg.toLowerCase().includes('already exists') || rawMsg.toLowerCase().includes('invalid name') || rawMsg.toLowerCase().includes('either the size'))) {
- errMsg = rawMsg;
- } else {
- errMsg = 'Invalid request. Please check your inputs and try again.';
- }
- } else if (response.status === 403) {
- errMsg = 'You do not have permission to perform this action.';
- } else if (response.status === 404) {
- errMsg = 'The requested item could not be found.';
- } else if (response.status === 409) {
- errMsg = 'This item already exists.';
- } else {
- errMsg = 'Something went wrong. Please check your connection and try again.';
- }
+  let errMsg = rawMsg;
+  if (!errMsg) {
+  if (response.status >= 500) {
+  errMsg = 'An unexpected server error occurred. Please try again later.';
+  } else if (response.status === 400) {
+  errMsg = 'Invalid request. Please check your inputs and try again.';
+  } else if (response.status === 403) {
+  errMsg = 'You do not have permission to perform this action.';
+  } else if (response.status === 404) {
+  errMsg = 'The requested item could not be found.';
+  } else if (response.status === 409) {
+  errMsg = 'This item already exists.';
+  } else {
+  errMsg = 'Something went wrong. Please check your connection and try again.';
+  }
+  }
 
  console.group('%c[Network API Error Interceptor]', 'color: var(--error-default); font-weight: bold;');
  console.error(`[URI]: ${url}`);
@@ -351,21 +365,21 @@ export function ProjectDetail({
  }
  };
 
- useEffect(() => {
- if (!token || project.isNewProject) return;
- loadLogs(logsPage, logsPageSize);
- }, [project.projectId, token, logsPage, logsPageSize, project.isNewProject]);
+  useEffect(() => {
+    if (!token) return;
+    loadLogs(logsPage, logsPageSize);
+  }, [project.projectId, token, logsPage, logsPageSize]);
 
- useEffect(() => {
- if (!token || project.isNewProject) return;
- if (project.photos !== undefined) {
- setProductPhotos(project.photos.map(p => p.photoBase64));
- const coverId = project.photos.find(p => p.isCover)?.id;
- setCoverPhoto(coverId ? String(coverId) : null);
- } else {
- fetchPhotos();
- }
- }, [project.projectId, token, project.isNewProject, project.photos]);
+  useEffect(() => {
+    if (!token) return;
+    if (project.photos !== undefined) {
+      setProductPhotos(project.photos.map(p => p.photoBase64));
+      const coverId = project.photos.find(p => p.isCover)?.id;
+      setCoverPhoto(coverId ? String(coverId) : null);
+    } else {
+      fetchPhotos();
+    }
+  }, [project.projectId, token, project.photos]);
 
  const handleFieldChange = () => {
  setIsSaved(false);
@@ -385,11 +399,34 @@ export function ProjectDetail({
  }
 
  autoSaveTimeoutRef.current = setTimeout(async () => {
- const trimmed = title.trim();
- if (!trimmed) return;
+  const trimmed = title.trim();
+  if (!trimmed) {
+  showToast("Cannot auto-save: Project title is empty.", "error");
+  return;
+  }
 
- const capitalized = capitalizeWords(trimmed);
- if (!isValidName(capitalized)) return;
+  if (trimmed.length > 150) {
+  showToast("Cannot auto-save: Title must not exceed 150 characters.", "error");
+  return;
+  }
+  if (notes && notes.length > 5000) {
+  showToast("Cannot auto-save: Notes must not exceed 5000 characters.", "error");
+  return;
+  }
+  if (careInstructions && careInstructions.length > 500) {
+  showToast("Cannot auto-save: Care instructions must not exceed 500 characters.", "error");
+  return;
+  }
+  if (totalTime && totalTime.length > 255) {
+  showToast("Cannot auto-save: Total time must not exceed 255 characters.", "error");
+  return;
+  }
+
+  const capitalized = capitalizeWords(trimmed);
+  if (!isValidName(capitalized)) {
+  showToast("Cannot auto-save: " + TEXT_REGEX_MESSAGE, "error");
+  return;
+  }
 
  const invalidHook = hooks.find(h => {
  const hasMm = h.sizeMm !== undefined && h.sizeMm !== null && !isNaN(h.sizeMm);
@@ -398,7 +435,10 @@ export function ProjectDetail({
  if (hasMm && h.sizeMm <= 0) return true;
  return false;
  });
- if (invalidHook) return;
+ if (invalidHook) {
+ showToast("Cannot auto-save: One or more hooks have invalid dimensions.", "error");
+ return;
+ }
 
  setIsSubmitting(true);
  try {
@@ -457,14 +497,31 @@ export function ProjectDetail({
  }, [isSaved]);
 
  const handleSaveFields = async () => {
- const trimmed = title.trim();
- if (!trimmed) return;
+  const trimmed = title.trim();
+  if (!trimmed) return;
 
- const capitalized = capitalizeWords(trimmed);
- if (!isValidName(capitalized)) {
- await showAlert('Project name can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, parentheses, and emojis.');
- return;
- }
+  if (trimmed.length > 150) {
+  await showAlert("Project title must not exceed 150 characters.");
+  return;
+  }
+  if (notes && notes.length > 5000) {
+  await showAlert("Notes must not exceed 5000 characters.");
+  return;
+  }
+  if (careInstructions && careInstructions.length > 500) {
+  await showAlert("Care instructions must not exceed 500 characters.");
+  return;
+  }
+  if (totalTime && totalTime.length > 255) {
+  await showAlert("Total time must not exceed 255 characters.");
+  return;
+  }
+
+  const capitalized = capitalizeWords(trimmed);
+  if (!isValidName(capitalized)) {
+  await showAlert(TEXT_REGEX_MESSAGE);
+  return;
+  }
 
  const invalidHook = hooks.find(h => {
  const hasMm = h.sizeMm !== undefined && h.sizeMm !== null && !isNaN(h.sizeMm);
@@ -761,6 +818,11 @@ export function ProjectDetail({
     e.preventDefault();
     if (!textEntry.trim()) return;
 
+    if (textEntry.trim().length > 5000) {
+      await showAlert("Journal entry must not exceed 5000 characters.");
+      return;
+    }
+
     setSubmittingLog(true);
 
     try {
@@ -796,6 +858,11 @@ export function ProjectDetail({
   const handleUpdateLog = async (logId: string, text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
+
+    if (trimmed.length > 5000) {
+      await showAlert("Journal entry must not exceed 5000 characters.");
+      return;
+    }
 
     try {
       const res = await fetchWithToken(`/api/v1/logs/${logId}`, {
@@ -1232,6 +1299,7 @@ export function ProjectDetail({
  <label className="text-[11px] font-extrabold text-muted uppercase tracking-wider block">Project Name</label>
  <input
  type="text"
+ maxLength={150}
  value={title}
  disabled={isSubmitting}
  onChange={(e) => { setTitle(e.target.value); handleFieldChange(); }}
@@ -1256,6 +1324,7 @@ export function ProjectDetail({
  <label className="text-[11px] font-extrabold text-muted uppercase tracking-wider block"> Notes</label>
  <textarea
  rows={2}
+ maxLength={5000}
  value={notes}
  disabled={isSubmitting}
  placeholder="e.g. Increase 6 stitches on the ears in round 5..."
@@ -1268,6 +1337,7 @@ export function ProjectDetail({
  <label className="text-[11px] font-extrabold text-muted uppercase tracking-wider block">Care Instructions</label>
  <textarea
  rows={2}
+ maxLength={500}
  value={careInstructions}
  disabled={isSubmitting}
  placeholder="e.g. Hand wash cold, lay flat to dry..."
@@ -1322,6 +1392,7 @@ export function ProjectDetail({
  <label className="text-[11px] font-extrabold text-muted uppercase tracking-wider block">Total Time Taken</label>
  <input
  type="text"
+ maxLength={255}
  value={totalTime}
  disabled={isSubmitting}
  placeholder="e.g. 5 days, 12 hours"
@@ -1563,23 +1634,24 @@ export function ProjectDetail({
  <div className="relative">
  <textarea
  value={textEntry}
+ maxLength={5000}
  placeholder="Adjusted round 12 to make the pattern smaller, used standard single loop Terminology..."
  onChange={(e) => setTextEntry(e.target.value)}
  required
  rows={3}
- className={`w-full p-3 bg-surface border rounded-xl text-xs focus:outline-none placeholder-muted font-semibold text-heading resize-none ${textEntry.length > 1000
+ className={`w-full p-3 bg-surface border rounded-xl text-xs focus:outline-none placeholder-muted font-semibold text-heading resize-none ${textEntry.length > 5000
  ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
  : 'border-subtle focus:ring-1 focus:ring-brand focus:border-brand'
  }`}
  />
  <div className="flex justify-between items-center px-1 mt-1 text-[11px] font-semibold">
- {textEntry.length > 1000 ? (
- <span className="text-red-500">Warning: Log entry exceeds character limit of 1000.</span>
+ {textEntry.length > 5000 ? (
+ <span className="text-red-500">Warning: Log entry exceeds character limit of 5000.</span>
  ) : (
- <span className="text-muted">Max 1000 characters</span>
+ <span className="text-muted">Max 5000 characters</span>
  )}
- <span className={textEntry.length > 1000 ? 'text-red-500 font-bold' : 'text-muted'}>
- {textEntry.length} / 1000
+ <span className={textEntry.length > 5000 ? 'text-red-500 font-bold' : 'text-muted'}>
+ {textEntry.length} / 5000
  </span>
  </div>
  </div>
@@ -1628,7 +1700,7 @@ export function ProjectDetail({
 
  <button
  type="submit"
- disabled={submittingLog || !textEntry.trim() || textEntry.length > 1000}
+ disabled={submittingLog || !textEntry.trim() || textEntry.length > 5000}
  className="px-4 py-1.5 bg-brand hover:bg-brand/85 text-white font-bold rounded-xl text-xs tracking-wide cursor-pointer disabled:opacity-40 shadow-md transform hover:-translate-y-0.5"
  >
  Add Entry
@@ -1668,6 +1740,7 @@ export function ProjectDetail({
  <div className="space-y-2 pt-1 w-full">
  <textarea
  value={editingLogText}
+ maxLength={5000}
  onChange={(e) => {
  setEditingLogText(e.target.value);
  logEditAutosave.schedule({ logId: log.logId, text: e.target.value });

@@ -41,7 +41,7 @@ public class Yarn {
     @Column(name = "yarn_weight", length = 30)
     private String weight;
 
-    @Column(name = "fiber_content", columnDefinition = "TEXT")
+    @Column(name = "fiber_content", length = 500)
     private String fiberContent;
 
     @Column(name = "quantity_used")

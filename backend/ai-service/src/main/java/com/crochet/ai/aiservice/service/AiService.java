@@ -230,14 +230,11 @@ public class AiService {
             throw new BadRequestException("Session title cannot be empty");
         }
         String trimmed = title.trim();
-        boolean hasLetterOrDigit = java.util.regex.Pattern.compile("[\\p{L}\\p{N}\\p{IsEmoji}]").matcher(trimmed)
-                .find();
-        boolean onlyAllowedChars = java.util.regex.Pattern.compile("^[ \\p{L}\\p{N}\\-_()#.\\p{IsEmoji}\\p{M}\\p{Cf}]+$")
+        boolean onlyAllowedChars = java.util.regex.Pattern.compile(com.crochet.ai.aiservice.util.ValidationConstants.TEXT_REGEX)
                 .matcher(trimmed)
                 .matches();
-        if (!hasLetterOrDigit || !onlyAllowedChars) {
-            throw new BadRequestException(
-                    "Session title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, parentheses, and emojis");
+        if (!onlyAllowedChars) {
+            throw new BadRequestException("Session title contains invalid characters (< > ; \\ or control characters)");
         }
     }
 

@@ -13,7 +13,6 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1")
-@CrossOrigin(origins = "*")
 public class YarnController {
 
     private final CrochetService crochetService;
@@ -33,7 +32,7 @@ public class YarnController {
     @PostMapping("/projects/{projectId}/yarns")
     public ResponseEntity<YarnResponse> addYarn(@RequestHeader("X-User-Id") String userId,
             @PathVariable String projectId,
-            @RequestBody YarnRequest request) {
+            @RequestBody @jakarta.validation.Valid YarnRequest request) {
         log.info("Adding new yarn to projectId: {} for user: {}", projectId, userId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(crochetService.addYarn(userId, projectId, request));
@@ -49,11 +48,10 @@ public class YarnController {
     @PutMapping("/yarns/{yarnId}")
     public ResponseEntity<YarnResponse> updateYarn(@RequestHeader("X-User-Id") String userId,
             @PathVariable Long yarnId,
-            @RequestBody YarnRequest request) {
+            @RequestBody @jakarta.validation.Valid YarnRequest request) {
         log.info("Updating yarn ID: {} for user: {}", yarnId, userId);
         return ResponseEntity.ok(crochetService.updateYarn(userId, yarnId, request));
     }
-
 
     @DeleteMapping("/yarns/{yarnId}")
     public ResponseEntity<Void> deleteYarn(@RequestHeader("X-User-Id") String userId,

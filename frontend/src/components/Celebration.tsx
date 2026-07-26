@@ -36,6 +36,7 @@ export function Celebration({ projectTitle, onClose }: CelebrationProps) {
  if (!ctx) return;
 
  let animationId: number;
+ let isRunning = true;
  let width = (canvas.width = window.innerWidth);
  let height = (canvas.height = window.innerHeight);
 
@@ -45,6 +46,14 @@ export function Celebration({ projectTitle, onClose }: CelebrationProps) {
  height = canvas.height = window.innerHeight;
  };
  window.addEventListener('resize', handleResize);
+
+ // Automatically stop particle physics loop after 5 seconds to prevent CPU/GPU exhaustion
+ const stopTimeout = setTimeout(() => {
+ isRunning = false;
+ if (animationId) {
+ cancelAnimationFrame(animationId);
+ }
+ }, 5000);
 
  // Initialize particles
  const particles: ConfettiParticle[] = [];
@@ -62,6 +71,7 @@ export function Celebration({ projectTitle, onClose }: CelebrationProps) {
  }
 
  const animate = () => {
+ if (!isRunning) return;
  ctx.clearRect(0, 0, width, height);
 
  let active = false;
@@ -89,7 +99,7 @@ export function Celebration({ projectTitle, onClose }: CelebrationProps) {
  }
  }
 
- if (active) {
+ if (active && isRunning) {
  animationId = requestAnimationFrame(animate);
  }
  };
@@ -97,6 +107,8 @@ export function Celebration({ projectTitle, onClose }: CelebrationProps) {
  animate();
 
  return () => {
+ isRunning = false;
+ clearTimeout(stopTimeout);
  cancelAnimationFrame(animationId);
  window.removeEventListener('resize', handleResize);
  };

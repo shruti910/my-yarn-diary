@@ -13,7 +13,6 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1")
-@CrossOrigin(origins = "*")
 public class HookController {
 
     private final CrochetService crochetService;
@@ -33,7 +32,7 @@ public class HookController {
     @PostMapping("/projects/{projectId}/hooks")
     public ResponseEntity<HookResponse> addHook(@RequestHeader("X-User-Id") String userId,
             @PathVariable String projectId,
-            @RequestBody HookRequest request) {
+            @RequestBody @jakarta.validation.Valid HookRequest request) {
         log.info("Adding new hook to projectId: {} for user: {}", projectId, userId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(crochetService.addHook(userId, projectId, request));
@@ -49,11 +48,10 @@ public class HookController {
     @PutMapping("/hooks/{hookId}")
     public ResponseEntity<HookResponse> updateHook(@RequestHeader("X-User-Id") String userId,
             @PathVariable Long hookId,
-            @RequestBody HookRequest request) {
+            @RequestBody @jakarta.validation.Valid HookRequest request) {
         log.info("Updating hook ID: {} for user: {}", hookId, userId);
         return ResponseEntity.ok(crochetService.updateHook(userId, hookId, request));
     }
-
 
     @DeleteMapping("/hooks/{hookId}")
     public ResponseEntity<Void> deleteHook(@RequestHeader("X-User-Id") String userId,

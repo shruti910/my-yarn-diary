@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Send, Image, Plus, Trash2, ArrowRight, MessagesSquare, Compass, AlertCircle, Camera, X, Edit2, Check, Pin, PinOff, Copy, Download, Maximize2, Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
+import { sanitizeHtml } from '../lib/sanitizer';
+import { isValidName, TEXT_REGEX_MESSAGE } from '../lib/validation';
 import { ChatSession, ChatMessage, ChatCategory } from '../types';
 import { useDialog } from './DialogProvider';
 
@@ -75,6 +77,14 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  const canvasRef = useRef<HTMLCanvasElement | null>(null);
  const streamRef = useRef<MediaStream | null>(null);
 
+ useEffect(() => {
+   return () => {
+     if (streamRef.current) {
+       streamRef.current.getTracks().forEach(track => track.stop());
+     }
+   };
+ }, []);
+
  // Custom creation modal to bypass iframe prompt sandbox restrictions
  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
  const [newChatTitle, setNewChatTitle] = useState('Pattern Customizer');
@@ -86,6 +96,24 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
 
  const messagesEndRef = useRef<HTMLDivElement | null>(null);
  const fileInputRef = useRef<HTMLInputElement | null>(null);
+ const historySidebarRef = useRef<HTMLDivElement | null>(null);
+ const historyToggleBtnRef = useRef<HTMLButtonElement | null>(null);
+
+ useEffect(() => {
+ const handleClickOutside = (event: MouseEvent) => {
+ if (
+ isHistoryOpen &&
+ historySidebarRef.current &&
+ !historySidebarRef.current.contains(event.target as Node) &&
+ historyToggleBtnRef.current &&
+ !historyToggleBtnRef.current.contains(event.target as Node)
+ ) {
+ setIsHistoryOpen(false);
+ }
+ };
+ document.addEventListener('mousedown', handleClickOutside);
+ return () => document.removeEventListener('mousedown', handleClickOutside);
+ }, [isHistoryOpen]);
 
  const fetchWithToken = async (url: string, options: RequestInit = {}) => {
  if (!token) return null;
@@ -101,32 +129,39 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  if (response.status === 401) {
  window.dispatchEvent(new Event('unauthorized'));
  }
- let rawMsg = '';
- try {
- const errData = await response.json();
- if (errData && errData.message) {
- rawMsg = errData.message;
- }
- } catch (_) { }
+  let rawMsg = '';
+  try {
+  const errData = await response.json();
+  if (errData && errData.errors && typeof errData.errors === 'object') {
+  const valErrors = Object.values(errData.errors).filter(Boolean);
+  if (valErrors.length > 0) {
+  rawMsg = valErrors.join(' ');
+  }
+  }
+  if (!rawMsg && errData && errData.message && errData.message !== 'Request parameter validation failed.' && errData.message !== 'Validation Error') {
+  rawMsg = errData.message;
+  }
+  if (!rawMsg && errData && errData.error && typeof errData.error === 'string' && errData.error !== 'Validation Error') {
+  rawMsg = errData.error;
+  }
+  } catch (_) { }
 
- let errMsg = '';
- if (response.status >= 500) {
- errMsg = 'An unexpected server error occurred. Please try again later.';
- } else if (response.status === 400) {
- if (rawMsg && (rawMsg.toLowerCase().includes('must be') || rawMsg.toLowerCase().includes('required') || rawMsg.toLowerCase().includes('already exists') || rawMsg.toLowerCase().includes('invalid name') || rawMsg.toLowerCase().includes('either the size'))) {
- errMsg = rawMsg;
- } else {
- errMsg = 'Invalid request. Please check your inputs and try again.';
- }
- } else if (response.status === 403) {
- errMsg = 'You do not have permission to perform this action.';
- } else if (response.status === 404) {
- errMsg = 'The requested item could not be found.';
- } else if (response.status === 409) {
- errMsg = 'This item already exists.';
- } else {
- errMsg = 'Something went wrong. Please check your connection and try again.';
- }
+  let errMsg = rawMsg;
+  if (!errMsg) {
+  if (response.status >= 500) {
+  errMsg = 'An unexpected server error occurred. Please try again later.';
+  } else if (response.status === 400) {
+  errMsg = 'Invalid request. Please check your inputs and try again.';
+  } else if (response.status === 403) {
+  errMsg = 'You do not have permission to perform this action.';
+  } else if (response.status === 404) {
+  errMsg = 'The requested item could not be found.';
+  } else if (response.status === 409) {
+  errMsg = 'This item already exists.';
+  } else {
+  errMsg = 'Something went wrong. Please check your connection and try again.';
+  }
+  }
 
  console.group('%c[Network API Error Interceptor]', 'color: var(--error-default); font-weight: bold;');
  console.error(`[URI]: ${url}`);
@@ -273,9 +308,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  .join(' ');
  };
 
- const isValidName = (str: string): boolean => {
- return /^[ \p{L}\p{N}\-_()#.\p{Emoji}\p{Extended_Pictographic}\p{M}\p{Cf}]+$/u.test(str) && /[\p{L}\p{N}\p{Emoji}\p{Extended_Pictographic}]/u.test(str);
- };
+
 
  const submitCreateChat = async () => {
  const trimmed = newChatTitle.trim();
@@ -286,7 +319,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
 
  const capitalized = capitalizeWords(trimmed);
  if (!isValidName(capitalized)) {
- await showAlert('Session title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, parentheses, and emojis.');
+ await showAlert(TEXT_REGEX_MESSAGE);
  return;
  }
 
@@ -346,7 +379,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
 
  const capitalized = capitalizeWords(trimmed);
  if (!isValidName(capitalized)) {
- await showAlert('Session title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, parentheses, and emojis.');
+ await showAlert(TEXT_REGEX_MESSAGE);
  return;
  }
 
@@ -414,7 +447,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
 
  const capitalized = capitalizeWords(trimmed);
  if (!isValidName(capitalized)) {
- await showAlert('Session title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, parentheses, and emojis.');
+ await showAlert(TEXT_REGEX_MESSAGE);
  return;
  }
 
@@ -760,21 +793,27 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  };
 
  return (
- <div id="full-chat-split-view" className="h-full flex max-w-7xl mx-auto items-stretch overflow-hidden">
+ <div id="full-chat-split-view" className="h-full flex max-w-7xl mx-auto items-stretch overflow-hidden relative">
 
  {/* Session selector left frame */}
- {/* Backdrop for mobile */}
+ {/* Backdrop when history sidebar is open */}
  {isHistoryOpen && (
  <div 
- className="lg:hidden fixed inset-0 bg-black/40 z-20 backdrop-blur-sm"
+ className="fixed inset-0 bg-black/30 z-20 backdrop-blur-xs transition-opacity"
  onClick={() => setIsHistoryOpen(false)}
  />
  )}
- <div className={`${isHistoryOpen ? 'flex absolute md:relative inset-y-0 left-0 z-30 shadow-2xl md:shadow-none' : 'hidden'} w-72 max-w-[85vw] border-r border-subtle bg-white flex-col h-full shrink-0 transition-all`}>
+ <div 
+ ref={historySidebarRef}
+ className={`${isHistoryOpen ? 'flex absolute inset-y-0 left-0 z-30 shadow-2xl' : 'hidden'} w-72 max-w-[85vw] border-r border-subtle bg-white flex-col h-full shrink-0 transition-all`}
+ >
  <div className="p-3 border-b border-subtle flex justify-between items-center bg-white">
  <span className="text-[11px] uppercase font-bold tracking-wider text-muted">Chat History</span>
  <button
- onClick={() => setActiveChatId(null)}
+ onClick={() => {
+ setActiveChatId(null);
+ setIsHistoryOpen(false);
+ }}
  className="p-1.5 rounded bg-brand/10 hover:bg-brand/20 text-brand text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
  >
  <Plus className="w-3.5 h-3.5" />
@@ -789,7 +828,10 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  <MessagesSquare className="w-8 h-8 mx-auto mb-2 opacity-50 text-brand-light" />
  <p className="text-xs font-bold uppercase tracking-wider">No Conversational Threads</p>
  <button
- onClick={() => setActiveChatId(null)}
+ onClick={() => {
+ setActiveChatId(null);
+ setIsHistoryOpen(false);
+ }}
  className="text-xs text-brand font-extrabold underline mt-1 cursor-pointer"
  >
  Create one now
@@ -803,7 +845,12 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  return (
  <div
  key={sess.chatId}
- onClick={() => { if (!isEditing) setActiveChatId(sess.chatId); }}
+ onClick={() => {
+ if (!isEditing) {
+ setActiveChatId(sess.chatId);
+ setIsHistoryOpen(false);
+ }
+ }}
  className={`group px-3 py-1.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${isActive
  ? 'bg-brand-light/15 border-brand-light/30 text-heading font-bold shadow-xs'
  : 'bg-transparent border-transparent hover:bg-page text-muted'
@@ -920,6 +967,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-subtle bg-white flex justify-between items-center shadow-xs z-10 shrink-0">
  <div className="flex items-center gap-2 w-full min-w-0">
  <button
+ ref={historyToggleBtnRef}
  onClick={() => setIsHistoryOpen(!isHistoryOpen)}
  className="p-1.5 -ml-2 rounded text-muted hover:text-brand hover:bg-brand/10 transition-colors cursor-pointer shrink-0"
  title="Toggle Chat History"
@@ -1099,7 +1147,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  ) : (
  <>
  <div className="markdown-body text-xs">
- <Markdown>{msg.text || ''}</Markdown>
+ <Markdown>{sanitizeHtml(msg.text || '')}</Markdown>
  </div>
 
  {(() => {

@@ -27,7 +27,8 @@ const isRunningStandalone = (): boolean =>
     (window.navigator as any).standalone === true;
 
 interface AuthScreenProps {
-    onAuthSuccess: (token: string, user: any) => void;
+    /** App observes Firebase's persistent auth state and completes sign-in. */
+    onAuthSuccess: () => void;
     /** When false, the form opens in "create account" mode (from the landing page's Sign up). */
     initialIsLogin?: boolean;
     /** Optional: render a back link that returns to the landing page. */
@@ -105,6 +106,10 @@ export function AuthScreen({ onAuthSuccess, initialIsLogin = true, onBack }: Aut
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
+    // Rate Limiting & Brute-Force Lockout State
+    const [failedAttempts, setFailedAttempts] = useState(0);
+    const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
+
     const [showPassword, setShowPassword] = useState(false);
     const [displayNameError, setDisplayNameError] = useState('');
     const [emailError, setEmailError] = useState('');
@@ -116,11 +121,28 @@ export function AuthScreen({ onAuthSuccess, initialIsLogin = true, onBack }: Aut
         e.preventDefault();
         setError('');
         setEmailError('');
+
+        if (lockoutUntil && Date.now() < lockoutUntil) {
+            const secondsRemaining = Math.ceil((lockoutUntil - Date.now()) / 1000);
+            setError(`Too many requests. Account temporarily locked for ${secondsRemaining} seconds.`);
+            return;
+        }
+
         setLoading(true);
 
         const emailErr = validateField('email', email);
         if (emailErr) {
             setEmailError(emailErr);
+            setLoading(false);
+            return;
+        }
+
+        const newAttempts = failedAttempts + 1;
+        setFailedAttempts(newAttempts);
+        if (newAttempts >= 5) {
+            const lockTime = Date.now() + 60 * 1000; // 1 minute lockout
+            setLockoutUntil(lockTime);
+            setError("Too many password reset requests. Account temporarily locked for 1 minute.");
             setLoading(false);
             return;
         }
@@ -141,15 +163,21 @@ export function AuthScreen({ onAuthSuccess, initialIsLogin = true, onBack }: Aut
         if (name === 'displayName') {
             if (!isLogin) {
                 if (!value.trim()) {
-                    return 'Your Name / Handle is required.';
+                    return 'Your Name is required.';
                 }
                 if (value.trim().length < 3) {
-                    return 'Name/Handle must be at least 3 characters.';
+                    return 'Name must be at least 3 characters.';
+                }
+                if (value.trim().length > 100) {
+                    return 'Name must not exceed 100 characters.';
                 }
             }
         } else if (name === 'email') {
             if (!value.trim()) {
                 return 'Email address is required.';
+            }
+            if (value.trim().length > 150) {
+                return 'Email must not exceed 150 characters.';
             }
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!emailRegex.test(value.trim())) {
@@ -161,6 +189,9 @@ export function AuthScreen({ onAuthSuccess, initialIsLogin = true, onBack }: Aut
             }
             if (value.length < 6) {
                 return 'Password must be at least 6 characters.';
+            }
+            if (value.length > 100) {
+                return 'Password must not exceed 100 characters.';
             }
         }
         return '';
@@ -196,6 +227,14 @@ export function AuthScreen({ onAuthSuccess, initialIsLogin = true, onBack }: Aut
         setDisplayNameError('');
         setEmailError('');
         setPasswordError('');
+
+        // Check if rate limited / locked out
+        if (lockoutUntil && Date.now() < lockoutUntil) {
+            const secondsRemaining = Math.ceil((lockoutUntil - Date.now()) / 1000);
+            setError(`Too many failed authentication attempts. Account temporarily locked for ${secondsRemaining} seconds.`);
+            return;
+        }
+
         setLoading(true);
 
         let isValid = true;
@@ -228,44 +267,50 @@ export function AuthScreen({ onAuthSuccess, initialIsLogin = true, onBack }: Aut
 
         try {
             if (isLogin) {
-                const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
-                const user = userCredential.user;
-                const token = await user.getIdToken();
-                const profileObj = {
-                    userId: user.uid,
-                    displayName: user.displayName || user.email?.split('@')[0] || 'Crafter',
-                    email: user.email || '',
-                    profilePicture: user.photoURL || '',
-                    createdAt: user.metadata.creationTime || new Date().toISOString()
-                };
-                onAuthSuccess(token, profileObj);
+                await signInWithEmailAndPassword(auth, email.trim(), password);
+                setFailedAttempts(0);
+                setLockoutUntil(null);
+                onAuthSuccess();
             } else {
+                sessionStorage.setItem('crochet_signup_in_progress', 'true');
                 const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
                 const user = userCredential.user;
                 await updateProfile(user, {
                     displayName: displayName.trim() || 'Crafter'
                 });
-                // Force refresh the token so that the displayName propagates to the minted ID token
-                const token = await user.getIdToken(true);
-                const profileObj = {
-                    userId: user.uid,
-                    displayName: displayName.trim() || 'Crafter',
-                    email: user.email || '',
-                    profilePicture: user.photoURL || '',
-                    createdAt: user.metadata.creationTime || new Date().toISOString()
-                };
-                onAuthSuccess(token, profileObj);
+                sessionStorage.removeItem('crochet_signup_in_progress');
+                // Refresh the Firebase-managed token so its display-name claim is current.
+                await user.getIdToken(true);
+                setFailedAttempts(0);
+                setLockoutUntil(null);
+                onAuthSuccess();
             }
         } catch (err: any) {
+            sessionStorage.removeItem('crochet_signup_in_progress');
             console.error('Firebase Email authentication failure:', err);
-            setError(getFriendlyErrorMessage(err));
+            const newAttempts = failedAttempts + 1;
+            setFailedAttempts(newAttempts);
+
+            if (newAttempts >= 5) {
+                const lockTime = Date.now() + 60 * 1000; // 1 minute lockout
+                setLockoutUntil(lockTime);
+                setError("Too many failed authentication attempts. Account temporarily locked for 1 minute.");
+            } else {
+                setError(getFriendlyErrorMessage(err));
+            }
         } finally {
+            sessionStorage.removeItem('crochet_signup_in_progress');
             setLoading(false);
         }
     };
 
     const handleGoogleSSO = async () => {
         setError('');
+        if (lockoutUntil && Date.now() < lockoutUntil) {
+            const secondsRemaining = Math.ceil((lockoutUntil - Date.now()) / 1000);
+            setError(`Too many failed authentication attempts. Account temporarily locked for ${secondsRemaining} seconds.`);
+            return;
+        }
         setLoading(true);
         try {
             if (isRunningStandalone()) {
@@ -279,21 +324,19 @@ export function AuthScreen({ onAuthSuccess, initialIsLogin = true, onBack }: Aut
                 return;
             }
 
-            const userCredential = await signInWithPopup(auth, googleProvider);
-            const user = userCredential.user;
-            const token = await user.getIdToken();
-
-            const profileObj = {
-                userId: user.uid,
-                displayName: user.displayName || user.email?.split('@')[0] || 'Google Crafter',
-                email: user.email || '',
-                profilePicture: user.photoURL || '',
-                createdAt: user.metadata.creationTime || new Date().toISOString()
-            };
-            onAuthSuccess(token, profileObj);
+            await signInWithPopup(auth, googleProvider);
+            onAuthSuccess();
         } catch (err: any) {
             console.error('Firebase Google authentication failure:', err);
-            setError(getFriendlyErrorMessage(err));
+            const newAttempts = failedAttempts + 1;
+            setFailedAttempts(newAttempts);
+            if (newAttempts >= 5) {
+                const lockTime = Date.now() + 60 * 1000;
+                setLockoutUntil(lockTime);
+                setError("Too many failed authentication attempts. Account temporarily locked for 1 minute.");
+            } else {
+                setError(getFriendlyErrorMessage(err));
+            }
         } finally {
             setLoading(false);
         }
@@ -378,6 +421,7 @@ export function AuthScreen({ onAuthSuccess, initialIsLogin = true, onBack }: Aut
                                         </span>
                                         <input
                                             type="email"
+                                            maxLength={150}
                                             value={email}
                                             onChange={handleEmailChange}
                                             placeholder="crafter@example.com"
@@ -447,13 +491,14 @@ export function AuthScreen({ onAuthSuccess, initialIsLogin = true, onBack }: Aut
                         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
                             {!isLogin && (
                                 <div className="space-y-1">
-                                    <label className="text-xs font-extrabold text-muted uppercase tracking-wider block">Your Name / Handle</label>
+                                    <label className="text-xs font-extrabold text-muted uppercase tracking-wider block"> Name </label>
                                     <div className="relative">
                                         <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted">
                                             <UserIcon className="w-4 h-4" />
                                         </span>
                                         <input
                                             type="text"
+                                            maxLength={100}
                                             value={displayName}
                                             onChange={handleDisplayNameChange}
                                             placeholder="e.g. GrandmaStitches"
@@ -480,6 +525,7 @@ export function AuthScreen({ onAuthSuccess, initialIsLogin = true, onBack }: Aut
                                     </span>
                                     <input
                                         type="email"
+                                        maxLength={150}
                                         value={email}
                                         onChange={handleEmailChange}
                                         placeholder="crafter@example.com"
@@ -505,6 +551,7 @@ export function AuthScreen({ onAuthSuccess, initialIsLogin = true, onBack }: Aut
                                     </span>
                                     <input
                                         type={showPassword ? 'text' : 'password'}
+                                        maxLength={100}
                                         value={password}
                                         onChange={handlePasswordChange}
                                         placeholder="••••••••"

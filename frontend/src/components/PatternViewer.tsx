@@ -5,6 +5,7 @@ import {
   ChevronLeft, ChevronRight, Edit2, Sliders
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { sanitizeHtml } from '../lib/sanitizer';
 import { CustomDropdown } from './CustomDropdown';
 import { YarnSpinner } from './YarnSpinner';
 import { Pattern, Project } from '../types';
@@ -143,28 +144,35 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
         let rawMsg = '';
         try {
           const errData = await response.json();
-          if (errData && errData.message) {
+          if (errData && errData.errors && typeof errData.errors === 'object') {
+            const valErrors = Object.values(errData.errors).filter(Boolean);
+            if (valErrors.length > 0) {
+              rawMsg = valErrors.join(' ');
+            }
+          }
+          if (!rawMsg && errData && errData.message && errData.message !== 'Request parameter validation failed.' && errData.message !== 'Validation Error') {
             rawMsg = errData.message;
+          }
+          if (!rawMsg && errData && errData.error && typeof errData.error === 'string' && errData.error !== 'Validation Error') {
+            rawMsg = errData.error;
           }
         } catch (_) { }
 
-        let errMsg = '';
-        if (response.status >= 500) {
-          errMsg = 'An unexpected server error occurred. Please try again later.';
-        } else if (response.status === 400) {
-          if (rawMsg && (rawMsg.toLowerCase().includes('must be') || rawMsg.toLowerCase().includes('required') || rawMsg.toLowerCase().includes('already exists') || rawMsg.toLowerCase().includes('invalid name') || rawMsg.toLowerCase().includes('either the size'))) {
-            errMsg = rawMsg;
-          } else {
+        let errMsg = rawMsg;
+        if (!errMsg) {
+          if (response.status >= 500) {
+            errMsg = 'An unexpected server error occurred. Please try again later.';
+          } else if (response.status === 400) {
             errMsg = 'Invalid request. Please check your inputs and try again.';
+          } else if (response.status === 403) {
+            errMsg = 'You do not have permission to perform this action.';
+          } else if (response.status === 404) {
+            errMsg = 'The requested item could not be found.';
+          } else if (response.status === 409) {
+            errMsg = 'This item already exists.';
+          } else {
+            errMsg = 'Something went wrong. Please check your connection and try again.';
           }
-        } else if (response.status === 403) {
-          errMsg = 'You do not have permission to perform this action.';
-        } else if (response.status === 404) {
-          errMsg = 'The requested item could not be found.';
-        } else if (response.status === 409) {
-          errMsg = 'This item already exists.';
-        } else {
-          errMsg = 'Something went wrong. Please check your connection and try again.';
         }
 
         console.group('%c[Network API Error Interceptor]', 'color: var(--error-default); font-weight: bold;');
@@ -1187,7 +1195,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
                     <h3 className="font-serif font-extrabold text-heading text-xl border-b border-subtle pb-3 mb-4 leading-snug">
                       {activePattern.fileName}
                     </h3>
-                    <ReactMarkdown>{activePattern.patternContent}</ReactMarkdown>
+                    <ReactMarkdown>{sanitizeHtml(activePattern.patternContent || '')}</ReactMarkdown>
                   </div>
                 )
               )}
@@ -1354,7 +1362,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
                   <h3 className="font-serif font-extrabold text-heading text-2xl border-b border-subtle pb-3 mb-6 leading-snug">
                     {activePattern.fileName}
                   </h3>
-                  <ReactMarkdown>{activePattern.patternContent}</ReactMarkdown>
+                  <ReactMarkdown>{sanitizeHtml(activePattern.patternContent || '')}</ReactMarkdown>
                 </div>
               )}
             </div>

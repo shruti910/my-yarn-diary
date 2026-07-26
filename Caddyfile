@@ -5,5 +5,13 @@
 
 # The domain will be passed as an environment variable in AWS
 {$DOMAIN:localhost} {
+    header {
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://accounts.google.com https://*.gstatic.com https://identitytoolkit.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' http: https: ws: wss: https://*.googleapis.com https://*.firebaseapp.com https://*.sentry.io; frame-src 'self' https://*.firebaseapp.com https://accounts.google.com; object-src 'none'; worker-src 'self' blob:;"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    }
+
     reverse_proxy gateway:3000
 }

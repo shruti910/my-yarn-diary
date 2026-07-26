@@ -16,7 +16,6 @@ import org.springframework.data.web.PageableDefault;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/projects")
-@CrossOrigin(origins = "*")
 public class ProjectController {
 
     private final CrochetService crochetService;
@@ -65,7 +64,7 @@ public class ProjectController {
 
     @PostMapping
     public ResponseEntity<ProjectResponse> createProject(@RequestHeader("X-User-Id") String userId,
-            @RequestBody ProjectRequest request) {
+            @RequestBody @jakarta.validation.Valid ProjectRequest request) {
         log.info("Creating project: '{}' for user: {} with status: {}", request.getTitle(), userId,
                 request.getStatus());
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -75,7 +74,7 @@ public class ProjectController {
     @PutMapping("/{projectId}")
     public ResponseEntity<ProjectResponse> updateProject(@RequestHeader("X-User-Id") String userId,
             @PathVariable String projectId,
-            @RequestBody ProjectRequest request) {
+            @RequestBody @jakarta.validation.Valid ProjectRequest request) {
         log.info("Updating projectId: {} for user: {} (new status: {})", projectId, userId, request.getStatus());
         return ResponseEntity.ok(crochetService.updateProject(userId, projectId, request));
     }

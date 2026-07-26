@@ -10,6 +10,7 @@ import { ProjectGallery } from './ProjectGallery';
 import { CustomDropdown } from './CustomDropdown';
 import { YarnSpinner } from './YarnSpinner';
 import { useDialog } from './DialogProvider';
+import { isValidName, TEXT_REGEX_MESSAGE } from '../lib/validation';
 
 const capitalizeWords = (str: string): string => {
   if (!str) return '';
@@ -27,9 +28,7 @@ const capitalizeWords = (str: string): string => {
     .join(' ');
 };
 
-const isValidName = (str: string): boolean => {
-  return /^[ \p{L}\p{N}\-_()#.\p{Emoji}\p{Extended_Pictographic}\p{M}\p{Cf}]+$/u.test(str) && /[\p{L}\p{N}\p{Emoji}\p{Extended_Pictographic}]/u.test(str);
-};
+
 
 const getProjectCoverPhoto = (project: Project): string | undefined => {
   if (project.base64CoverPhoto) {
@@ -197,7 +196,7 @@ export function Dashboard({
 
     const capitalized = capitalizeWords(trimmed);
     if (!isValidName(capitalized)) {
-      await showAlert('Project title can only contain letters, numbers, spaces, hyphens, underscores, hashes, periods, parentheses, and emojis.');
+      await showAlert(TEXT_REGEX_MESSAGE);
       return;
     }
 

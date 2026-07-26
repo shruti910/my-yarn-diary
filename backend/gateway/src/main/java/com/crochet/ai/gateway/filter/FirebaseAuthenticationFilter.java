@@ -15,6 +15,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 
@@ -41,13 +43,16 @@ public class FirebaseAuthenticationFilter extends AbstractGatewayFilterFactory<F
             String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
 
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                log.warn("Authentication failure: Authorization header missing or invalid for path: {}", request.getPath());
-                return Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authorization challenge failed. Bearer token missing."));
+                log.warn("Authentication failure: Authorization header missing or invalid for path: {}",
+                        request.getPath());
+                return Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                        "Authorization challenge failed. Bearer token missing."));
             }
 
             String token = authHeader.substring(7);
 
-            // Wrap Firebase SDK's asynchronous ApiFuture in a reactive Mono using Mono.create
+            // Wrap Firebase SDK's asynchronous ApiFuture in a reactive Mono using
+            // Mono.create
             return Mono.<FirebaseToken>create(sink -> {
                 try {
                     ApiFuture<FirebaseToken> future = FirebaseAuth.getInstance().verifyIdTokenAsync(token);
@@ -63,34 +68,41 @@ public class FirebaseAuthenticationFilter extends AbstractGatewayFilterFactory<F
                     sink.error(ex);
                 }
             })
-            .flatMap(decodedToken -> {
-                String firebaseUid = decodedToken.getUid();
-                String email = decodedToken.getEmail();
-                String name = decodedToken.getName();
-                String picture = decodedToken.getPicture();
-                
-                // Map Firebase UID to standardized UUID
-                String standardizedUserId = UuidGenerator.getUuidFromFirebaseUid(firebaseUid);
+                    .flatMap(decodedToken -> {
+                        String firebaseUid = decodedToken.getUid();
+                        String email = decodedToken.getEmail();
+                        String name = decodedToken.getName();
+                        String picture = decodedToken.getPicture();
 
-                // Generate signed downstream handoff token containing original firebaseUid
-                String internalJwt = tokenProvider.createToken(standardizedUserId, email, name, picture, firebaseUid);
+                        // Map Firebase UID to standardized UUID
+                        String standardizedUserId = UuidGenerator.getUuidFromFirebaseUid(firebaseUid);
 
-                // Inject headers to request
-                ServerHttpRequest mutatedRequest = request.mutate()
-                        .header("X-User-Id", standardizedUserId)
-                        .header("X-User-Email", email != null ? email : "")
-                        .header("X-User-Name", name != null ? name : "")
-                        .header("X-User-Profile-Picture", picture != null ? picture : "")
-                        .header("X-Firebase-Uid", firebaseUid)
-                        .header("X-Forwarded-Identity", internalJwt)
-                        .build();
+                        // Generate signed downstream handoff token containing original firebaseUid
+                        String internalJwt = tokenProvider.createToken(standardizedUserId, email, name, picture,
+                                firebaseUid);
 
-                return chain.filter(exchange.mutate().request(mutatedRequest).build());
-            })
-            .onErrorResume(ex -> {
-                log.error("Authentication security block: Firebase token verification failed: {}", ex.getMessage());
-                return Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication challenge failed. Token is invalid or expired."));
-            });
+                        String safeEmail = email != null ? URLEncoder.encode(email, StandardCharsets.UTF_8) : "";
+                        String safeName = name != null ? URLEncoder.encode(name, StandardCharsets.UTF_8) : "";
+                        String safePicture = picture != null ? URLEncoder.encode(picture, StandardCharsets.UTF_8) : "";
+
+                        // Inject headers to request
+                        ServerHttpRequest mutatedRequest = request.mutate()
+                                .header("X-User-Id", standardizedUserId)
+                                .header("X-User-Email", safeEmail)
+                                .header("X-User-Name", safeName)
+                                .header("X-User-Profile-Picture", safePicture)
+                                .header("X-Firebase-Uid", firebaseUid)
+                                .header("X-Forwarded-Identity", internalJwt)
+                                .build();
+
+                        return chain.filter(exchange.mutate().request(mutatedRequest).build());
+                    })
+                    .onErrorResume(ex -> {
+                        log.error("Authentication security block: Firebase token verification failed: {}",
+                                ex.getMessage());
+                        return Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                                "Authentication challenge failed. Token is invalid or expired."));
+                    });
         };
     }
 }

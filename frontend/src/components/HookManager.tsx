@@ -50,7 +50,18 @@ function HookCard({ hook, index, disabled, isEditing, onSetEditing, onChange, on
 
   // Update parent state immediately and schedule a debounced background save.
   const edit = (field: keyof Hook, value: any) => {
-    const updated = { ...hook, [field]: value };
+    let val = value;
+    if (field === 'sizeUs' && typeof val === 'string' && val.length > 30) {
+      val = val.slice(0, 30);
+    }
+    if ((field === 'material' || field === 'brand') && typeof val === 'string' && val.length > 255) {
+      val = val.slice(0, 255);
+    }
+    if (field === 'sizeMm' && typeof val === 'number') {
+      if (val < 0.1) val = 0.1;
+      if (val > 50.0) val = 50.0;
+    }
+    const updated = { ...hook, [field]: val };
     onChange(updated);
     schedule(updated);
   };
@@ -128,7 +139,8 @@ function HookCard({ hook, index, disabled, isEditing, onSetEditing, onChange, on
               <input
                 type="number"
                 step="0.25"
-                min="0"
+                min="0.1"
+                max="50.0"
                 value={hook.sizeMm || ''}
                 disabled={disabled}
                 onChange={(e) => {
@@ -143,6 +155,7 @@ function HookCard({ hook, index, disabled, isEditing, onSetEditing, onChange, on
               <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider block mb-1">Size (US)</label>
               <input
                 type="text"
+                maxLength={30}
                 value={hook.sizeUs || ''}
                 disabled={disabled}
                 onChange={(e) => edit('sizeUs', e.target.value)}
@@ -158,6 +171,7 @@ function HookCard({ hook, index, disabled, isEditing, onSetEditing, onChange, on
               <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider block mb-1">Material</label>
               <input
                 type="text"
+                maxLength={255}
                 value={hook.material || ''}
                 disabled={disabled}
                 onChange={(e) => edit('material', e.target.value)}
@@ -169,6 +183,7 @@ function HookCard({ hook, index, disabled, isEditing, onSetEditing, onChange, on
               <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider block mb-1">Brand</label>
               <input
                 type="text"
+                maxLength={255}
                 value={hook.brand || ''}
                 disabled={disabled}
                 onChange={(e) => edit('brand', e.target.value)}
@@ -209,14 +224,9 @@ export const HookManager = forwardRef<HookManagerHandle, HookManagerProps>(funct
   // PUT response can carry a stale hooks array, so once mounted we trust our own
   // fetch from the dedicated /hooks endpoint, not repeated parent prop updates.
   useEffect(() => {
-    if (isNewProject) {
-      setHooks([]);
-      setIsLoading(false);
-      return;
-    }
     if (initialHooks !== undefined) setHooks(initialHooks); // instant first paint
     fetchHooks(); // reconcile with the authoritative list
-  }, [projectId, isNewProject]);
+  }, [projectId]);
 
   const addHook = async () => {
     try {
