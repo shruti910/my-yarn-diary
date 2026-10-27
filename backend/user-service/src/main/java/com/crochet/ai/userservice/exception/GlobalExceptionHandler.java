@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.validation.FieldError;
 import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,6 +17,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
 
 @Slf4j
 @ControllerAdvice
@@ -78,8 +80,8 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
     }
 
-    @ExceptionHandler(NoHandlerFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleNoHandlerFound(NoHandlerFoundException ex, HttpServletRequest request) {
+    @ExceptionHandler({ NoHandlerFoundException.class, NoResourceFoundException.class })
+    public ResponseEntity<Map<String, Object>> handleNoHandlerFound(Exception ex, HttpServletRequest request) {
         return buildErrorResponse(ex, HttpStatus.NOT_FOUND, request, false);
     }
 
@@ -88,9 +90,46 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(ex, HttpStatus.METHOD_NOT_ALLOWED, request, false);
     }
 
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(
+            org.springframework.dao.DataIntegrityViolationException ex, HttpServletRequest request) {
+        return buildGenericResponse("This change conflicts with existing data.",
+                HttpStatus.CONFLICT, request, ex);
+    }
+
+    @ExceptionHandler(org.springframework.dao.DataAccessException.class)
+    public ResponseEntity<Map<String, Object>> handleDataAccess(
+            org.springframework.dao.DataAccessException ex, HttpServletRequest request) {
+        return buildGenericResponse("A database error occurred. Please try again.",
+                HttpStatus.INTERNAL_SERVER_ERROR, request, ex);
+    }
+
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleUnreadableBody(
+            org.springframework.http.converter.HttpMessageNotReadableException ex, HttpServletRequest request) {
+        return buildGenericResponse("Malformed request body.", HttpStatus.BAD_REQUEST, request, ex);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleAllExceptions(Exception ex, HttpServletRequest request) {
         return buildErrorResponse(ex, HttpStatus.INTERNAL_SERVER_ERROR, request, true);
+    }
+
+    private ResponseEntity<Map<String, Object>> buildGenericResponse(
+            String clientMessage, HttpStatus status, HttpServletRequest request, Exception ex) {
+        String traceId = UUID.randomUUID().toString();
+        log.error("[Data Access Failure] [TraceID: {}] {} on path: {}",
+                traceId, ex.getClass().getSimpleName(), request.getRequestURI(), ex);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", Instant.now().toString());
+        body.put("status", status.value());
+        body.put("error", status.getReasonPhrase());
+        body.put("message", clientMessage);
+        body.put("path", request.getRequestURI());
+        body.put("traceId", traceId);
+
+        return new ResponseEntity<>(body, status);
     }
 
     private ResponseEntity<Map<String, Object>> buildErrorResponse(Exception ex, HttpStatus status, HttpServletRequest request, boolean isSevere) {
@@ -108,7 +147,9 @@ public class GlobalExceptionHandler {
         body.put("timestamp", Instant.now().toString());
         body.put("status", status.value());
         body.put("error", status.getReasonPhrase());
-        body.put("message", ex.getMessage() != null ? ex.getMessage() : "An unexpected event was captured.");
+        body.put("message", status.is5xxServerError()
+                ? "An unexpected server error occurred. Please try again, quoting the trace ID."
+                : (ex.getMessage() != null ? ex.getMessage() : "An unexpected event was captured."));
         body.put("path", request.getRequestURI());
         body.put("traceId", traceId);
 

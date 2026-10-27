@@ -83,4 +83,16 @@ public class AiController {
         log.info("Updating AI chat session: {} for user: {}", chatId, userId);
         return ResponseEntity.ok(aiService.updateSession(userId, chatId, request));
     }
+
+    @DeleteMapping("/chats/user/{targetUserId}")
+    public ResponseEntity<Void> deleteAllChatsForUser(
+            @RequestHeader("X-User-Id") String authenticatedUserId,
+            @PathVariable String targetUserId) {
+        log.warn("Purging all AI chats for user: {} (authenticated: {})", targetUserId, authenticatedUserId);
+        if (authenticatedUserId == null || !authenticatedUserId.equalsIgnoreCase(targetUserId)) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).build();
+        }
+        aiService.deleteAllUserData(targetUserId);
+        return ResponseEntity.noContent().build();
+    }
 }

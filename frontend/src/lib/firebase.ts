@@ -6,6 +6,7 @@ import {
   indexedDBLocalPersistence,
   browserLocalPersistence,
 } from 'firebase/auth';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 
 // Vite loads public credentials from your frontend environment configuration files
 const firebaseConfig = {
@@ -19,6 +20,19 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+
+// Initialize Firebase App Check with reCAPTCHA Enterprise
+const appCheckKey = import.meta.env.VITE_FIREBASE_APPCHECK_KEY;
+if (typeof window !== 'undefined' && appCheckKey) {
+  if (import.meta.env.DEV) {
+    (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  }
+
+  initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider(appCheckKey),
+    isTokenAutoRefreshEnabled: true
+  });
+}
 
 // The default web persistence stack can fall back to in-memory/session storage,
 // which iOS standalone PWAs wipe when Safari hands control back after a redirect

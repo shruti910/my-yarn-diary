@@ -25,6 +25,8 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - JAVA_OPTS=-XX:+UseG1GC -Xms256m -Xmx512m
+      - OTEL_TRACES_SAMPLER=parentbased_traceidratio
+      - OTEL_TRACES_SAMPLER_ARG=0.1
 
   user-service:
     deploy:
@@ -34,6 +36,8 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - JAVA_OPTS=-XX:+UseG1GC -Xms256m -Xmx512m
+      - OTEL_TRACES_SAMPLER=parentbased_traceidratio
+      - OTEL_TRACES_SAMPLER_ARG=0.1
 
   crochet-service:
     deploy:
@@ -43,6 +47,8 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - JAVA_OPTS=-XX:+UseG1GC -Xms256m -Xmx512m
+      - OTEL_TRACES_SAMPLER=parentbased_traceidratio
+      - OTEL_TRACES_SAMPLER_ARG=0.1
 
   ai-service:
     deploy:
@@ -52,6 +58,8 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - JAVA_OPTS=-XX:+UseG1GC -Xms512m -Xmx1024m
+      - OTEL_TRACES_SAMPLER=parentbased_traceidratio
+      - OTEL_TRACES_SAMPLER_ARG=0.1
 
   postgres:
     ports:

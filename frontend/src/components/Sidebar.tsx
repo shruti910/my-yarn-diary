@@ -9,11 +9,13 @@ import { Category } from '../types';
 import { TerminologyToggle } from './TerminologyToggle';
 import { YarnSpinner } from './YarnSpinner';
 import { useDialog } from './DialogProvider';
+import { DELETE_ACCOUNT_MAILTO, SUPPORT_EMAIL } from '../lib/constants';
 import { motion, AnimatePresence } from 'motion/react';
 import { updateProfile, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { isValidName, TEXT_REGEX_MESSAGE } from '../lib/validation';
 import packageJson from '../../package.json';
+import { DeleteAccountModal } from './DeleteAccountModal';
 
 const capitalizeWords = (str: string): string => {
     if (!str) return '';
@@ -71,6 +73,7 @@ interface SidebarProps {
     activeTab?: string;
     onSelectTab?: (tab: 'dashboard' | 'gallery' | 'aitools') => void;
     onUpdateCrochetTerminology?: (pref: 'US' | 'UK') => Promise<void>;
+    projects?: any[];
 }
 
 export function Sidebar({
@@ -89,7 +92,8 @@ export function Sidebar({
     onUpdateToken,
     activeTab,
     onSelectTab,
-    onUpdateCrochetTerminology
+    onUpdateCrochetTerminology,
+    projects = []
 }: SidebarProps) {
     const [newCategoryName, setNewCategoryName] = useState('');
     const [isAdding, setIsAdding] = useState(false);
@@ -104,6 +108,7 @@ export function Sidebar({
     const [tempProfilePicture, setTempProfilePicture] = useState('');
     const [isSavingProfile, setIsSavingProfile] = useState(false);
     const [isDeactivating, setIsDeactivating] = useState(false);
+    const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] = useState(false);
 
     const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
     const [currentPassword, setCurrentPassword] = useState('');
@@ -926,28 +931,20 @@ export function Sidebar({
 
                                 {/* Delete Account Section */}
                                 <div className="space-y-2 bg-stone-50/50 p-4 border border-subtle/40 rounded-2xl">
-                                    <h4 className="text-xs font-bold text-heading uppercase tracking-widest">Delete Account</h4>
+                                    <h4 className="text-xs font-bold text-red-600 uppercase tracking-widest">Delete Account</h4>
                                     <p className="text-[11px] text-muted font-semibold leading-relaxed">
-                                        To permanently delete your account and all associated patterns, projects, and chat history, please email us to delete your account at:
+                                        Permanently delete your account, projects, patterns, and photos. You will have an opportunity to download a full backup archive first.
                                     </p>
-                                    <div className="flex items-center justify-between bg-white border border-subtle/60 px-3.5 py-2.5 rounded-xl mt-1">
-                                        <a
-                                            href="mailto:support.myyarndiary@gmail.com?subject=Delete%20My%20Yarn%20Diary%20Account"
-                                            className="text-xs font-bold text-accent hover:underline transition-all"
-                                        >
-                                            support.myyarndiary@gmail.com
-                                        </a>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                navigator.clipboard.writeText('support.myyarndiary@gmail.com');
-                                                showAlert('Email copied to clipboard!', 'Copied');
-                                            }}
-                                            className="text-[11px] font-bold text-muted bg-page hover:bg-border/60 px-2 py-1 rounded-md border border-subtle/30 transition-all cursor-pointer"
-                                        >
-                                            Copy
-                                        </button>
-                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsSettingsOpen(false);
+                                            setIsDeleteAccountModalOpen(true);
+                                        }}
+                                        className="mt-1 px-4 py-2 border border-red-300 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs transition-all cursor-pointer shadow-xs"
+                                    >
+                                        Delete Account Permanently
+                                    </button>
                                 </div>
                             </div>
 
@@ -1057,6 +1054,16 @@ export function Sidebar({
                     </div>
                 )}
             </AnimatePresence>
+
+            {/* Account Permanent Deletion & Export Modal */}
+            <DeleteAccountModal
+                isOpen={isDeleteAccountModalOpen}
+                onClose={() => setIsDeleteAccountModalOpen(false)}
+                currentUser={currentUser}
+                token={token}
+                categories={categories}
+                projects={projects}
+            />
         </div>
     );
 }

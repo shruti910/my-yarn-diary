@@ -85,6 +85,10 @@ public class FirebaseAuthenticationFilter extends AbstractGatewayFilterFactory<F
                         String safeName = name != null ? URLEncoder.encode(name, StandardCharsets.UTF_8) : "";
                         String safePicture = picture != null ? URLEncoder.encode(picture, StandardCharsets.UTF_8) : "";
 
+                        // Extract auth_time claim (epoch seconds) for sensitive operations like password change
+                        Object authTimeClaim = decodedToken.getClaims().get("auth_time");
+                        String authTimeStr = authTimeClaim != null ? String.valueOf(authTimeClaim) : "";
+
                         // Inject headers to request
                         ServerHttpRequest mutatedRequest = request.mutate()
                                 .header("X-User-Id", standardizedUserId)
@@ -92,6 +96,7 @@ public class FirebaseAuthenticationFilter extends AbstractGatewayFilterFactory<F
                                 .header("X-User-Name", safeName)
                                 .header("X-User-Profile-Picture", safePicture)
                                 .header("X-Firebase-Uid", firebaseUid)
+                                .header("X-Auth-Time", authTimeStr)
                                 .header("X-Forwarded-Identity", internalJwt)
                                 .build();
 

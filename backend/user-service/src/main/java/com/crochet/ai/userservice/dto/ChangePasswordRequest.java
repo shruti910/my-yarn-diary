@@ -2,12 +2,13 @@ package com.crochet.ai.userservice.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import lombok.Data;
 
-@Data
-public class ChangePasswordRequest {
-
+public record ChangePasswordRequest(
     @NotBlank(message = "New password is required")
-    @Size(min = 6, max = 100, message = "New password must be at least 6 characters long")
-    private String newPassword;
+    @Size(min = 6, max = 100, message = "New password must be between 6 and 100 characters")
+    String newPassword
+) {
+    public String getNewPassword() {
+        return newPassword;
+    }
 }

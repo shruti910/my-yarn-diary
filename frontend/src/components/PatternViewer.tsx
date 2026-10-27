@@ -11,6 +11,7 @@ import { YarnSpinner } from './YarnSpinner';
 import { Pattern, Project } from '../types';
 import { useDialog } from './DialogProvider';
 import { useAutosave } from '../hooks/useAutosave';
+import { logger, scrubUrl } from '../lib/logger';
 import { useClickOutside } from '../hooks/useClickOutside';
 
 // Extend Window interface for PDF.js loading
@@ -175,11 +176,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
           }
         }
 
-        console.group('%c[Network API Error Interceptor]', 'color: var(--error-default); font-weight: bold;');
-        console.error(`[URI]: ${url}`);
-        console.error(`[Status Code]: ${response.status} (${response.statusText || 'Status Unknown'})`);
-        console.error(`[Method]: ${options.method || 'GET'}`);
-        console.groupEnd();
+        logger.apiError(url, response.status, options.method || 'GET');
         throw new Error(errMsg);
       }
       if (response.status === 204) {
@@ -187,7 +184,7 @@ export function PatternViewer({ project, token, onUpdateProject, onUpdateProject
       }
       return await response.json();
     } catch (err) {
-      console.error(`%c[Pipeline Fetch Failure] unable to resolve: ${url}`, 'color: var(--warning-default); font-weight: bold;', err);
+      logger.error('Fetch failed', err, { route: scrubUrl(url) });
       throw err;
     }
   };

@@ -2,12 +2,15 @@ package com.crochet.ai.crochetservice.service;
 
 import com.crochet.ai.crochetservice.dto.*;
 import com.crochet.ai.crochetservice.entity.*;
+import com.crochet.ai.crochetservice.enums.AuditAction;
+import com.crochet.ai.crochetservice.enums.ResourceType;
 import com.crochet.ai.crochetservice.exception.*;
 import com.crochet.ai.crochetservice.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import java.time.LocalDateTime;
@@ -17,6 +20,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class CrochetService {
 
@@ -27,6 +31,7 @@ public class CrochetService {
     private final YarnRepository yarnRepository;
     private final HookRepository hookRepository;
     private final PhotoRepository photoRepository;
+    private final AsyncAuditPublisher auditPublisher;
 
     @Autowired
     public CrochetService(CategoryRepository categoryRepository,
@@ -35,7 +40,8 @@ public class CrochetService {
             PatternRepository patternRepository,
             YarnRepository yarnRepository,
             HookRepository hookRepository,
-            PhotoRepository photoRepository) {
+            PhotoRepository photoRepository,
+            AsyncAuditPublisher auditPublisher) {
         this.categoryRepository = categoryRepository;
         this.projectRepository = projectRepository;
         this.journalLogRepository = journalLogRepository;
@@ -43,6 +49,7 @@ public class CrochetService {
         this.yarnRepository = yarnRepository;
         this.hookRepository = hookRepository;
         this.photoRepository = photoRepository;
+        this.auditPublisher = auditPublisher;
     }
 
     // --- DIRECTORIES / CATEGORIES ---
@@ -323,6 +330,13 @@ public class CrochetService {
                 .build();
 
         project = projectRepository.save(project);
+        auditPublisher.publish(
+                project.getUserId(),
+                AuditAction.PROJECT_CREATED,
+                ResourceType.PROJECT,
+                project.getProjectId().toString(),
+                "{\"title\":\"" + project.getTitle() + "\"}"
+        );
         return mapToProjectResponse(project);
     }
 
@@ -376,6 +390,13 @@ public class CrochetService {
         Project project = getProjectDetails(userId, projectId);
         journalLogRepository.deleteByProjectId(project.getProjectId());
         projectRepository.delete(project);
+        auditPublisher.publish(
+                project.getUserId(),
+                AuditAction.PROJECT_DELETED,
+                ResourceType.PROJECT,
+                projectId,
+                "{\"title\":\"" + project.getTitle() + "\"}"
+        );
     }
 
     @Transactional
@@ -445,6 +466,22 @@ public class CrochetService {
     public void deleteJournalLog(String userId, String logId) {
         JournalLog log = getValidatedJournalLog(userId, logId);
         journalLogRepository.delete(log);
+    }
+
+    @Transactional
+    public void deleteAllUserData(String userId) {
+        UUID userUuid = UUID.fromString(userId);
+        log.warn("Purging all projects and categories for user: {}", userId);
+        List<Project> projects = projectRepository.findByUserId(userUuid);
+        if (projects != null && !projects.isEmpty()) {
+            projectRepository.deleteAll(projects);
+            log.info("Successfully deleted {} projects for user: {}", projects.size(), userId);
+        }
+        List<Category> categories = categoryRepository.findByUserId(userUuid);
+        if (categories != null && !categories.isEmpty()) {
+            categoryRepository.deleteAll(categories);
+            log.info("Successfully deleted {} categories for user: {}", categories.size(), userId);
+        }
     }
 
     // --- HUB GALLERY ---

@@ -220,8 +220,9 @@ export async function exportProjectToPdf(
   logs: JournalLog[],
   categoryName: string,
   selectedCoverPhotoIdOrBase64: string | null,
-  rawProductPhotos?: string[]
-) {
+  rawProductPhotos?: string[],
+  download: boolean = true
+): Promise<Uint8Array> {
   const allProductPhotos = (rawProductPhotos && rawProductPhotos.length > 0)
     ? rawProductPhotos
     : (project.photos || []).map(p => p.photoBase64);
@@ -905,17 +906,28 @@ export async function exportProjectToPdf(
  }
 
  const mergedPdfBytes = await mainPdfDoc.save();
+ if (download) {
  const blob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
  const link = document.createElement('a');
  link.href = URL.createObjectURL(blob);
  link.download = fileName;
  link.click();
  URL.revokeObjectURL(link.href);
+ }
+ return mergedPdfBytes;
  } catch (mergeErr) {
  console.error('Failed to merge PDFs using pdf-lib, falling back to standard download:', mergeErr);
+ const fallbackBytes = new Uint8Array(doc.output('arraybuffer'));
+ if (download) {
  doc.save(fileName);
  }
+ return fallbackBytes;
+ }
  } else {
+ const rawBytes = new Uint8Array(doc.output('arraybuffer'));
+ if (download) {
  doc.save(fileName);
+ }
+ return rawBytes;
  }
 }

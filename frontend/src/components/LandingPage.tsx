@@ -9,6 +9,7 @@ import {
    NotebookPen, Sparkles, ScanText, ScanSearch, Images, Globe,
    Heart, Plus, ArrowRight,
 } from 'lucide-react';
+import { SUPPORT_MAILTO } from '../lib/constants';
 
 interface LandingPageProps {
    /** Open the auth screen in sign-in mode. */
@@ -63,7 +64,7 @@ const FAQS = [
 
 const FOOTER: Record<string, [string, string][]> = {
    Product: [['Features', '#features'], ['AI Buddy', '#features'], ['Pattern decoder', '#features'], ['Mobile', '#']],
-   Company: [['About', '#'], ['Blog', '#'], ['Contact', 'mailto:myyarndiary@gmail.com'], ['Support', 'mailto:myyarndiary@gmail.com']],
+   Company: [['About', '#'], ['Blog', '#'], ['Contact', SUPPORT_MAILTO], ['Support', SUPPORT_MAILTO]],
    Legal: [['Terms of Service', '#'], ['Privacy Policy', '#'], ['Cookie Policy', '#'], ['Licenses', '#']],
 };
 

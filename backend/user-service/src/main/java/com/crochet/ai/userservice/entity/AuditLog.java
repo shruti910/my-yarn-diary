@@ -25,6 +25,18 @@ public class AuditLog {
     @Column(name = "action", nullable = false, length = 100)
     private String action;
 
+    @Column(name = "resource_type", length = 40)
+    private String resourceType;
+
+    @Column(name = "resource_id", length = 100)
+    private String resourceId;
+
+    @Column(name = "status", nullable = false, length = 20)
+    private String status;
+
+    @Column(name = "details", columnDefinition = "TEXT")
+    private String details;
+
     @Column(name = "timestamp", nullable = false)
     private LocalDateTime timestamp;
 }

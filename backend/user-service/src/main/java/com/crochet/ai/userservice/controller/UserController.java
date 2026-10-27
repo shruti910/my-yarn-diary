@@ -69,20 +69,31 @@ public class UserController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(
             @RequestHeader("X-User-Id") String authenticatedUserId,
+            @RequestHeader(value = "X-Firebase-Uid", required = false) String firebaseUid,
+            @RequestHeader(value = "X-Auth-Time", required = false) String authTime,
             @PathVariable("id") String userId) {
         log.warn("Deleting user account for userId: {} (authenticated: {})", userId, authenticatedUserId);
         validateUserOwnership(authenticatedUserId, userId);
-        userService.deleteUser(userId);
+        userService.deleteUser(userId, firebaseUid, authTime);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/audit-events")
+    public ResponseEntity<Void> recordAuditEvent(
+            @RequestHeader(value = "X-Forwarded-Identity", required = false) String forwardedIdentity,
+            @RequestBody @jakarta.validation.Valid com.crochet.ai.userservice.dto.AuditLogEventRequest request) {
+        userService.recordAuditEvent(request);
+        return ResponseEntity.status(org.springframework.http.HttpStatus.ACCEPTED).build();
     }
 
     @PutMapping({ "/profile/change-password", "/{id}/password" })
     public ResponseEntity<Void> changePassword(
             @RequestHeader("X-User-Id") String authenticatedUserId,
             @RequestHeader("X-Firebase-Uid") String firebaseUid,
+            @RequestHeader("X-Auth-Time") String authTime,
             @RequestBody @jakarta.validation.Valid ChangePasswordRequest request) {
         log.info("Request to change password for user ID: {} (firebase UID: {})", authenticatedUserId, firebaseUid);
-        userService.changePassword(authenticatedUserId, firebaseUid, request.getNewPassword());
+        userService.changePassword(authenticatedUserId, firebaseUid, authTime, request.getNewPassword());
         return ResponseEntity.ok().build();
     }
 

@@ -19,11 +19,13 @@ import { CrochetLoader } from './components/CrochetLoader';
 import { InstallPrompt } from './components/InstallPrompt';
 import { useOnlineStatus } from './lib/useOnlineStatus';
 import { Category, Project, JournalLog, ProjectStatus, ChatCategory } from './types';
-import { BookOpen, Sparkles, X, Menu, CircleUserRound, Settings, Mail, Trash2, User, Image as ImageIcon, Check, CloudOff } from 'lucide-react';
+import { BookOpen, Sparkles, X, Menu, CircleUserRound, Trash2, User, Image as ImageIcon, Check, CloudOff } from 'lucide-react';
 import { TerminologyToggle } from './components/TerminologyToggle';
 import { motion, AnimatePresence } from 'motion/react';
 import { useDialog } from './components/DialogProvider';
 import { auth } from './lib/firebase';
+import { logger, scrubUrl } from './lib/logger';
+import { clearAllDrafts } from './lib/journalDraft';
 import { onIdTokenChanged, signOut, getRedirectResult } from 'firebase/auth';
 
 interface ProfileModalProps {
@@ -195,92 +197,11 @@ function ProfileModal({ isOpen, onClose, currentUser, onSave }: ProfileModalProp
   );
 }
 
-interface SettingsModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  currentUser: any;
-  onDeactivate: () => Promise<void>;
-}
-
-function SettingsModal({ isOpen, onClose, currentUser, onDeactivate }: SettingsModalProps) {
-  if (!isOpen) return null;
-
-  const mailtoUrl = `mailto:myyarndiary@gmail.com?subject=Delete%20Account%20Request&body=Please%20delete%20my%20account%20associated%20with%20email%20${encodeURIComponent(currentUser?.email || '')}.`;
-
-  return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs select-none">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 15 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 15 }}
-        transition={{ duration: 0.2 }}
-        className="bg-white rounded-[2rem] border border-subtle max-w-md w-full p-6 space-y-6 shadow-2xl relative max-h-[90dvh] overflow-y-auto scrollbar-hide"
-      >
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-muted hover:text-brand hover:bg-stone-100 rounded-full transition-colors cursor-pointer"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        <div className="flex items-center gap-3 border-b border-subtle pb-3">
-          <div className="p-2.5 rounded-xl bg-accent/10 text-accent">
-            <Settings className="w-6 h-6" />
-          </div>
-          <div>
-            <h3 className="font-serif font-extrabold text-heading text-lg">Account Settings</h3>
-            <p className="text-xs text-muted font-medium">Manage your account preferences</p>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          {/* Deactivate Option Card */}
-          <div className="p-4 bg-amber-50/40 border border-amber-200/60 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-1 max-w-[240px]">
-              <h4 className="text-xs font-bold text-amber-800">Deactivate Account</h4>
-              <p className="text-[11px] text-stone-600 leading-relaxed">
-                Temporarily disable your profile. You can reactivate anytime by logging back in.
-              </p>
-            </div>
-            <button
-              onClick={onDeactivate}
-              className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shadow-amber-600/10 shrink-0 self-start sm:self-center"
-            >
-              Deactivate
-            </button>
-          </div>
-
-          {/* Delete Option Card */}
-          <div className="p-4 bg-red-50/40 border border-red-200/60 rounded-2xl flex flex-col gap-3">
-            <div className="space-y-1">
-              <h4 className="text-xs font-bold text-red-800">Delete Account</h4>
-              <p className="text-[11px] text-stone-600 leading-relaxed font-semibold">
-                Permanently delete all stored projects, patterns, and journals. This action is irreversible.
-              </p>
-            </div>
-
-            <a
-              href={mailtoUrl}
-              className="w-full py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shadow-red-600/10 flex items-center justify-center gap-1.5 text-center"
-            >
-              <Mail className="w-3.5 h-3.5" />
-              Contact Support to Delete Account
-            </a>
-            <p className="text-[11px] text-center text-stone-500 font-semibold italic">
-              Opens your default mail app to email support at myyarndiary@gmail.com
-            </p>
-          </div>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
 
 export default function App() {
   const { showToast, showAlert, showConfirm } = useDialog();
   const isOnline = useOnlineStatus();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [shouldAutoOpenProjectModal, setShouldAutoOpenProjectModal] = useState(false);
 
   // Render-state copy only. Firebase owns durable auth-session persistence.
@@ -470,11 +391,7 @@ export default function App() {
           }
         }
 
-        console.group('%c[Network API Error Interceptor]', 'color: var(--error-default); font-weight: bold;');
-        console.error(`[URI]: ${url}`);
-        console.error(`[Status Code]: ${response.status} (${response.statusText || 'Status Unknown'})`);
-        console.error(`[Method]: ${options.method || 'GET'}`);
-        console.groupEnd();
+        logger.apiError(url, response.status, options.method || 'GET');
         throw new Error(errMsg);
       }
       if (response.status === 204) {
@@ -482,7 +399,7 @@ export default function App() {
       }
       return await response.json();
     } catch (err) {
-      console.error(`%c[Pipeline Fetch Failure] unable to resolve: ${url}`, 'color: var(--warning-default); font-weight: bold;', err);
+      logger.error('Fetch failed', err, { route: scrubUrl(url) });
       throw err;
     }
   };
@@ -620,6 +537,7 @@ export default function App() {
     localStorage.removeItem('crochet_token');
     localStorage.removeItem('crochet_user');
     localStorage.removeItem('crochet_floating_buddy_dismissed');
+    clearAllDrafts();
     setIsFloatingBuddyDismissed(false);
     setToken(null);
     setUser(null);
@@ -969,26 +887,6 @@ export default function App() {
     }
   };
 
-  const handleDeactivateAccount = async () => {
-    const confirmed = await showConfirm(
-      'Are you sure you want to deactivate your account? This will hide your profile and log you out. You can re-activate by logging in again.',
-      'Deactivate Account'
-    );
-    if (!confirmed) return;
-
-    try {
-      await fetchWithToken(`/api/v1/users/${user.userId}`, {
-        method: 'DELETE'
-      });
-      showToast('Account deactivated successfully.', 'success');
-      setIsSettingsOpen(false);
-      handleLogout();
-    } catch (err: any) {
-      console.error('Failed to deactivate account:', err);
-      showToast(err.message || 'Failed to deactivate account.', 'error');
-    }
-  };
-
   const handleSelectCategory = (categoryId: string) => {
     setActiveCategoryId(categoryId);
     setSelectedProject(null);
@@ -1104,6 +1002,7 @@ export default function App() {
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         onUpdateCrochetTerminology={updateCrochetTerminology}
+        projects={projects}
       />
 
       {/* 2. Main working content frame */}
@@ -1317,16 +1216,6 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {isSettingsOpen && (
-          <SettingsModal
-            isOpen={isSettingsOpen}
-            onClose={() => setIsSettingsOpen(false)}
-            currentUser={user}
-            onDeactivate={handleDeactivateAccount}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 }

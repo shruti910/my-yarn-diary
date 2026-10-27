@@ -101,4 +101,16 @@ public class ProjectController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(crochetService.duplicateProject(userId, projectId));
     }
+
+    @DeleteMapping("/user/{targetUserId}")
+    public ResponseEntity<Void> deleteAllProjectsForUser(
+            @RequestHeader("X-User-Id") String authenticatedUserId,
+            @PathVariable String targetUserId) {
+        log.warn("Request to purge all projects for target user: {} (authenticated: {})", targetUserId, authenticatedUserId);
+        if (authenticatedUserId == null || !authenticatedUserId.equalsIgnoreCase(targetUserId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        crochetService.deleteAllUserData(targetUserId);
+        return ResponseEntity.noContent().build();
+    }
 }

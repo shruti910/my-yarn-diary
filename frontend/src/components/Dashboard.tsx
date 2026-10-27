@@ -547,6 +547,7 @@ export function Dashboard({
                   Previous
                 </button>
 
+                {/* Index key: `i` is the page number. */}
                 {Array.from({ length: totalPages }, (_, i) => (
                   <button
                     key={i}

@@ -13,5 +13,12 @@
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     }
 
-    reverse_proxy gateway:3000
+    # `route` so evaluation follows written order, not Caddy's directive table.
+    route {
+        # Actuator is in-container diagnostics only. Also locked down at the
+        # source in each service's application*.yml; this is the second layer.
+        respond /actuator* 404
+
+        reverse_proxy gateway:3000
+    }
 }

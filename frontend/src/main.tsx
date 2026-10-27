@@ -68,19 +68,18 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
 
 // Resolve your secure production DSN target dynamically from Vite's environment context
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN || '';
+const gatewayOrigin = import.meta.env.VITE_GATEWAY_URL;
 
 if (sentryDsn) {
  Sentry.init({
  dsn: sentryDsn,
  environment: import.meta.env.VITE_APP_PROFILE || 'local',
 
- // Modern functional integrations hook for automatic browser performance tracking
  integrations: [
  Sentry.browserTracingIntegration(),
  ],
 
- // Capture 100% of frontend transactions during local dev/testing
- tracesSampleRate: 1.0,
+ tracesSampleRate: import.meta.env.DEV ? 1.0 : 0.1,
 
  //Propagates W3C traceparent headers across origins
  tracePropagationTargets: [
@@ -88,6 +87,7 @@ if (sentryDsn) {
  /^http:\/\/localhost:5173/,
  /^http:\/\/localhost:3000/, // Maps your Ingress Gateway entry context
  /^\/api\/v1/,
+ ...(gatewayOrigin ? [gatewayOrigin] : []),
  ],
 
  // Compliance data governance block from your template sheet
@@ -96,9 +96,6 @@ if (sentryDsn) {
  // httpBodies: []
  }
  });
- console.log('[Sentry Engine] Distributed performance tracing initialization complete.');
-} else {
- console.warn('[Sentry Engine] VITE_SENTRY_DSN key missing. Running client on fallback standalone pipeline.');
 }
 
 import { DialogProvider } from './components/DialogProvider';

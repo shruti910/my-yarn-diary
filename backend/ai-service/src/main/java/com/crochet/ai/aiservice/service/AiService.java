@@ -5,6 +5,8 @@ import com.crochet.ai.aiservice.entity.ChatMessage;
 import com.crochet.ai.aiservice.entity.ChatRole;
 import com.crochet.ai.aiservice.entity.ChatSession;
 import com.crochet.ai.aiservice.entity.UserRateLimit;
+import com.crochet.ai.aiservice.enums.AuditAction;
+import com.crochet.ai.aiservice.enums.ResourceType;
 import com.crochet.ai.aiservice.exception.*;
 import com.crochet.ai.aiservice.interfaces.LlmProvider;
 import com.crochet.ai.aiservice.repository.ChatMessageRepository;
@@ -32,16 +34,19 @@ public class AiService {
     private final ChatMessageRepository chatMessageRepository;
     private final UserRateLimitRepository userRateLimitRepository;
     private final LlmProvider llmProvider;
+    private final AsyncAuditPublisher auditPublisher;
 
     @Autowired
     public AiService(ChatSessionRepository chatSessionRepository,
             ChatMessageRepository chatMessageRepository,
             UserRateLimitRepository userRateLimitRepository,
-            LlmProvider llmProvider) {
+            LlmProvider llmProvider,
+            AsyncAuditPublisher auditPublisher) {
         this.chatSessionRepository = chatSessionRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.userRateLimitRepository = userRateLimitRepository;
         this.llmProvider = llmProvider;
+        this.auditPublisher = auditPublisher;
     }
 
     public Page<ChatSessionDto> getSessions(String userId, String categoryStr, Pageable pageable) {
@@ -77,6 +82,13 @@ public class AiService {
                 .build();
 
         ChatSession saved = chatSessionRepository.save(session);
+        auditPublisher.publish(
+                saved.getUserId(),
+                AuditAction.CHAT_SESSION_CREATED,
+                ResourceType.CHAT_SESSION,
+                saved.getChatId().toString(),
+                "{\"title\":\"" + saved.getTitle() + "\"}"
+        );
         return mapToSessionDto(saved);
     }
 
@@ -203,6 +215,13 @@ public class AiService {
             throw new ForbiddenException("Forbidden session removal context");
         }
         chatSessionRepository.delete(session);
+        auditPublisher.publish(
+                userUuid,
+                AuditAction.CHAT_SESSION_DELETED,
+                ResourceType.CHAT_SESSION,
+                chatId,
+                "{\"title\":\"" + session.getTitle() + "\"}"
+        );
     }
 
     @Transactional
@@ -258,5 +277,18 @@ public class AiService {
                 .createdAt(session.getCreatedAt())
                 .pinned(session.isPinned())
                 .build();
+    }
+
+    @Transactional
+    public void deleteAllUserData(String userId) {
+        UUID userUuid = UUID.fromString(userId);
+        log.warn("Purging all AI chat sessions and rate limits for user: {}", userId);
+        List<ChatSession> sessions = chatSessionRepository.findByUserIdOrderByCreatedAtDesc(userUuid);
+        if (sessions != null && !sessions.isEmpty()) {
+            chatSessionRepository.deleteAll(sessions);
+            log.info("Successfully purged {} AI chat sessions for user: {}", sessions.size(), userId);
+        }
+        userRateLimitRepository.deleteById(userUuid);
+        log.info("Purged rate limit record for user: {}", userId);
     }
 }

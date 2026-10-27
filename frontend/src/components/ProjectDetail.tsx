@@ -14,6 +14,17 @@ import { PatternViewer } from './PatternViewer';
 import { YarnSpinner } from './YarnSpinner';
 import { exportProjectToPdf } from '../lib/pdfExport';
 import { isValidName, TEXT_REGEX_MESSAGE } from '../lib/validation';
+import { logger, scrubUrl } from '../lib/logger';
+import { toCompressedJpeg } from '../lib/image';
+import {
+ TEXT_DRAFT_PREFIX,
+ clearPhotoDraft,
+ clearTextDraft,
+ loadPhotoDraft,
+ savePhotoDraft,
+ saveTextDraft,
+ toDataUrl,
+} from '../lib/journalDraft';
 import { useAutosave } from '../hooks/useAutosave';
 
 const capitalizeWords = (str: string): string => {
@@ -76,47 +87,52 @@ export function ProjectDetail({
  const [logImageMime, setLogImageMime] = useState('');
  const [logImageBase64, setLogImageBase64] = useState<string | null>(null);
 
+  // Warn at most once per attached photo.
+  const draftQuotaWarnedRef = useRef(false);
+
   // LocalStorage draft for the in-progress journal entry (text + attached photo),
   // so nothing is lost if the tab is closed before clicking "Add Entry".
   useEffect(() => {
     if (!project?.projectId) return;
-    const savedDraft = localStorage.getItem(`journal_draft_${project.projectId}`);
+    const savedDraft = localStorage.getItem(TEXT_DRAFT_PREFIX + project.projectId);
     if (savedDraft && !textEntry) {
       setTextEntry(savedDraft);
     }
-    const savedPhoto = localStorage.getItem(`journal_draft_photo_${project.projectId}`);
+    const savedPhoto = loadPhotoDraft(project.projectId);
     if (savedPhoto && !logImage) {
-      try {
-        const p = JSON.parse(savedPhoto);
-        if (p.logImage) setLogImage(p.logImage);
-        if (p.logImageMime) setLogImageMime(p.logImageMime);
-        if (p.logImageBase64) setLogImageBase64(p.logImageBase64);
-      } catch (e) {
-        console.error('Failed to restore journal photo draft:', e);
-      }
+      setLogImage(toDataUrl(savedPhoto));
+      setLogImageMime(savedPhoto.mime);
+      setLogImageBase64(savedPhoto.b64);
     }
   }, [project?.projectId]);
 
   useEffect(() => {
     if (!project?.projectId) return;
     if (textEntry) {
-      localStorage.setItem(`journal_draft_${project.projectId}`, textEntry);
+      saveTextDraft(project.projectId, textEntry);
     } else {
-      localStorage.removeItem(`journal_draft_${project.projectId}`);
+      clearTextDraft(project.projectId);
     }
   }, [textEntry, project?.projectId]);
 
   useEffect(() => {
     if (!project?.projectId) return;
-    const key = `journal_draft_photo_${project.projectId}`;
-    if (logImage) {
-      try {
-        localStorage.setItem(key, JSON.stringify({ logImage, logImageMime, logImageBase64 }));
-      } catch (e) {
-        console.error('Failed to persist journal photo draft:', e);
-      }
-    } else {
-      localStorage.removeItem(key);
+
+    if (!logImage) {
+      clearPhotoDraft(project.projectId);
+      draftQuotaWarnedRef.current = false;
+      return;
+    }
+
+    const b64 = logImageBase64 ?? logImage.split(',')[1] ?? '';
+    const result = savePhotoDraft(project.projectId, logImageMime || 'image/jpeg', b64);
+
+    if (result !== 'saved' && !draftQuotaWarnedRef.current) {
+      draftQuotaWarnedRef.current = true;
+      showToast(
+        'This photo is too large to save as a draft — add the entry before closing the tab.',
+        'error',
+      );
     }
   }, [logImage, logImageMime, logImageBase64, project?.projectId]);
 
@@ -306,11 +322,7 @@ export function ProjectDetail({
   }
   }
 
- console.group('%c[Network API Error Interceptor]', 'color: var(--error-default); font-weight: bold;');
- console.error(`[URI]: ${url}`);
- console.error(`[Status Code]: ${response.status} (${response.statusText || 'Status Unknown'})`);
- console.error(`[Method]: ${options.method || 'GET'}`);
- console.groupEnd();
+ logger.apiError(url, response.status, options.method || 'GET');
  throw new Error(errMsg);
  }
  if (response.status === 204) {
@@ -318,7 +330,7 @@ export function ProjectDetail({
  }
  return await response.json();
  } catch (err) {
- console.error(`%c[Pipeline Fetch Failure] unable to resolve: ${url}`, 'color: var(--warning-default); font-weight: bold;', err);
+ logger.error('Fetch failed', err, { route: scrubUrl(url) });
  throw err;
  }
  };
@@ -843,8 +855,8 @@ export function ProjectDetail({
         setLogImage(null);
         setLogImageMime('');
         setLogImageBase64(null);
-        localStorage.removeItem(`journal_draft_${project.projectId}`);
-        localStorage.removeItem(`journal_draft_photo_${project.projectId}`);
+        clearTextDraft(project.projectId);
+        clearPhotoDraft(project.projectId);
         showToast('Saving...', 'success');
         loadLogs(0, logsPageSize, true);
       }
@@ -927,15 +939,13 @@ export function ProjectDetail({
  if (!videoRef.current || !cameraStream) return;
 
  const video = videoRef.current;
- const canvas = document.createElement('canvas');
- canvas.width = video.videoWidth || 640;
- canvas.height = video.videoHeight || 480;
+ const capturedBase64 = toCompressedJpeg(
+ video,
+ video.videoWidth || 640,
+ video.videoHeight || 480,
+ );
 
- const ctx = canvas.getContext('2d');
- if (ctx) {
- ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
- const capturedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-
+ if (capturedBase64) {
  if (cameraTarget === 'product') {
  if (productPhotos.length >= 6) {
  await showAlert("You have already uploaded the maximum limit of 6 photos.");
@@ -1526,7 +1536,7 @@ export function ProjectDetail({
  : (coverPhoto === photo);
 
  return (
- <div key={i} className="relative aspect-square group rounded-xl overflow-hidden border border-subtle bg-surface">
+ <div key={matchedPhoto?.id ?? photo.slice(-40)} className="relative aspect-square group rounded-xl overflow-hidden border border-subtle bg-surface">
  <img
  src={photo}
  alt={`Finished product showcase ${i + 1}`}
@@ -1828,6 +1838,7 @@ export function ProjectDetail({
  Prev
  </button>
 
+ {/* Index key: `i` is the page number. */}
  {Array.from({ length: logsTotalPages }, (_, i) => (
  <button
  key={i}

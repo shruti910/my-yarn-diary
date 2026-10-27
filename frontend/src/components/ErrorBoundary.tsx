@@ -1,4 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import * as Sentry from '@sentry/react';
+import { logger } from '../lib/logger';
 
 interface Props {
  children?: ReactNode;
@@ -20,7 +22,11 @@ export class ErrorBoundary extends Component<Props, State> {
  }
 
  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
- console.error('[Error Boundary Intercepted Exception]:', error, errorInfo);
+ Sentry.captureException(error, {
+ tags: { source: 'client', boundary: 'react' },
+ contexts: { react: { componentStack: errorInfo.componentStack } },
+ });
+ logger.error('[ErrorBoundary] render failure', error);
  }
 
  public render() {

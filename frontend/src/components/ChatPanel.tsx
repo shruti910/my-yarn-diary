@@ -5,6 +5,8 @@ import Markdown from 'react-markdown';
 import { sanitizeHtml } from '../lib/sanitizer';
 import { isValidName, TEXT_REGEX_MESSAGE } from '../lib/validation';
 import { ChatSession, ChatMessage, ChatCategory } from '../types';
+import { logger, scrubUrl } from '../lib/logger';
+import { toCompressedJpeg } from '../lib/image';
 import { useDialog } from './DialogProvider';
 
 const detectTerminology = (text: string | null | undefined): 'US' | 'UK' | null => {
@@ -67,6 +69,9 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
 
  // In-chat image attachments (multiple, up to 3)
  interface ImageAttachment {
+ // FileReader.onload callbacks resolve out of order, so array position is not
+ // a stable identity.
+ id: string;
  preview: string;
  base64: string;
  mime: string;
@@ -74,7 +79,6 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  const [attachments, setAttachments] = useState<ImageAttachment[]>([]);
  const [cameraActive, setCameraActive] = useState(false);
  const videoRef = useRef<HTMLVideoElement | null>(null);
- const canvasRef = useRef<HTMLCanvasElement | null>(null);
  const streamRef = useRef<MediaStream | null>(null);
 
  useEffect(() => {
@@ -163,16 +167,13 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
   }
   }
 
- console.group('%c[Network API Error Interceptor]', 'color: var(--error-default); font-weight: bold;');
- console.error(`[URI]: ${url}`);
- console.error(`[Status Code]: ${response.status} (${response.statusText || 'Status Unknown'})`);
- console.error(`[Method]: ${options.method || 'GET'}`);
- console.groupEnd();
+ logger.apiError(url, response.status, options.method || 'GET');
  throw new Error(errMsg);
  }
  return await response.json();
  } catch (err) {
- console.error(`%c[Pipeline Fetch Failure] unable to resolve: ${url}`, 'color: var(--warning-default); font-weight: bold;', err);
+ // NB: unlike the other callers this swallows the error and returns null.
+ logger.error('Fetch failed', err, { route: scrubUrl(url) });
  return null;
  }
  };
@@ -489,15 +490,15 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  reader.onload = () => {
  const preview = reader.result as string;
  const base64 = preview.split(',')[1];
- setAttachments(prev => [...prev, { preview, base64, mime: file.type }]);
+ setAttachments(prev => [...prev, { id: crypto.randomUUID(), preview, base64, mime: file.type }]);
  };
  reader.readAsDataURL(file);
  });
  }
  };
 
- const removeAttachment = (index: number) => {
- setAttachments(prev => prev.filter((_, i) => i !== index));
+ const removeAttachment = (id: string) => {
+ setAttachments(prev => prev.filter(a => a.id !== id));
  };
 
  const clearAttachments = () => {
@@ -530,16 +531,10 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  };
 
  const capturePhoto = () => {
- if (videoRef.current && canvasRef.current) {
+ if (videoRef.current) {
  const video = videoRef.current;
- const canvas = canvasRef.current;
- const ctx = canvas.getContext('2d');
- if (ctx) {
- canvas.width = video.videoWidth;
- canvas.height = video.videoHeight;
- ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
- const dataUrl = canvas.toDataURL('image/jpeg');
+ const dataUrl = toCompressedJpeg(video, video.videoWidth, video.videoHeight);
+ if (dataUrl) {
  const preview = dataUrl;
  const base64 = dataUrl.split(',')[1];
 
@@ -549,7 +544,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  return;
  }
 
- setAttachments(prev => [...prev, { preview, base64, mime: 'image/jpeg' }]);
+ setAttachments(prev => [...prev, { id: crypto.randomUUID(), preview, base64, mime: 'image/jpeg' }]);
  stopCamera();
  }
  }
@@ -1049,6 +1044,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  <p className="text-xs text-muted font-semibold mt-1">{intro.desc}</p>
  </div>
  <div className="flex flex-wrap gap-2 justify-center pt-2">
+ {/* Index key: static literals, never reordered. */}
  {intro.suggestions.map((sug, i) => (
  <button
  key={i}
@@ -1088,6 +1084,7 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  {/* Message payload cards */}
  {msg.imageData && (
  <div className="flex flex-col gap-3">
+ {/* Index key: immutable, derived from a settled message. */}
  {msg.imageData.split('|||').map((imgUrl, i) => (
  <div key={i} className="flex flex-col max-w-sm rounded-2xl overflow-hidden shadow-md border border-subtle bg-white">
 
@@ -1246,11 +1243,11 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  <div className="mb-3 p-2.5 bg-surface border border-subtle rounded-xl flex items-center justify-between w-full gap-4 animate-scale-up">
  <div className="flex flex-wrap gap-2.5 items-center">
  {attachments.map((att, index) => (
- <div key={index} className="relative group w-12 h-12">
- <img src={att.preview} className="w-12 h-12 rounded-lg object-cover border border-subtle" alt={`attachment-${index}`} />
+ <div key={att.id} className="relative group w-12 h-12">
+ <img src={att.preview} className="w-12 h-12 rounded-lg object-cover border border-subtle" alt={`attachment-${index + 1}`} />
  <button
  type="button"
- onClick={() => removeAttachment(index)}
+ onClick={() => removeAttachment(att.id)}
  className="absolute -top-1.5 -right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 shadow-md flex items-center justify-center cursor-pointer border border-white"
  >
  <X className="w-2.5 h-2.5" />
@@ -1276,7 +1273,6 @@ export function ChatPanel({ token, category, user, onUpdateCrochetTerminology }:
  <div className="mb-3 p-3 bg-page border border-subtle rounded-xl flex flex-col items-center gap-3 shrink-0 animate-fadeIn">
  <div className="relative w-full max-w-sm rounded-xl overflow-hidden border border-subtle bg-black aspect-video shadow-inner">
  <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
- <canvas ref={canvasRef} className="hidden" />
  </div>
  <div className="flex gap-2.5">
  <button

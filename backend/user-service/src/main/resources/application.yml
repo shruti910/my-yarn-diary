@@ -1,6 +1,9 @@
 spring:
   profiles:
     active: local
+  threads:
+    virtual:
+      enabled: true
   jpa:
     open-in-view: false
     show-sql: true
@@ -13,6 +16,14 @@ spring:
 internal:
   jwt:
     secret: ${INTERNAL_JWT_SECRET}
+
+crochet-service:
+  url: ${CROCHET_SERVICE_URL:http://crochet-service:8082}
+  delete-user-endpoint: ${CROCHET_SERVICE_DELETE_USER_ENDPOINT:/api/v1/projects/user}
+
+ai-service:
+  url: ${AI_SERVICE_URL:http://ai-service:8083}
+  delete-user-endpoint: ${AI_SERVICE_DELETE_USER_ENDPOINT:/api/v1/chats/user}
 
 ---
 spring:
@@ -32,7 +43,7 @@ logging:
   include-application-name: true
   structured:
     format:
-      console: logstash # Automatically bundles active traceId and spanId fields into every log line
+      console: logstash
 management:
   tracing:
     sampling:
@@ -40,7 +51,10 @@ management:
   endpoints:
     web:
       exposure:
-        include: "health,info,prometheus"
+        include: "health"
+      discovery:
+        enabled: false
   endpoint:
     health:
-      show-details: always
+      show-details: never
+      show-components: never

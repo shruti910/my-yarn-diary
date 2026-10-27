@@ -27,6 +27,8 @@ jobs:
             react_frontend: 'frontend/**'
             infra: |
               - 'docker-compose.yml'
+              - 'docker-compose.prod.yml'
+              - 'Caddyfile'
               - '.github/workflows/**'
 
   # JOB 2: Validate Infrastructure & Docker Composites
@@ -90,6 +92,11 @@ jobs:
         run: |
           cd frontend
           npm ci
+
+      - name: Unit Tests
+        run: |
+          cd frontend
+          npm test
 
       - name: Production Compilation Check
         run: |

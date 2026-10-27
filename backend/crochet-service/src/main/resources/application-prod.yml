@@ -38,11 +38,14 @@ logging:
 management:
   tracing:
     sampling:
-      probability: 1.0 
+      probability: 0.1 # 10% in production; ingest is billed.
   endpoints:
     web:
       exposure:
-        include: "health,info,prometheus"
+        include: "health"
+      discovery:
+        enabled: false
   endpoint:
     health:
-      show-details: always
+      show-details: never
+      show-components: never
