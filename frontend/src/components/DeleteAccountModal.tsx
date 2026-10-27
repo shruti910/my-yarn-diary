@@ -8,10 +8,9 @@ import {
   reauthenticateWithPopup,
   signOut
 } from 'firebase/auth';
-import JSZip from 'jszip';
 import { auth } from '../lib/firebase';
-import { exportProjectToPdf } from '../lib/pdfExport';
-import { Project, User, Category, ProjectStatus } from '../types';
+import { generateAccountArchiveZip } from '../lib/archiveExport';
+import { Project, User, Category } from '../types';
 
 interface DeleteAccountModalProps {
   isOpen: boolean;
@@ -82,64 +81,14 @@ export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({
     setExportProgress('Preparing your projects archive...');
 
     try {
-      const zip = new JSZip();
-      const projectsFolder = zip.folder('Projects');
+      const zipBlob = await generateAccountArchiveZip({
+        projects,
+        categories,
+        currentUser,
+        token,
+        onProgress: setExportProgress
+      });
 
-      // 1. Generate PDF for each project
-      const categoryMap = new Map(categories.map(c => [c.categoryId, c.name]));
-      for (let i = 0; i < projects.length; i++) {
-        const proj = projects[i];
-        setExportProgress(`Exporting PDF ${i + 1} of ${projects.length}: ${proj.title}...`);
-
-        try {
-          const catName = categoryMap.get(proj.categoryId) || 'General';
-          const pdfBytes = await exportProjectToPdf(
-            proj,
-            [],
-            catName,
-            null,
-            undefined,
-            false // do not trigger individual browser download
-          );
-
-          const safeTitle = proj.title.replace(/[^a-zA-Z0-9_\- ]/g, '_').trim() || `Project_${i + 1}`;
-          projectsFolder?.file(`${safeTitle}.pdf`, pdfBytes);
-        } catch (pdfErr) {
-          console.warn(`Failed to export project ${proj.title}:`, pdfErr);
-        }
-      }
-
-      // 2. Add structured account summary
-      setExportProgress('Generating account summary metadata...');
-      const inProgressCount = projects.filter(p => p.status === ProjectStatus.InProgress).length;
-      const completedCount = projects.filter(p => p.status === ProjectStatus.Completed).length;
-      const onHoldCount = projects.filter(p => p.status === ProjectStatus.OnHold).length;
-      const archivedCount = projects.filter(p => p.isArchive).length;
-
-      const summary = {
-        appName: 'My Yarn Diary',
-        exportDate: new Date().toISOString(),
-        account: {
-          userId: currentUser.userId,
-          displayName: currentUser.displayName,
-          email: currentUser.email,
-          crochetTerminology: currentUser.crochetTerminology || 'US',
-          accountCreatedAt: currentUser.createdAt
-        },
-        projectStatistics: {
-          totalProjects: projects.length,
-          inProgress: inProgressCount,
-          completed: completedCount,
-          onHold: onHoldCount,
-          archived: archivedCount
-        }
-      };
-
-      zip.file('account_summary.json', JSON.stringify(summary, null, 2));
-
-      // 3. Trigger download
-      setExportProgress('Compressing archive...');
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
       const downloadUrl = URL.createObjectURL(zipBlob);
       const link = document.createElement('a');
       link.href = downloadUrl;

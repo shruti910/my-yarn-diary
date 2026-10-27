@@ -8,6 +8,146 @@ import { PDFDocument } from 'pdf-lib';
 import { Project, JournalLog, Category, ProjectStatus, Pattern } from '../types';
 import { GrandHotelBase64 } from './GrandHotelBase64';
 
+/**
+ * Detects whether a string contains emojis or complex Pictographic characters.
+ */
+export function containsEmoji(text: string): boolean {
+  if (!text) return false;
+  return /\p{Extended_Pictographic}|\p{Emoji_Presentation}|\p{Emoji}\uFE0F?/u.test(text);
+}
+
+/**
+ * Sanitizes a string for use as a filesystem filename across Windows, macOS, and Linux.
+ * PRESERVES ALL valid Unicode characters, emojis, accents, and international text.
+ * ONLY replaces characters strictly forbidden by operating system filesystems:
+ * < > : " / \ | ? * and ASCII control characters (0x00 - 0x1F).
+ */
+export function sanitizeFilename(name: string): string {
+  if (!name) return 'Project';
+  const cleaned = name
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+    .trim()
+    .replace(/\s+/g, ' ');
+  return cleaned || 'Project';
+}
+
+export interface CanvasTextOptions {
+  fontSizePt: number;
+  textColor?: string;
+  fontWeight?: string;
+  fontFamily?: string;
+  maxWidthMm?: number;
+  lineHeightMultiplier?: number;
+  align?: 'left' | 'center' | 'right';
+}
+
+/**
+ * Renders text containing emojis onto an offscreen canvas with native OS emoji rendering
+ * (Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji) and returns crisp PNG image bytes.
+ * This preserves emojis in full color and prevents WinAnsi Latin-1 encoding corruption (e.g. Ø=ÜR).
+ */
+export function renderTextWithEmojiToDataUrl(
+  text: string,
+  options: CanvasTextOptions
+): { dataUrl: string; widthMm: number; heightMm: number } {
+  const {
+    fontSizePt,
+    textColor = '#242223',
+    fontWeight = 'normal',
+    fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif',
+    maxWidthMm,
+    lineHeightMultiplier = 1.35,
+    align = 'left'
+  } = options;
+
+  // 4x resolution factor for crisp retina-grade rendering in PDF
+  const scale = 4;
+  const ptToPx = fontSizePt * (96 / 72);
+  const fontSizePx = ptToPx * scale;
+  const lineHeightPx = fontSizePx * lineHeightMultiplier;
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    return { dataUrl: '', widthMm: 0, heightMm: 0 };
+  }
+
+  ctx.font = `${fontWeight} ${fontSizePx}px ${fontFamily}`;
+
+  const maxWidthPx = maxWidthMm ? maxWidthMm * (96 / 25.4) * scale : undefined;
+
+  // Split lines by explicit newlines, then wrap lines by words
+  const inputLines = text.split('\n');
+  const wrappedLines: string[] = [];
+
+  for (const rawLine of inputLines) {
+    if (!rawLine) {
+      wrappedLines.push('');
+      continue;
+    }
+    const words = rawLine.split(' ');
+    let currentLine = '';
+
+    for (let i = 0; i < words.length; i++) {
+      const testLine = currentLine ? `${currentLine} ${words[i]}` : words[i];
+      const metrics = ctx.measureText(testLine);
+      if (maxWidthPx && metrics.width > maxWidthPx && currentLine) {
+        wrappedLines.push(currentLine);
+        currentLine = words[i];
+      } else {
+        currentLine = testLine;
+      }
+    }
+    if (currentLine) {
+      wrappedLines.push(currentLine);
+    }
+  }
+
+  // Calculate canvas dimensions
+  let maxLineWidth = 0;
+  for (const line of wrappedLines) {
+    const w = ctx.measureText(line).width;
+    if (w > maxLineWidth) maxLineWidth = w;
+  }
+
+  const paddingPx = 4 * scale;
+  const targetWidthPx = Math.ceil(maxWidthPx ? Math.min(Math.max(maxLineWidth, 10), maxWidthPx) : maxLineWidth) + (paddingPx * 2);
+  const targetHeightPx = Math.ceil(Math.max(wrappedLines.length, 1) * lineHeightPx) + (paddingPx * 2);
+
+  canvas.width = targetWidthPx;
+  canvas.height = targetHeightPx;
+
+  // Clear transparent background and set styles
+  ctx.clearRect(0, 0, targetWidthPx, targetHeightPx);
+  ctx.font = `${fontWeight} ${fontSizePx}px ${fontFamily}`;
+  ctx.fillStyle = textColor;
+  ctx.textBaseline = 'top';
+
+  for (let idx = 0; idx < wrappedLines.length; idx++) {
+    const line = wrappedLines[idx];
+    if (!line) continue;
+    let drawX = paddingPx;
+    if (align === 'center') {
+      const lineW = ctx.measureText(line).width;
+      drawX = (targetWidthPx - lineW) / 2;
+    } else if (align === 'right') {
+      const lineW = ctx.measureText(line).width;
+      drawX = targetWidthPx - lineW - paddingPx;
+    }
+    ctx.fillText(line, drawX, paddingPx + (idx * lineHeightPx));
+  }
+
+  // Convert canvas pixels back to mm for jsPDF dimensions (1 px at 96 DPI = 25.4 / 96 mm)
+  const widthMm = (targetWidthPx / scale) * (25.4 / 96);
+  const heightMm = (targetHeightPx / scale) * (25.4 / 96);
+
+  return {
+    dataUrl: canvas.toDataURL('image/png'),
+    widthMm,
+    heightMm
+  };
+}
+
 interface ImageCache {
  [url: string]: { width: number; height: number };
 }
@@ -145,11 +285,24 @@ function drawHeaderAndFooter(
   doc.text('CRAFTER COMPANION', textX, 18);
 
   // Right-aligned Project Title running text
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  doc.setTextColor('#813B4C');
-  const truncatedTitle = projectTitle.length > 35 ? projectTitle.substring(0, 32) + '...' : projectTitle;
-  doc.text(truncatedTitle, 190, 14, { align: 'right' });
+  const safeProjectTitle = projectTitle || '';
+  if (containsEmoji(safeProjectTitle)) {
+    const truncatedTitle = safeProjectTitle.length > 35 ? safeProjectTitle.substring(0, 32) + '...' : safeProjectTitle;
+    const rendered = renderTextWithEmojiToDataUrl(truncatedTitle, {
+      fontSizePt: 8.5,
+      textColor: '#813B4C',
+      fontWeight: 'normal',
+      align: 'right',
+      maxWidthMm: 70
+    });
+    doc.addImage(rendered.dataUrl, 'PNG', 190 - rendered.widthMm, 10.5, rendered.widthMm, rendered.heightMm);
+  } else {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor('#813B4C');
+    const truncatedTitle = safeProjectTitle.length > 35 ? safeProjectTitle.substring(0, 32) + '...' : safeProjectTitle;
+    doc.text(truncatedTitle, 190, 14, { align: 'right' });
+  }
 
   // Header Divider
   doc.setDrawColor('#BABABA');
@@ -287,16 +440,27 @@ export async function exportProjectToPdf(
  // ==========================================
  // 1. PROJECT HEADER TITLE & METADATA CARD
  // ==========================================
- const titleLines = doc.splitTextToSize(project.title.toUpperCase(), ctx.usableWidth);
- const titleHeight = titleLines.length * 6;
- ctx.ensureSpace(titleHeight + 35); // Title height + space for metadata card
-
- // Write Title
- doc.setFont('helvetica', 'bold');
- doc.setFontSize(16);
- doc.setTextColor('#242223');
- doc.text(titleLines, ctx.marginLeft, ctx.currentY + 5);
- ctx.currentY += titleHeight + 3;
+ const rawTitle = project.title || 'UNTITLED PROJECT';
+ if (containsEmoji(rawTitle)) {
+   const rendered = renderTextWithEmojiToDataUrl(rawTitle, {
+     fontSizePt: 16,
+     fontWeight: 'bold',
+     textColor: '#242223',
+     maxWidthMm: ctx.usableWidth
+   });
+   ctx.ensureSpace(rendered.heightMm + 35);
+   doc.addImage(rendered.dataUrl, 'PNG', ctx.marginLeft, ctx.currentY + 2, rendered.widthMm, rendered.heightMm);
+   ctx.currentY += rendered.heightMm + 3;
+ } else {
+   const titleLines = doc.splitTextToSize(rawTitle.toUpperCase(), ctx.usableWidth);
+   const titleHeight = titleLines.length * 6;
+   ctx.ensureSpace(titleHeight + 35);
+   doc.setFont('helvetica', 'bold');
+   doc.setFontSize(16);
+   doc.setTextColor('#242223');
+   doc.text(titleLines, ctx.marginLeft, ctx.currentY + 5);
+   ctx.currentY += titleHeight + 3;
+ }
 
  // Metadata Panel card
  const panelH = 26;
@@ -538,59 +702,111 @@ export async function exportProjectToPdf(
 
  // Render Notes
  if (project.notes) {
- const notesLines = doc.splitTextToSize(project.notes, ctx.usableWidth - 6);
- const notesHeight = notesLines.length * 4.2 + 8;
- ctx.ensureSpace(notesHeight + 5);
+   if (containsEmoji(project.notes)) {
+     const rendered = renderTextWithEmojiToDataUrl(project.notes, {
+       fontSizePt: 8.5,
+       textColor: '#242223',
+       maxWidthMm: ctx.usableWidth - 8
+     });
+     const notesHeight = rendered.heightMm + 10;
+     ctx.ensureSpace(notesHeight + 5);
 
- // Draw custom container mimicking a notebook block
- doc.setFillColor('#FFFFFF');
- doc.rect(ctx.marginLeft, ctx.currentY, ctx.usableWidth, notesHeight, 'F');
- doc.setDrawColor('#BABABA');
- doc.rect(ctx.marginLeft, ctx.currentY, ctx.usableWidth, notesHeight, 'S');
+     doc.setFillColor('#FFFFFF');
+     doc.rect(ctx.marginLeft, ctx.currentY, ctx.usableWidth, notesHeight, 'F');
+     doc.setDrawColor('#BABABA');
+     doc.rect(ctx.marginLeft, ctx.currentY, ctx.usableWidth, notesHeight, 'S');
 
- // Accent colored note border (Left edge highlight)
- doc.setFillColor('#D4738B');
- doc.rect(ctx.marginLeft, ctx.currentY, 1.2, notesHeight, 'F');
+     doc.setFillColor('#D4738B');
+     doc.rect(ctx.marginLeft, ctx.currentY, 1.2, notesHeight, 'F');
 
- doc.setFont('helvetica', 'bold');
- doc.setFontSize(8.5);
- doc.setTextColor('#D4738B');
- doc.text('NOTES:', ctx.marginLeft + 4, ctx.currentY + 4.8);
+     doc.setFont('helvetica', 'bold');
+     doc.setFontSize(8.5);
+     doc.setTextColor('#D4738B');
+     doc.text('NOTES:', ctx.marginLeft + 4, ctx.currentY + 4.8);
 
- doc.setFont('helvetica', 'normal');
- doc.setFontSize(8.5);
- doc.setTextColor('#242223');
- doc.text(notesLines, ctx.marginLeft + 4, ctx.currentY + 9.5);
+     doc.addImage(rendered.dataUrl, 'PNG', ctx.marginLeft + 4, ctx.currentY + 6.5, rendered.widthMm, rendered.heightMm);
+     ctx.currentY += notesHeight + 5;
+   } else {
+     const notesLines = doc.splitTextToSize(project.notes, ctx.usableWidth - 6);
+     const notesHeight = notesLines.length * 4.2 + 8;
+     ctx.ensureSpace(notesHeight + 5);
 
- ctx.currentY += notesHeight + 5;
+     // Draw custom container mimicking a notebook block
+     doc.setFillColor('#FFFFFF');
+     doc.rect(ctx.marginLeft, ctx.currentY, ctx.usableWidth, notesHeight, 'F');
+     doc.setDrawColor('#BABABA');
+     doc.rect(ctx.marginLeft, ctx.currentY, ctx.usableWidth, notesHeight, 'S');
+
+     // Accent colored note border (Left edge highlight)
+     doc.setFillColor('#D4738B');
+     doc.rect(ctx.marginLeft, ctx.currentY, 1.2, notesHeight, 'F');
+
+     doc.setFont('helvetica', 'bold');
+     doc.setFontSize(8.5);
+     doc.setTextColor('#D4738B');
+     doc.text('NOTES:', ctx.marginLeft + 4, ctx.currentY + 4.8);
+
+     doc.setFont('helvetica', 'normal');
+     doc.setFontSize(8.5);
+     doc.setTextColor('#242223');
+     doc.text(notesLines, ctx.marginLeft + 4, ctx.currentY + 9.5);
+
+     ctx.currentY += notesHeight + 5;
+   }
  }
 
  // Render Care Instructions
  if (project.careInstructions) {
- const careLines = doc.splitTextToSize(project.careInstructions, ctx.usableWidth - 6);
- const careHeight = careLines.length * 4.2 + 8;
- ctx.ensureSpace(careHeight + 5);
+   if (containsEmoji(project.careInstructions)) {
+     const rendered = renderTextWithEmojiToDataUrl(project.careInstructions, {
+       fontSizePt: 8.5,
+       textColor: '#242223',
+       maxWidthMm: ctx.usableWidth - 8
+     });
+     const careHeight = rendered.heightMm + 10;
+     ctx.ensureSpace(careHeight + 5);
 
- doc.setFillColor('#FFFFFF');
- doc.rect(ctx.marginLeft, ctx.currentY, ctx.usableWidth, careHeight, 'F');
- doc.setDrawColor('#BABABA');
- doc.rect(ctx.marginLeft, ctx.currentY, ctx.usableWidth, careHeight, 'S');
+     doc.setFillColor('#FFFFFF');
+     doc.rect(ctx.marginLeft, ctx.currentY, ctx.usableWidth, careHeight, 'F');
+     doc.setDrawColor('#BABABA');
+     doc.rect(ctx.marginLeft, ctx.currentY, ctx.usableWidth, careHeight, 'S');
 
- // Accent border for care instructions
- doc.setFillColor('#813B4C');
- doc.rect(ctx.marginLeft, ctx.currentY, 1.2, careHeight, 'F');
+     doc.setFillColor('#813B4C');
+     doc.rect(ctx.marginLeft, ctx.currentY, 1.2, careHeight, 'F');
 
- doc.setFont('helvetica', 'bold');
- doc.setFontSize(8.5);
- doc.setTextColor('#813B4C');
- doc.text('CARE INSTRUCTIONS:', ctx.marginLeft + 4, ctx.currentY + 4.8);
+     doc.setFont('helvetica', 'bold');
+     doc.setFontSize(8.5);
+     doc.setTextColor('#813B4C');
+     doc.text('CARE INSTRUCTIONS:', ctx.marginLeft + 4, ctx.currentY + 4.8);
 
- doc.setFont('helvetica', 'normal');
- doc.setFontSize(8.5);
- doc.setTextColor('#242223');
- doc.text(careLines, ctx.marginLeft + 4, ctx.currentY + 9.5);
+     doc.addImage(rendered.dataUrl, 'PNG', ctx.marginLeft + 4, ctx.currentY + 6.5, rendered.widthMm, rendered.heightMm);
+     ctx.currentY += careHeight + 5;
+   } else {
+     const careLines = doc.splitTextToSize(project.careInstructions, ctx.usableWidth - 6);
+     const careHeight = careLines.length * 4.2 + 8;
+     ctx.ensureSpace(careHeight + 5);
 
- ctx.currentY += careHeight + 5;
+     doc.setFillColor('#FFFFFF');
+     doc.rect(ctx.marginLeft, ctx.currentY, ctx.usableWidth, careHeight, 'F');
+     doc.setDrawColor('#BABABA');
+     doc.rect(ctx.marginLeft, ctx.currentY, ctx.usableWidth, careHeight, 'S');
+
+     // Accent border for care instructions
+     doc.setFillColor('#813B4C');
+     doc.rect(ctx.marginLeft, ctx.currentY, 1.2, careHeight, 'F');
+
+     doc.setFont('helvetica', 'bold');
+     doc.setFontSize(8.5);
+     doc.setTextColor('#813B4C');
+     doc.text('CARE INSTRUCTIONS:', ctx.marginLeft + 4, ctx.currentY + 4.8);
+
+     doc.setFont('helvetica', 'normal');
+     doc.setFontSize(8.5);
+     doc.setTextColor('#242223');
+     doc.text(careLines, ctx.marginLeft + 4, ctx.currentY + 9.5);
+
+     ctx.currentY += careHeight + 5;
+   }
  }
  }
 
@@ -783,10 +999,25 @@ export async function exportProjectToPdf(
  }) : '—';
 
  // Parse log entry text lines
- doc.setFont('helvetica', 'normal');
- doc.setFontSize(8.5);
- const logLines = doc.splitTextToSize(log.textEntry || '', contentW);
- const textH = logLines.length * 3.8;
+ const rawLogText = log.textEntry || '';
+ const isEmojiLog = containsEmoji(rawLogText);
+ let renderedLog: { dataUrl: string; widthMm: number; heightMm: number } | null = null;
+ let textH = 0;
+ let logLines: string[] = [];
+
+ if (isEmojiLog) {
+   renderedLog = renderTextWithEmojiToDataUrl(rawLogText, {
+     fontSizePt: 8.5,
+     textColor: '#242223',
+     maxWidthMm: contentW
+   });
+   textH = renderedLog.heightMm;
+ } else {
+   doc.setFont('helvetica', 'normal');
+   doc.setFontSize(8.5);
+   logLines = doc.splitTextToSize(rawLogText, contentW);
+   textH = logLines.length * 3.8;
+ }
 
  // Calculate photo attachment dimensions
  let photoH = 0;
@@ -852,10 +1083,14 @@ export async function exportProjectToPdf(
  }
 
  // 5. Journal text body
- doc.setFont('helvetica', 'normal');
- doc.setFontSize(8.5);
- doc.setTextColor('#242223');
- doc.text(logLines, contentX, itemStartY + 4.5);
+ if (isEmojiLog && renderedLog) {
+   doc.addImage(renderedLog.dataUrl, 'PNG', contentX, itemStartY + 4.5, renderedLog.widthMm, renderedLog.heightMm);
+ } else {
+   doc.setFont('helvetica', 'normal');
+   doc.setFontSize(8.5);
+   doc.setTextColor('#242223');
+   doc.text(logLines, contentX, itemStartY + 4.5);
+ }
 
  // 6. Log photo attachment
  if (hasPhoto && log.imageBase64) {
@@ -881,7 +1116,7 @@ export async function exportProjectToPdf(
  }
 
  // Save/Merge the document
- const cleanProjectName = project.title.replace(/[^a-zA-Z0-9]/g, '');
+ const cleanProjectName = sanitizeFilename(project.title);
  const fileName = `${cleanProjectName}_MyYarnDiary.pdf`;
 
  if (pdfPatterns.length > 0) {

@@ -23,15 +23,24 @@ export const auth = getAuth(app);
 
 // Initialize Firebase App Check with reCAPTCHA Enterprise
 const appCheckKey = import.meta.env.VITE_FIREBASE_APPCHECK_KEY;
-if (typeof window !== 'undefined' && appCheckKey) {
-  if (import.meta.env.DEV) {
-    (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+const isDev = import.meta.env.DEV;
+const configuredDebugToken = import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN;
+
+// In local development, only initialize App Check if a debug token has been configured or dev mode is explicitly requested.
+// This avoids repeated 403 "App attestation failed" errors when a locally generated debug token is not yet registered in Firebase Console.
+if (typeof window !== 'undefined' && appCheckKey && (!isDev || configuredDebugToken || import.meta.env.VITE_ENABLE_DEV_APPCHECK === 'true')) {
+  if (isDev) {
+    (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = configuredDebugToken || true;
   }
 
-  initializeAppCheck(app, {
-    provider: new ReCaptchaEnterpriseProvider(appCheckKey),
-    isTokenAutoRefreshEnabled: true
-  });
+  try {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaEnterpriseProvider(appCheckKey),
+      isTokenAutoRefreshEnabled: !isDev
+    });
+  } catch (appCheckErr) {
+    console.warn('Firebase App Check initialization warning:', appCheckErr);
+  }
 }
 
 // The default web persistence stack can fall back to in-memory/session storage,

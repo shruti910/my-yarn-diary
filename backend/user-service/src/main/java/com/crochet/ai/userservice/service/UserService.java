@@ -142,7 +142,7 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponse updateProfile(String userId, UserSignUpRequest updateRequest) {
+    public UserResponse updateProfile(String userId, UserProfileUpdateRequest updateRequest) {
         UUID uuid = UUID.fromString(userId);
         User user = userRepository.findByUserId(uuid)
                 .orElseThrow(() -> new ResourceNotFoundException("User profile not found with ID: " + userId));

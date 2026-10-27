@@ -49,7 +49,7 @@ public class UserController {
     public ResponseEntity<UserResponse> updateProfile(
             @RequestHeader("X-User-Id") String authenticatedUserId,
             @PathVariable("id") String userId,
-            @RequestBody @jakarta.validation.Valid UserSignUpRequest request) {
+            @RequestBody @jakarta.validation.Valid UserProfileUpdateRequest request) {
         log.info("Updating profile details for userId: {} (authenticated: {})", userId, authenticatedUserId);
         validateUserOwnership(authenticatedUserId, userId);
         return ResponseEntity.ok(userService.updateProfile(userId, request));

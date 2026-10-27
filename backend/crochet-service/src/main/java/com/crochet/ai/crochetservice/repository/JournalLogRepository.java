@@ -15,6 +15,7 @@ public interface JournalLogRepository extends JpaRepository<JournalLog, Long> {
     List<JournalLog> findByProjectId(UUID projectId);
     List<JournalLog> findByUserId(UUID userId);
     void deleteByProjectId(UUID projectId);
+    void deleteByUserId(UUID userId);
     Page<JournalLog> findByUserIdAndProjectId(UUID userId, UUID projectId, Pageable pageable);
     Page<JournalLog> findByUserId(UUID userId, Pageable pageable);
 }

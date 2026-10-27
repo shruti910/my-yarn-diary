@@ -471,11 +471,12 @@ public class CrochetService {
     @Transactional
     public void deleteAllUserData(String userId) {
         UUID userUuid = UUID.fromString(userId);
-        log.warn("Purging all projects and categories for user: {}", userId);
+        log.warn("Purging all projects, journal logs, and categories for user: {}", userId);
+        journalLogRepository.deleteByUserId(userUuid);
         List<Project> projects = projectRepository.findByUserId(userUuid);
         if (projects != null && !projects.isEmpty()) {
             projectRepository.deleteAll(projects);
-            log.info("Successfully deleted {} projects for user: {}", projects.size(), userId);
+            log.info("Successfully deleted {} projects and all associated logs for user: {}", projects.size(), userId);
         }
         List<Category> categories = categoryRepository.findByUserId(userUuid);
         if (categories != null && !categories.isEmpty()) {

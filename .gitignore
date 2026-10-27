@@ -54,6 +54,7 @@ ai_db_data/
 *.iws
 *.iml
 *.ipr
+.claude/settings.json
 
 # Visual Studio Code
 .vscode/
@@ -69,3 +70,7 @@ Thumbs.db
 docker-compose.override.yml
 deploy.sh
 RECREATION_PLAYBOOK.md
+security_remediation_plan.md
+
+GEMINI.md
+.agent/rules/coding-standards.md
