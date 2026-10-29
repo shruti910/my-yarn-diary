@@ -5,14 +5,11 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
-import org.hibernate.annotations.SoftDelete;
-import org.hibernate.annotations.SoftDeleteType;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
 @Table(name = "users")
-@SoftDelete(columnName = "is_active", strategy = SoftDeleteType.ACTIVE)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -42,13 +39,20 @@ public class User {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "membership_status", nullable = false, length = 30)
-    private MembershipStatus membershipStatus; // FREE, GOLDEN_HOOK, PLATINUM_YARN
+    @Builder.Default
+    private MembershipStatus membershipStatus = MembershipStatus.FREE;
 
     @Column(name = "membership_active", nullable = false)
-    private boolean membershipActive;
+    @Builder.Default
+    private boolean membershipActive = false;
 
     @Column(name = "crochet_terminology", nullable = false, length = 10)
-    private String crochetTerminology;
+    @Builder.Default
+    private String crochetTerminology = "US";
+
+    @Column(name = "is_active", nullable = false)
+    @Builder.Default
+    private boolean active = true;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

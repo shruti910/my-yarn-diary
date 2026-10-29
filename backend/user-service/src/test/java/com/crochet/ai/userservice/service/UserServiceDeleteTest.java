@@ -20,6 +20,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
@@ -68,7 +69,7 @@ class UserServiceDeleteTest {
     @Test
     @DisplayName("TC-18.4: Downstream crochet-service failure aborts with ConflictException and prevents user deletion")
     void shouldAbortAndNotDeleteWhenCrochetServiceFails() {
-        when(userRepository.findByUserId(testUserId)).thenReturn(Optional.of(testUser));
+        when(userRepository.findByUserIdAndActiveTrue(testUserId)).thenReturn(Optional.of(testUser));
         when(tokenProvider.createToken(anyString(), anyString(), anyString())).thenReturn("mock-token");
 
         // Simulate crochet-service down / network error
@@ -85,7 +86,9 @@ class UserServiceDeleteTest {
 
         assertTrue(ex.getMessage().contains("Storage service is temporarily unavailable"));
 
-        // Crucial invariant: Ensure userRepository.delete was NEVER invoked
+        // Crucial invariant: Ensure user was NEVER deactivated/saved
+        verify(userRepository, never()).save(any(User.class));
+        verify(userRepository, never()).save(any(User.class));
         verify(userRepository, never()).delete(any());
         // Ensure auditLog was NOT marked successful prematurely
         verify(auditLogRepository, never()).save(any(AuditLog.class));
@@ -94,7 +97,7 @@ class UserServiceDeleteTest {
     @Test
     @DisplayName("TC-18.4b: Downstream ai-service failure aborts with ConflictException and prevents user deletion")
     void shouldAbortAndNotDeleteWhenAiServiceFails() {
-        when(userRepository.findByUserId(testUserId)).thenReturn(Optional.of(testUser));
+        when(userRepository.findByUserIdAndActiveTrue(testUserId)).thenReturn(Optional.of(testUser));
         when(tokenProvider.createToken(anyString(), anyString(), anyString())).thenReturn("mock-token");
 
         // Crochet succeeds, but ai-service fails
@@ -118,13 +121,14 @@ class UserServiceDeleteTest {
 
         assertTrue(ex.getMessage().contains("AI service is temporarily unavailable"));
 
+        verify(userRepository, never()).save(any(User.class));
         verify(userRepository, never()).delete(any());
     }
 
     @Test
     @DisplayName("TC-18.5: When all services are healthy, cascading delete proceeds and deletes user record")
     void shouldCompleteCascadeDeletionWhenAllServicesHealthy() {
-        when(userRepository.findByUserId(testUserId)).thenReturn(Optional.of(testUser));
+        when(userRepository.findByUserIdAndActiveTrue(testUserId)).thenReturn(Optional.of(testUser));
         when(tokenProvider.createToken(anyString(), anyString(), anyString())).thenReturn("mock-token");
 
         when(restTemplate.exchange(
@@ -146,7 +150,8 @@ class UserServiceDeleteTest {
 
         // Verify audit log recorded
         verify(auditLogRepository, times(1)).save(any(AuditLog.class));
-        // Verify user deleted from database
-        verify(userRepository, times(1)).delete(testUser);
+        // Verify user soft deleted (deactivated) in database
+        verify(userRepository, times(1)).save(testUser);
+        assertFalse(testUser.isActive());
     }
 }

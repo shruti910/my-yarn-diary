@@ -316,8 +316,8 @@ export function Sidebar({
 
         setIsDeactivating(true);
         try {
-            const response = await fetch(`/api/v1/users/${currentUser?.userId}`, {
-                method: 'DELETE',
+            const response = await fetch(`/api/v1/users/${currentUser?.userId}/deactivate`, {
+                method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }

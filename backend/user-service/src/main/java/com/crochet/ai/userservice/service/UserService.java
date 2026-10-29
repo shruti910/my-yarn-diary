@@ -72,17 +72,39 @@ public class UserService {
             throw new BadRequestException("Invalid User ID format: " + userIdStr);
         }
 
-        // Reactivate the user if they are deactivated.
-        if (userRepository.existsByUserIdIncludeDeactivated(userId)) {
-            userRepository.reactivateUser(userId);
-        } else if (email != null && !email.isBlank() && userRepository.existsByEmailIncludeDeactivated(email)) {
-            userRepository.reactivateUserByEmail(email);
+        Optional<User> existingUserOpt = userRepository.findByUserId(userId);
+        if (existingUserOpt.isEmpty() && email != null && !email.isBlank()) {
+            existingUserOpt = userRepository.findByEmail(email);
+            if (existingUserOpt.isPresent()) {
+                existingUserOpt.get().setUserId(userId);
+            }
         }
 
-        Optional<User> existingUserOpt = userRepository.findByUserId(userId);
         if (existingUserOpt.isPresent()) {
             User user = existingUserOpt.get();
             boolean modified = false;
+
+            // Explicitly verify active state: reactivate soft-deleted user on authenticated sync
+            if (!user.isActive()) {
+                user.setActive(true);
+                modified = true;
+                log.info("Reactivated soft-deleted account for user: {}", userId);
+                try {
+                    AuditLog auditLog = AuditLog.builder()
+                            .userId(user.getUserId())
+                            .action(AuditAction.ACCOUNT_REACTIVATED.name())
+                            .resourceType(ResourceType.USER.name())
+                            .resourceId(user.getUserId().toString())
+                            .status("SUCCESS")
+                            .details("{\"reason\":\"User reactivated via login sync\",\"email\":\"" + user.getEmail() + "\"}")
+                            .timestamp(java.time.LocalDateTime.now())
+                            .build();
+                    auditLogRepository.save(auditLog);
+                } catch (Exception e) {
+                    log.error("Failed to write audit log for user reactivation: {}", e.getMessage());
+                }
+            }
+
             if (displayName != null && !displayName.isBlank() && !displayName.equals(user.getDisplayName())) {
                 user.setDisplayName(displayName);
                 modified = true;
@@ -91,7 +113,7 @@ public class UserService {
                     && !profilePicture.equals(user.getProfilePicture())) {
                 user.setProfilePicture(profilePicture);
                 modified = true;
-                    }
+            }
             if (email != null && !email.isBlank() && !email.equals(user.getEmail())) {
                 user.setEmail(email);
                 modified = true;
@@ -100,23 +122,6 @@ public class UserService {
                 user = userRepository.save(user);
             }
             return mapToResponse(user);
-        }
-
-        // If not found by userId, check if email matches to link accounts
-        if (email != null && !email.isBlank()) {
-            Optional<User> existingEmailOpt = userRepository.findByEmail(email);
-            if (existingEmailOpt.isPresent()) {
-                User user = existingEmailOpt.get();
-                user.setUserId(userId);
-                if (displayName != null && !displayName.isBlank()) {
-                    user.setDisplayName(displayName);
-                }
-                if (profilePicture != null && !profilePicture.isBlank()) {
-                    user.setProfilePicture(profilePicture);
-                }
-                user = userRepository.save(user);
-                return mapToResponse(user);
-            }
         }
 
         // Otherwise create new user
@@ -136,7 +141,7 @@ public class UserService {
 
     public UserResponse getProfile(String userId) {
         UUID uuid = UUID.fromString(userId);
-        User user = userRepository.findByUserId(uuid)
+        User user = userRepository.findByUserIdAndActiveTrue(uuid)
                 .orElseThrow(() -> new ResourceNotFoundException("User profile not found with ID: " + userId));
         return mapToResponse(user);
     }
@@ -144,7 +149,7 @@ public class UserService {
     @Transactional
     public UserResponse updateProfile(String userId, UserProfileUpdateRequest updateRequest) {
         UUID uuid = UUID.fromString(userId);
-        User user = userRepository.findByUserId(uuid)
+        User user = userRepository.findByUserIdAndActiveTrue(uuid)
                 .orElseThrow(() -> new ResourceNotFoundException("User profile not found with ID: " + userId));
 
         if (updateRequest.getDisplayName() != null) {
@@ -191,7 +196,7 @@ public class UserService {
     @Transactional
     public UserResponse updateMembership(String userId, MembershipUpdateRequest request) {
         UUID uuid = UUID.fromString(userId);
-        User user = userRepository.findByUserId(uuid)
+        User user = userRepository.findByUserIdAndActiveTrue(uuid)
                 .orElseThrow(() -> new ResourceNotFoundException("User profile not found with ID: " + userId));
 
         user.setMembershipStatus(request.getMembershipStatus());
@@ -202,9 +207,36 @@ public class UserService {
     }
 
     @Transactional
+    public void deactivateUser(String userId) {
+        UUID uuid = UUID.fromString(userId);
+        User user = userRepository.findByUserIdAndActiveTrue(uuid)
+                .orElseThrow(() -> new ResourceNotFoundException("User profile not found with ID: " + userId));
+
+        user.setActive(false);
+        userRepository.save(user);
+        log.info("Deactivated user account for user: {}", userId);
+
+        try {
+            AuditLog auditLog = AuditLog.builder()
+                    .userId(uuid)
+                    .action(AuditAction.ACCOUNT_DEACTIVATED.name())
+                    .resourceType(ResourceType.USER.name())
+                    .resourceId(userId)
+                    .status("SUCCESS")
+                    .details("{\"reason\":\"User requested self-deactivation\",\"email\":\"" + user.getEmail() + "\"}")
+                    .timestamp(java.time.LocalDateTime.now())
+                    .build();
+            auditLogRepository.save(auditLog);
+            log.info("Recorded ACCOUNT_DEACTIVATED in audit_logs for user: {}", userId);
+        } catch (Exception e) {
+            log.error("Failed to write audit log for user deactivation: {}", e.getMessage());
+        }
+    }
+
+    @Transactional
     public void deleteUser(String userId, String firebaseUid, String authTimeStr) {
         UUID uuid = UUID.fromString(userId);
-        User user = userRepository.findByUserId(uuid)
+        User user = userRepository.findByUserIdAndActiveTrue(uuid)
                 .orElseThrow(() -> new ResourceNotFoundException("User profile not found with ID: " + userId));
 
         // Generate HMAC internal handoff token to securely invoke other microservices
@@ -251,9 +283,10 @@ public class UserService {
             log.error("Failed to write audit log for user deletion: {}", e.getMessage());
         }
 
-        // 4. Delete user record from database
-        userRepository.delete(user);
-        log.info("Deleted user row from PostgreSQL for user: {}", userId);
+        // 4. Soft delete user record from database
+        user.setActive(false);
+        userRepository.save(user);
+        log.info("Soft deleted user row in database for user: {}", userId);
 
         // 5. Delete user from Firebase Auth via Admin SDK if firebaseUid provided
         if (firebaseUid != null && !firebaseUid.isBlank()) {

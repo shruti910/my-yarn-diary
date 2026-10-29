@@ -66,6 +66,16 @@ public class UserController {
         return ResponseEntity.ok(userService.updateMembership(userId, request));
     }
 
+    @PostMapping("/{id}/deactivate")
+    public ResponseEntity<Void> deactivateUser(
+            @RequestHeader("X-User-Id") String authenticatedUserId,
+            @PathVariable("id") String userId) {
+        log.warn("Deactivating user account for userId: {} (authenticated: {})", userId, authenticatedUserId);
+        validateUserOwnership(authenticatedUserId, userId);
+        userService.deactivateUser(userId);
+        return ResponseEntity.noContent().build();
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(
             @RequestHeader("X-User-Id") String authenticatedUserId,

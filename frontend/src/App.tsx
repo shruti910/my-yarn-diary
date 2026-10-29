@@ -210,8 +210,20 @@ export default function App() {
 
   // Landing page → auth flow: unauthenticated visitors see the landing page first;
   // Sign in / Sign up flip to the AuthScreen (in the matching mode).
-  const [showAuth, setShowAuth] = useState(false);
-  const [authIsLogin, setAuthIsLogin] = useState(true);
+  const [showAuth, setShowAuth] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      return p.get('auth') === 'login' || p.get('auth') === 'signup';
+    }
+    return false;
+  });
+  const [authIsLogin, setAuthIsLogin] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get('auth') === 'signup') return false;
+    }
+    return true;
+  });
   const [activeTab, setActiveTab] = useState<'dashboard' | 'aitools' | 'gallery'>('dashboard');
   const [aiToolsInitialTab, setAiToolsInitialTab] = useState<ChatCategory>('crochet-buddy');
   const [isFloatingBuddyDismissed, setIsFloatingBuddyDismissed] = useState<boolean>(() => {
